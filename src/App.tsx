@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ProveedorAuth } from './lib/auth'
 import { hayConfiguracion } from './lib/supabase'
@@ -9,9 +9,16 @@ import { Aviso } from './components/ui'
 /**
  * SITUR — Enrutado.
  *
- * La primera superficie: el acceso del operador. Todo lo demás entra
- * después.
+ * El panel del operador, con sus cinco pantallas. El panel se carga bajo
+ * demanda: el ciudadano entra por el móvil, a veces con mala conexión, y
+ * no tiene por qué descargar la consola de administración.
  */
+const Consola = lazy(() => import('./admin/Consola'))
+const GestionUsuarios = lazy(() => import('./admin/GestionUsuarios'))
+const Catalogos = lazy(() => import('./admin/Catalogos'))
+const Historial = lazy(() => import('./admin/Historial'))
+const Estadisticas = lazy(() => import('./admin/Estadisticas'))
+
 export default function App() {
   const { pathname } = useLocation()
   useTitulo(tituloDeRuta(pathname))
@@ -39,7 +46,14 @@ export default function App() {
       <Suspense fallback={<Cargando />}>
         <Routes>
           <Route path="/" element={<Navigate to="/admin" replace />} />
+
           <Route path="/admin" element={<Entrar />} />
+          <Route path="/admin/turnos" element={<Consola />} />
+          <Route path="/admin/usuarios" element={<GestionUsuarios />} />
+          <Route path="/admin/catalogos" element={<Catalogos />} />
+          <Route path="/admin/historial" element={<Historial />} />
+          <Route path="/admin/estadisticas" element={<Estadisticas />} />
+
           <Route path="*" element={<NoEncontrado />} />
         </Routes>
       </Suspense>
@@ -75,6 +89,16 @@ function tituloDeRuta(ruta: string): string | null {
   switch (ruta) {
     case '/admin':
       return 'Acceso'
+    case '/admin/turnos':
+      return 'Turnos'
+    case '/admin/usuarios':
+      return 'Usuarios'
+    case '/admin/catalogos':
+      return 'Catálogos'
+    case '/admin/historial':
+      return 'Historial'
+    case '/admin/estadisticas':
+      return 'Estadísticas'
     default:
       return null
   }
