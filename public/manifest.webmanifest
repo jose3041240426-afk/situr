@@ -1,0 +1,14 @@
+{
+  "name": "SITUR — Turnos de la Dirección de Catastro",
+  "short_name": "SITUR",
+  "description": "Consulte su turno con el código QR, sin cuenta ni datos personales.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f5f9",
+  "theme_color": "#1f3049",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "situr",
+  "private": true,
+  "version": "1.5.0",
+  "type": "module",
+  "description": "SITUR — Sistema Web de Gestión y Seguimiento de Turnos (Dirección de Catastro, Durango)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "tsc -b --noEmit",
+    "alto-impacto": "node pruebas/alto-impacto.mjs",
+    "secretos": "node scripts/generar-secretos.mjs",
+    "enlace": "node scripts/enlace-local.mjs",
+    "arrancar": "node scripts/arrancar.mjs",
+    "desplegar": "bash scripts/desplegar.sh"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "axe-core": "^4.14.0",
+    "next": "^16.4.2",
+    "playwright-core": "^1.64.1",
+    "qrcode": "^1.5.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

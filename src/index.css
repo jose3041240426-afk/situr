@@ -1,0 +1,231 @@
+@import 'tailwindcss';
+
+/*
+ * SITUR — Sistema Web de Gestión y Seguimiento de Turnos
+ * Dirección de Catastro, Durango.
+ *
+ * Paleta institucional: azul oscuro de gobierno (el mismo #2F4A6D del DRS),
+ * fondo claro para la lectura de listas largas y acentos solo donde hay que
+ * llamar la atención (un turno que se acerca, un error).
+ */
+
+@theme {
+  --color-institucional-50: #f2f5f9;
+  --color-institucional-100: #e3eaf3;
+  --color-institucional-200: #c3d2e6;
+  /*
+   * Rampa de TEXTO sobre fondo claro. Los pasos 300, 400 y 500 son los que
+   * se usan como texto secundario: los tres pasan 4.5:1 sobre #f2f5f9 y sobre
+   * blanco (WCAG 1.4.3, nivel AA). Comprobado con calculo de contraste, no
+   * a ojo: 300 -> 5.04, 400 -> 5.55, 500 -> 8.27.
+   *
+   * Sobre fondo OSCURO (barra lateral, login, pantalla publica) el texto usa
+   * los pasos 100 y 200, no estos: #c3d2e6 da 8.67 sobre la barra y 10.24
+   * sobre la pantalla.
+   */
+  --color-institucional-300: #4a6a99;
+  --color-institucional-400: #3f639a;
+  --color-institucional-500: #2f4a6d;
+  --color-institucional-600: #263c59;
+  --color-institucional-700: #1f3049;
+  --color-institucional-800: #16233a;
+  --color-institucional-900: #0f1929;
+
+  /*
+   * Colores de estado. Los que se usan de FONDO con texto blanco
+   * (boton-ok, boton-peligro) estan oscurecidos hasta pasar 4.5:1 con
+   * blanco: el verde de #10b981 se quedaba en 2.54 y no se leia
+   * (WCAG 1.4.3). Los tonos claros se reservan para texto sobre fondo
+   * blanco o para bordes.
+   */
+  --color-ok-50: #ecfdf5;
+  --color-ok-500: #047857;
+  --color-ok-700: #065f46;
+
+  --color-alerta-50: #fffbeb;
+  --color-alerta-500: #b45309;
+  --color-alerta-700: #92400e;
+
+  --color-peligro-50: #fef2f2;
+  --color-peligro-500: #dc2626;
+  --color-peligro-700: #991b1b;
+
+  /*
+   * Tipografia: PILA DEL SISTEMA, deliberadamente.
+   *
+   * Se declara una pila del sistema y no una fuente web a proposito. Cargar
+   * Inter desde Google Fonts meteria al proveedor de la fuente en la peticion
+   * de cada ciudadano: una transferencia a un tercero con la direccion IP del
+   * ciudadano, en un sistema cuyo argumento de proteccion de datos es
+   * precisamente no recogerlos (ver PROTECCION-DATOS.md). Una pila del sistema
+   * no pide nada a nadie y funciona sin conexion, que en una ventanilla con
+   * mala senal importa.
+   */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-institucional-50 text-institucional-900 font-sans antialiased;
+  }
+
+  /* Los objetivos táctiles del panel son grandes: se opera en ventanilla,
+     a veces con la mano ocupada. */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply outline-none;
+  }
+
+  :focus-visible {
+    @apply ring-2 ring-institucional-400 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  /* Los botones comparten la misma base. Se declara en un selector múltiple
+     porque en Tailwind v4 `@apply` no puede referenciar otra clase propia
+     (solo utilidades reales). */
+  .boton,
+  .boton-primario,
+  .boton-secundario,
+  .boton-peligro,
+  .boton-ok {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-semibold transition-colors disabled:cursor-not-allowed
+           disabled:opacity-50;
+  }
+
+  .boton-primario {
+    @apply bg-institucional-600 text-white hover:bg-institucional-700;
+  }
+
+  .boton-secundario {
+    @apply border border-institucional-200 bg-white text-institucional-700
+           hover:border-institucional-300 hover:bg-institucional-50;
+  }
+
+  .boton-peligro {
+    @apply bg-peligro-500 text-white hover:bg-peligro-700;
+  }
+
+  .boton-ok {
+    @apply bg-ok-500 text-white hover:bg-ok-700;
+  }
+
+  /*
+   * `.campo` y `.selector` comparten esqueleto, asi que van en un selector
+   * multiple: en Tailwind v4 `@apply` no puede referenciar otra clase propia
+   * (solo utilidades reales), y por eso no se puede hacer `@apply campo`.
+   */
+  .campo,
+  .selector {
+    @apply w-full min-w-0 rounded-lg border border-institucional-200 bg-white px-3 py-2.5
+           text-sm text-institucional-900 placeholder:text-institucional-300
+           focus:border-institucional-400 focus:ring-2 focus:ring-institucional-100;
+  }
+
+  /*
+   * Los controles nativos del sistema operativo (el <select> con su flecha
+   * gris y su alto propio) rompen el sistema de diseno: se ve de otra
+   * familia tipografica, con otra altura y otro color de borde que el resto
+   * de los controles. Se les quita el aspecto nativo y se les da el mismo
+   * esqueleto, con su propio chevron.
+   */
+  .selector {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a6a99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.65rem center;
+    background-size: 1rem 1rem;
+  }
+
+  .tarjeta {
+    @apply rounded-xl border border-institucional-100 bg-white shadow-sm;
+  }
+
+  /*
+   * `sr-only` es `position: absolute`, así que **no** sale del flujo pero sí
+   * hereda su posición estática. Dentro de una tabla más ancha que la
+   * ventana, eso estira el documento y crea scroll horizontal (WCAG 1.4.10).
+   * Con `left: 0` el elemento se ancla al origen y no empuja nada.
+   */
+  .sr-only {
+    @apply absolute left-0 h-px w-px overflow-hidden whitespace-nowrap p-0;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+  }
+
+  .etiqueta {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
+           text-xs font-semibold;
+  }
+}
+
+/*
+ * IMPRESIÓN DEL BOLETO (RF-006).
+ *
+ * El botón «Imprimir» tiene que sacar **solo** el boleto del turno. Sin
+ * esto, imprimía la consola entera: la barra lateral, el formulario de
+ * emisión y —lo grave— la **cola de espera con los folios, los trámites y
+ * las posiciones de todos los demás ciudadanos**. Un boleto que al
+ * imprimirse lleva encima la cola de los demás no es un boleto: es una
+ * fuga de datos ajenos a un papel que el ciudadano se lleva a la calle.
+ *
+ * La técnica es la de siempre: se oculta todo con `visibility: hidden` y se
+ * vuelve a mostrar el boleto, que se saca del flujo con `position: absolute`
+ * para que ocupe la página entera.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .impresion-boleto,
+  .impresion-boleto * {
+    visibility: visible;
+  }
+
+  .impresion-boleto {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 1.5rem 0;
+    text-align: center;
+  }
+
+  /* Los botones no se imprimen: nadie los va a pulsar. */
+  .impresion-boleto .no-imprimir {
+    display: none !important;
+  }
+
+  /* El boleto se imprime centrado: la cabecera encima del QR, no al lado. */
+  .impresion-boleto > div:first-of-type {
+    justify-content: center !important;
+    text-align: center;
+  }
+
+  .impresion-boleto-fila {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  /* El QR, algo mas grande: se escanea mejor desde un papel. */
+  .impresion-boleto img {
+    width: 14rem !important;
+    height: 14rem !important;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}
