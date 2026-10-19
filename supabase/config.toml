@@ -1,0 +1,74 @@
+# SITUR — Configuración de Supabase
+#
+# Este archivo lo usa la CLI de Supabase (`supabase start`, `supabase db push`,
+# `supabase db reset`). La estructura de migraciones vive en
+# `supabase/migrations/`, que es lo que `supabase db push` aplica al proyecto
+# remoto.
+#
+# Referencia: https://supabase.com/docs/reference/cli/supabase-config
+
+project_id = "situr"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+# Las migraciones se versionan y se aplican en orden. El esquema `auth` y los
+# roles `anon`/`authenticated`/`service_role` los pone Supabase: la migración
+# NO los crea (para eso está `migracion/prueba/00_stubs.sql`, que es solo para
+# PostgreSQL local).
+schema_paths = []
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = false
+minimum_password_length = 12
+
+# MFA: el TOTP es obligatorio para las cuentas privilegiadas (RF-026).
+[auth.mfa]
+enabled = true
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = false
+
+[storage]
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+
+[auth.email.template]
+subject = "Acceso a SITUR — Dirección de Catastro"
+content = """
+<p>Hola,</p>
+<p>Se creó su acceso a <strong>SITUR</strong>, el sistema de turnos de la
+Dirección de Catastro.</p>
+<p>Use el correo <strong>{{ .Email }}</strong> para entrar.</p>
+"""

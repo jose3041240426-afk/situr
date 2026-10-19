@@ -1,0 +1,617 @@
+-- ============================================================================
+-- SITUR — MIGRACIÓN 001: ESQUEMA INICIAL
+-- Modelo de datos FUSIONADO v2.0
+-- Motor: PostgreSQL 15+ (Supabase). Probado en PostgreSQL 18.6.
+--
+-- ORIGEN DE LA FUSIÓN
+--   Base (columna vertebral): DRS-v1.2 §7 + uml/04-er.puml  -> nombres, tipos,
+--                             máquina de estados, trazabilidad, auditoría.
+--   Aportación:              TOMA_TURNO v3.0 (MySQL)        -> 3 piezas.
+--
+-- PIEZAS PORTADAS DESDE TOMA_TURNO (y por qué)
+--   1. tabla FOLIOS          El DRS declara UNIQUE(periodo, tramite, folio) pero
+--                            nunca dice QUIÉN incrementa el consecutivo.
+--                            TOMA_TURNO lo resolvía con un contador atómico.
+--                            Aquí se porta como tabla + ON CONFLICT DO UPDATE.
+--   2. tabla CONFIGURACION   El DRS pedía "configurable" sin dónde persistirlo.
+--                            TOMA_TURNO lo tenía ya resuelto. Se portó y se
+--                            corrigió su propio bug (generar_turno ignoraba
+--                            MAXIMO_NUMERO_DIARIO y validaba 999 hardcodeado).
+--   3. tabla ROLES           Reemplaza el ENUM `rol` de usuarios. Añadir un rol
+--                            deja de ser una migración de datos. (RF-002 sigue
+--                            sembrando solo ADMINISTRADOR y SUPERVISOR.)
+--
+-- PIEZAS DE TOMA_TURNO DESCARTADAS (y por qué)
+--   - tokens_turno duplicado: guardaba el token en turnos.token Y en
+--     tokens_turno.token. Duplicación = divergencia. Se deja UNA sola columna.
+--   - ventanillas.usuario_id: duplicaba usuarios.modulo_id desde el lado
+--     contrario. Se conserva usuarios.modulo_id (lo exige RG-004).
+--   - fecha DATE en turnos: superseded por periodo_operativo_id (RG-002).
+--   - estados en español: se conservan los del DRS (WAITING/CALLED/...) porque
+--     los diagramas 6, 7, 8, 11 y 12 los usan literalmente.
+--
+-- CAMBIOS CORRECTIVOS APLICADOS SOBRE TOMA_TURNO
+--   - prefijo de trámite ahora es UNIQUE global (TOMA: CHAR(1) UNIQUE) -> el
+--     código visible "A-001" es único y no colisiona entre trámites.
+--   - la vista de seguimiento ciudadano YA NO depende de un campo de estado del
+--     token (TOMA desaparecía cuando el token expiraba).
+--   - llamar_siguiente_turno VALIDA que el usuario esté asignado al módulo
+--     (TOMA no lo hacía: cualquier cuenta llamaba desde cualquier ventanilla).
+--   - asignar módulo deja registro en AUDITORIA (TOMA no registraba nada).
+-- ============================================================================
+
+-- pgcrypto: gen_random_bytes() para el token QR (>=128 bits, RN-010).
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- ============================================================================
+-- 1. TIPOS ENUMERADOS
+-- ============================================================================
+
+-- Estados del turno (DRS RF-008 + diagrama 6). Se mantiene la nomenclatura
+-- inglesa porque los diagramas UML la usan literalmente.
+CREATE TYPE enum_estado_turno AS ENUM (
+    'WAITING',
+    'CALLED',
+    'SERVING',
+    'COMPLETED',
+    'CANCELLED',
+    'SKIPPED'
+);
+
+-- Prioridades (RN-017: URGENTE > PREFERENTE > NORMAL).
+CREATE TYPE enum_prioridad_turno AS ENUM (
+    'NORMAL',
+    'PREFERENTE',
+    'URGENTE'
+);
+
+-- Disponibilidad operativa de un módulo (RN-013).
+CREATE TYPE enum_estado_modulo AS ENUM (
+    'ACTIVO',
+    'PAUSADO',
+    'FUERA_DE_SERVICIO'
+);
+
+-- Ciclo de vida de un periodo operativo (RF-025).
+CREATE TYPE enum_estado_periodo AS ENUM (
+    'ABIERTO',
+    'CERRADO'
+);
+
+-- Resultado de una línea de auditoría (RF-024).
+CREATE TYPE enum_resultado_auditoria AS ENUM (
+    'EXITO',
+    'ERROR',
+    'DENEGADO'
+);
+
+-- ============================================================================
+-- 2. APELLIDOS (catálogo)
+-- SITUR: catálogo único de apellidos, RG-003. TOMA_TURNO usaba texto libre.
+-- ============================================================================
+
+CREATE TABLE apellidos (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    apellido    TEXT        NOT NULL,
+    creado_en   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_apellidos_apellido
+        UNIQUE (apellido),
+
+    CONSTRAINT chk_apellidos_no_vacio
+        CHECK (length(btrim(apellido)) > 0)
+);
+
+-- ============================================================================
+-- 3. ROLES                          <<< PORTADO DE TOMA_TURNO >>>
+-- Antes: `rol ENUM` dentro de usuarios. Ahora: tabla con FK.
+-- Ventaja concreta: agregar un rol (p. ej. AGENTE) es un INSERT, no una
+-- migración de estructura. RF-002 sigue sembrando solo ADMINISTRADOR y
+-- SUPERVISOR; la tercera fila queda disponible sin tocar el esquema.
+-- ============================================================================
+
+CREATE TABLE roles (
+    id          SMALLINT    GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    clave       TEXT        NOT NULL,
+    nombre      TEXT        NOT NULL,
+    descripcion TEXT,
+    activo      BOOLEAN     NOT NULL DEFAULT TRUE,
+    creado_en   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_roles_clave  UNIQUE (clave),
+    CONSTRAINT uq_roles_nombre UNIQUE (nombre),
+
+    CONSTRAINT chk_roles_clave
+        CHECK (clave = upper(clave) AND length(clave) BETWEEN 3 AND 30)
+);
+
+-- ============================================================================
+-- 4. MODULOS (equivalente a `ventanillas` de TOMA_TURNO)
+-- Se conserva el diseño de SITUR: el módulo NO se ata a un trámite.
+-- El enrutamiento lo resuelve RG-004 a través de usuarios.modulo_id.
+--
+-- Distinción importante entre las dos columnas de estado:
+--   activo  -> habilitación administrativa (¿la fila está dada de alta?)
+--   estado  -> disponibilidad operativa (RN-013) (¿puede recibir turnos hoy?)
+-- ============================================================================
+
+CREATE TABLE modulos (
+    id            UUID               PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo        TEXT               NOT NULL,
+    denominacion  TEXT               NOT NULL,
+    estado        enum_estado_modulo NOT NULL DEFAULT 'ACTIVO',
+    activo        BOOLEAN            NOT NULL DEFAULT TRUE,
+    creado_en     TIMESTAMPTZ        NOT NULL DEFAULT now(),
+    actualizado_en TIMESTAMPTZ       NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_modulos_codigo UNIQUE (codigo),
+
+    CONSTRAINT chk_modulos_codigo
+        CHECK (codigo ~ '^M[0-9]{2,3}$')
+);
+
+-- ============================================================================
+-- 5. PERIODOS_OPERATIVOS
+-- Entidad que TOMA_TURNO NO tenía (allí la jornada era un `fecha DATE` plano).
+-- Sostiene RG-002, RF-025 y el cierre de jornada de la Figura 12.
+-- ============================================================================
+
+CREATE TABLE periodos_operativos (
+    id          UUID                 PRIMARY KEY DEFAULT gen_random_uuid(),
+    clave       DATE                 NOT NULL,
+    fecha       DATE                 NOT NULL,
+    hora_inicio TIMESTAMPTZ,
+    hora_fin    TIMESTAMPTZ,
+    estado      enum_estado_periodo  NOT NULL DEFAULT 'ABIERTO',
+    cerrado_en  TIMESTAMPTZ,
+    creado_en   TIMESTAMPTZ          NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_periodos_clave UNIQUE (clave),
+
+    CONSTRAINT chk_periodos_fecha
+        CHECK (fecha = clave),
+
+    CONSTRAINT chk_periodos_cerrado
+        CHECK (
+            (estado = 'CERRADO' AND cerrado_en IS NOT NULL)
+            OR (estado = 'ABIERTO' AND cerrado_en IS NULL)
+        )
+);
+
+-- RF-025: "solo uno activo". Se garantiza en la base, no solo en la app.
+CREATE UNIQUE INDEX uq_periodo_uno_abierto
+    ON periodos_operativos ((true))
+    WHERE estado = 'ABIERTO';
+
+-- ============================================================================
+-- 6. TRAMITES
+-- SITUR: clave + prefijo + denominación + prioridad.
+-- PORTADO DE TOMA_TURNO: `prefijo` ahora es UNIQUE GLOBAL (allí era
+-- CHAR(1) UNIQUE en servicios). Consecuencia: el código visible "A-001" es
+-- único sin necesidad de llevar la fecha en el string. Cierra la duda que
+-- abría ANALISIS-DRS-v1.1.md §10 sobre colisión de prefijos entre trámites.
+-- PORTADO DE TOMA_TURNO: `tiempo_estimado_minutos` (estimación al ciudadano).
+-- ============================================================================
+
+CREATE TABLE tramites (
+    id                 UUID                  PRIMARY KEY DEFAULT gen_random_uuid(),
+    clave              TEXT                  NOT NULL,
+    prefijo            TEXT                  NOT NULL,
+    denominacion       TEXT                  NOT NULL,
+    prioridad          enum_prioridad_turno  NOT NULL DEFAULT 'NORMAL',
+    tiempo_estimado_minutos SMALLINT         NOT NULL DEFAULT 10,
+    activo             BOOLEAN               NOT NULL DEFAULT TRUE,
+    creado_en          TIMESTAMPTZ           NOT NULL DEFAULT now(),
+    actualizado_en     TIMESTAMPTZ           NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_tramites_clave    UNIQUE (clave),
+    CONSTRAINT uq_tramites_prefijo  UNIQUE (prefijo),
+
+    CONSTRAINT chk_tramites_clave
+        CHECK (clave = upper(clave) AND length(clave) BETWEEN 2 AND 20),
+
+    -- Prefijo de un solo carácter: es el prefijo del código visible.
+    CONSTRAINT chk_tramites_prefijo
+        CHECK (prefijo ~ '^[A-Z]$'),
+
+    CONSTRAINT chk_tramites_tiempo
+        CHECK (tiempo_estimado_minutos BETWEEN 1 AND 480)
+);
+
+-- ============================================================================
+-- 7. USUARIOS
+-- Cambios frente al DRS v1.2:
+--   - `rol ENUM` -> `rol_id` FK a la tabla roles (portado de TOMA_TURNO).
+--   - `auth_uid` enlaza con Supabase Auth; es lo que RLS usa en auth.uid().
+-- ============================================================================
+
+CREATE TABLE usuarios (
+    id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    auth_uid             UUID,
+    nombres              TEXT        NOT NULL,
+    apellido_paterno_id  UUID        NOT NULL,
+    apellido_materno_id  UUID,
+    email                TEXT        NOT NULL,
+    numero_empleado      TEXT        NOT NULL,
+    rol_id               SMALLINT    NOT NULL,
+    modulo_id            UUID,
+    activo               BOOLEAN     NOT NULL DEFAULT TRUE,
+    mfa_habilitado       BOOLEAN     NOT NULL DEFAULT FALSE,
+    creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actualizado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_usuarios_apellido_paterno
+        FOREIGN KEY (apellido_paterno_id) REFERENCES apellidos (id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+
+    CONSTRAINT fk_usuarios_apellido_materno
+        FOREIGN KEY (apellido_materno_id) REFERENCES apellidos (id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+
+    CONSTRAINT fk_usuarios_roles
+        FOREIGN KEY (rol_id) REFERENCES roles (id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+
+    CONSTRAINT fk_usuarios_modulos
+        FOREIGN KEY (modulo_id) REFERENCES modulos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    CONSTRAINT uq_usuarios_email           UNIQUE (email),
+    CONSTRAINT uq_usuarios_numero_empleado UNIQUE (numero_empleado),
+    CONSTRAINT uq_usuarios_auth_uid        UNIQUE (auth_uid),
+
+    -- Evita duplicar a la misma persona en el directorio (RG-003).
+    -- NULLS NOT DISTINCT: sin esto, dos personas sin apellido materno
+    -- evadirían la restricción porque NULL <> NULL en PostgreSQL.
+    CONSTRAINT uq_usuarios_persona
+        UNIQUE NULLS NOT DISTINCT (
+            apellido_paterno_id, apellido_materno_id, nombres
+        ),
+
+    CONSTRAINT chk_usuarios_email
+        CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+);
+
+-- ============================================================================
+-- 8. FOLIOS                    <<< PORTADO DE TOMA_TURNO >>>
+-- LA pieza que faltaba en el DRS. Contador atómico del consecutivo de folio,
+-- por periodo y por trámite.
+--
+-- TOMA_TURNO lo resolvía con:
+--     INSERT INTO folios ... ON DUPLICATE KEY UPDATE ultimo_numero = ultimo_numero + 1
+-- Aquí el equivalente exacto en PostgreSQL es:
+--     INSERT ... ON CONFLICT (periodo_operativo_id, tramite_id)
+--         DO UPDATE SET ultimo_numero = folios.ultimo_numero + 1
+--         RETURNING ultimo_numero;
+-- Un solo statement = un solo bloqueo de fila = sin carrera entre ventanillas.
+--
+-- Soporta UNIQUE(periodo_operativo_id, tramite_id, folio) de RN-003 porque
+-- `ultimo_numero` es la única fuente de verdad del consecutivo.
+-- ============================================================================
+
+CREATE TABLE folios (
+    id                   BIGINT      GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    periodo_operativo_id UUID        NOT NULL,
+    tramite_id           UUID        NOT NULL,
+    ultimo_numero        INTEGER     NOT NULL DEFAULT 0,
+    creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actualizado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_folios_periodo_tramite
+        UNIQUE (periodo_operativo_id, tramite_id),
+
+    CONSTRAINT fk_folios_periodo
+        FOREIGN KEY (periodo_operativo_id) REFERENCES periodos_operativos (id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT fk_folios_tramite
+        FOREIGN KEY (tramite_id) REFERENCES tramites (id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT chk_folios_numero
+        CHECK (ultimo_numero >= 0)
+);
+
+-- ============================================================================
+-- 9. TURNOS
+-- ============================================================================
+
+CREATE TABLE turnos (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Número consecutivo dentro de (periodo, trámite). RN-003.
+    folio       INTEGER     NOT NULL,
+
+    -- Código visible impreso en el ticket: 'A-001'. Se ALMACENA como snapshot
+    -- del prefijo al momento de emitir, para que un cambio posterior de
+    -- prefijo no reescriba tickets ya impresos.
+    -- Único dentro del periodo (el prefijo ya es único global, ver tramites).
+    codigo      TEXT        NOT NULL,
+
+    periodo_operativo_id UUID NOT NULL,
+    tramite_id           UUID NOT NULL,
+    modulo_id            UUID,
+
+    estado    enum_estado_turno   NOT NULL DEFAULT 'WAITING',
+    prioridad enum_prioridad_turno NOT NULL DEFAULT 'NORMAL',
+
+    -- Token del QR. ÚNICA copia (TOMA_TURNO lo guardaba en dos tablas).
+    token_publico   TEXT           NOT NULL,
+    token_expira_en TIMESTAMPTZ,
+    -- PORTADO DE TOMA_TURNO: huella de la última consulta ciudadana.
+    token_ultimo_acceso TIMESTAMPTZ,
+
+    numero_llamadas SMALLINT       NOT NULL DEFAULT 0,
+
+    -- PORTADO DE TOMA_TURNO: tiempo estimado congelado al emitir el ticket.
+    tiempo_estimado_mostrado_minutos SMALLINT,
+
+    -- Trazabilidad (SITUR; TOMA_TURNO solo guardaba hora_creacion/llamado/
+    -- inicio/finalizacion y derivaba quién atendió de la ventanilla actual).
+    -- clock_timestamp() en vez de now(): `now()` devuelve la hora de INICIO de
+    -- la transacción, por lo que varios turnos emitidos en la misma transacción
+    -- compartirían la marca y el desempate de RN-017 caería sobre `id`, que es
+    -- un UUID aleatorio. Con clock_timestamp() cada fila obtiene su orden real
+    -- de inserción y la cola es FIFO de verdad.
+    creado_en         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    llamado_en        TIMESTAMPTZ,
+    inicio_atencion   TIMESTAMPTZ,
+    finalizado_en     TIMESTAMPTZ,
+    cancelado_en      TIMESTAMPTZ,
+    cancelado_por     UUID,
+    motivo_cancelacion TEXT,
+    saltado_en        TIMESTAMPTZ,
+    saltado_por       UUID,
+    motivo_salto      TEXT,
+    atendido_por      UUID,
+    -- Consideraciones del titular (RF-033). La LFPDPPP da a toda persona
+    -- titular el derecho a oponerse al tratamiento de sus datos por causa
+    -- legitima (art. 21). Como el ciudadano no deja datos de identidad, la
+    -- via por la que se hace valer ese derecho es su propio token: lo escribe
+    -- en el portal y el turno queda cancelado con la constancia de que fue
+    -- el titular, no el operador.
+    consideraciones   TEXT,
+
+    CONSTRAINT fk_turnos_periodo
+        FOREIGN KEY (periodo_operativo_id) REFERENCES periodos_operativos (id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+
+    CONSTRAINT fk_turnos_tramite
+        FOREIGN KEY (tramite_id) REFERENCES tramites (id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+
+    CONSTRAINT fk_turnos_modulo
+        FOREIGN KEY (modulo_id) REFERENCES modulos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    CONSTRAINT fk_turnos_cancelado_por
+        FOREIGN KEY (cancelado_por) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    CONSTRAINT fk_turnos_saltado_por
+        FOREIGN KEY (saltado_por) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    CONSTRAINT fk_turnos_atendido_por
+        FOREIGN KEY (atendido_por) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    -- RN-003: consecutivo propio por trámite y periodo.
+    CONSTRAINT uq_turnos_periodo_tramite_folio
+        UNIQUE (periodo_operativo_id, tramite_id, folio),
+
+    -- El código visible no puede repetirse dentro del mismo periodo.
+    -- Equivalente a `uq_turnos_fecha_codigo` de TOMA_TURNO, con la fecha
+    -- sustituida por el periodo operativo (RG-002).
+    CONSTRAINT uq_turnos_periodo_codigo
+        UNIQUE (periodo_operativo_id, codigo),
+
+    -- RN-010: token único.
+    CONSTRAINT uq_turnos_token
+        UNIQUE (token_publico),
+
+    -- Coherencia de trazabilidad: si quedó cancelado, tiene quién y cuándo.
+    -- Un turno cancelado lo estuvo o por un operador (`cancelado_por`) o por
+    -- el propio titular, que manifiesta su consideracion (RF-033). En el
+    -- segundo caso no hay operador, y por eso `consideraciones` va informado:
+    -- es lo que distingue una cosa de la otra en la traza.
+    CONSTRAINT chk_turnos_cancelacion
+        CHECK (
+            (estado = 'CANCELLED'
+                AND cancelado_en IS NOT NULL
+                AND motivo_cancelacion IS NOT NULL
+                AND (
+                    cancelado_por IS NOT NULL
+                    OR (cancelado_por IS NULL AND consideraciones IS NOT NULL)
+                ))
+            OR estado <> 'CANCELLED'
+        ),
+
+    -- Idem para SKIPPED (omitido / timeout / cierre de jornada).
+    -- `saltado_por` admite NULL: el actor puede ser pg_cron, que no tiene
+    -- usuario (Figura 11). `motivo_salto` sí es obligatorio.
+    CONSTRAINT chk_turnos_salto
+        CHECK (
+            (estado = 'SKIPPED'
+                AND saltado_en IS NOT NULL
+                AND motivo_salto IS NOT NULL)
+            OR estado <> 'SKIPPED'
+        ),
+
+    -- RN-004: COMPLETED no puede volver a WAITING. Lo garantizan los
+    -- procedimientos, y este CHECK evita escrituras directas accidentales.
+    CONSTRAINT chk_turnos_folio
+        CHECK (folio > 0),
+
+    CONSTRAINT chk_turnos_llamadas
+        CHECK (numero_llamadas >= 0),
+
+    -- El motivo lo escribe el operador a mano. Es la ÚNICA vía por la que
+    -- podrían colarse datos del ciudadano (un nombre, un teléfono) en una
+    -- tabla que ya no se puede modificar. Por eso se acota la longitud, y en
+    -- la interfaz se recuerda que no es un campo para datos personales: la
+    -- misma regla del DRS §11 que ya se aplica a `metadata` (RF-024).
+    CONSTRAINT chk_turnos_motivos
+        CHECK (
+            (motivo_cancelacion IS NULL OR length(btrim(motivo_cancelacion)) <= 200)
+            AND (motivo_salto IS NULL OR length(btrim(motivo_salto)) <= 200)
+            AND (consideraciones IS NULL OR length(btrim(consideraciones)) <= 300)
+        )
+);
+
+-- ============================================================================
+-- 10. HISTORIAL_TURNOS
+-- Habla del TURNO. TOMA_TURNO tenía la misma estructura; solo se cambian los
+-- nombres de columna al estándar del DRS.
+-- ============================================================================
+
+CREATE TABLE historial_turnos (
+    id              BIGINT            GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    turno_id        UUID              NOT NULL,
+    estado_anterior enum_estado_turno,
+    estado_nuevo    enum_estado_turno NOT NULL,
+    usuario_id      UUID,
+    modulo_id       UUID,
+    motivo          TEXT,
+    -- Misma razón que en turnos.creado_en: en el cierre de jornada (Figura 12)
+    -- se escriben muchas filas de historial en una sola transacción y `now()`
+    -- les daría exactamente la misma marca, borrando su orden cronológico.
+    fecha           TIMESTAMPTZ       NOT NULL DEFAULT clock_timestamp(),
+    metadata        JSONB,
+
+    CONSTRAINT fk_historial_turno
+        FOREIGN KEY (turno_id) REFERENCES turnos (id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT fk_historial_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    CONSTRAINT fk_historial_modulo
+        FOREIGN KEY (modulo_id) REFERENCES modulos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+-- ============================================================================
+-- 11. AUDITORIA
+-- Habla del ADMINISTRADOR, no del turno. TOMA_TURNO NO LA TENÍA: su
+-- asignar_trabajador_ventanilla cambiaba quién operaba una ventanilla sin
+-- dejar rastro de quién lo ordenó. RN-016 queda cumplido aquí.
+-- RF-024: tabla de solo-inserción (ver trigger en 005_rls_policies.sql).
+-- ============================================================================
+
+CREATE TABLE auditoria (
+    id         BIGINT                  GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    usuario_id UUID,
+    accion     TEXT                    NOT NULL,
+    entidad    TEXT                    NOT NULL,
+    entidad_id TEXT,
+    -- idem: el barrido de timeout escribe varias líneas en la misma
+    -- transacción y deben poder ordenarse.
+    fecha      TIMESTAMPTZ             NOT NULL DEFAULT clock_timestamp(),
+    resultado  enum_resultado_auditoria NOT NULL DEFAULT 'EXITO',
+    metadata   JSONB,
+
+    CONSTRAINT fk_auditoria_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    -- RN-016: nunca PII, tokens completos ni credenciales (DRS §11).
+    CONSTRAINT chk_auditoria_metadata
+        CHECK (
+            metadata IS NULL
+            OR NOT (metadata::text ~* '(password|token_publico|secret|contraseña)')
+        )
+);
+
+-- ============================================================================
+-- 12. CONFIGURACION             <<< PORTADO DE TOMA_TURNO >>>
+-- El DRS (RF-023) pedía parámetros configurables sin decir dónde vivían.
+-- TOMA_TURNO ya lo tenía resuelto. Corrección aplicada: se añade `tipo` para
+-- validar el valor, y TODOS los procedimientos leen de aquí en vez de
+-- hardcodear (TOMA_TURNO declaraba MAXIMO_NUMERO_DIARIO en configuracion pero
+-- validaba `> 999` en el procedimiento).
+-- ============================================================================
+
+CREATE TABLE configuracion (
+    id           SMALLINT     GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    clave        TEXT         NOT NULL,
+    nombre       TEXT         NOT NULL,
+    valor        TEXT         NOT NULL,
+    tipo         TEXT         NOT NULL DEFAULT 'TEXTO',
+    descripcion  TEXT,
+    activo       BOOLEAN      NOT NULL DEFAULT TRUE,
+    creado_en    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_configuracion_clave  UNIQUE (clave),
+    CONSTRAINT uq_configuracion_nombre UNIQUE (nombre),
+
+    CONSTRAINT chk_configuracion_tipo
+        CHECK (tipo IN ('TEXTO', 'ENTERO', 'DECIMAL', 'BOOLEANO', 'JSON')),
+
+    CONSTRAINT chk_configuracion_entero
+        CHECK (tipo <> 'ENTERO' OR valor ~ '^-?[0-9]+$')
+);
+
+-- ============================================================================
+-- 13. SUSCRIPCIONES_PUSH        <<< NUEVO EN DRS v1.5 — RF-028 >>>
+-- El ciudadano escanea el QR, ve su turno con get_turno_publico(token) y
+-- ALLÍ la aplicación le pregunta si quiere el aviso de cuando su turno se
+-- acerque. Si acepta, el navegador registra su suscripción Web Push y esta
+-- tabla es donde queda ligada a su turno (DRS §5.2, Figuras 4, 5 y 9).
+--
+-- Dos reglas que el esquema sostiene por sí solo:
+--   * UNIQUE(token_publico)  -> un turno tiene COMO MUCHO una suscripción.
+--       Escanear el QR dos veces no duplica avisos (DRS §5.2).
+--   * ON DELETE CASCADE      -> si la fila del turno desaparece, su permiso
+--       de notificación no queda huérfano.
+--
+-- endpoint NO es UNIQUE (corrección sobre lo que decía DRS v1.5 en un
+-- primer borrador): el navegador devuelve el MISMO endpoint para cualquier
+-- suscripción de este origen, así que un mismo navegador puede legítimamente
+-- tener dos turnos abiertos y repetir endpoint. Lo que debe ser único es el
+-- turno, no el navegador. Un índice común cubre la búsqueda por endpoint.
+--
+-- Contenido: SOLO el permiso del navegador (endpoint y las claves del cifrado
+-- de la carga útil). Aquí no hay folio, ni nombres, ni estado, ni token de
+-- otro turno — el aviso que sale por Web Push es una comunicación a un
+-- tercero y debe llevar lo justo (DRS §5.2, criterio de aceptación 4).
+-- ============================================================================
+
+CREATE TABLE suscripciones_push (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    token_publico     TEXT         NOT NULL,
+    endpoint          TEXT         NOT NULL,
+    clave_p256dh      TEXT         NOT NULL,
+    clave_auth        TEXT         NOT NULL,
+    creada_en         TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
+    -- NULL hasta el primer envío o re-suscripción; huella de actividad.
+    ultima_activacion TIMESTAMPTZ,
+    activa            BOOLEAN      NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT uq_suscripciones_push_token UNIQUE (token_publico),
+
+    CONSTRAINT fk_suscripciones_push_turno
+        FOREIGN KEY (token_publico) REFERENCES turnos (token_publico)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    -- El endpoint del servicio push siempre es HTTPS: no se admite otra cosa.
+    CONSTRAINT chk_suscripciones_push_endpoint
+        CHECK (endpoint ~* '^https://'),
+
+    -- Las dos claves son la materia prima de la encriptación de la carga;
+    -- vacías, no hay forma de entregar el mensaje.
+    CONSTRAINT chk_suscripciones_push_claves
+        CHECK (length(clave_p256dh) >= 32 AND length(clave_auth) >= 16)
+);
+
+COMMENT ON TABLE suscripciones_push IS
+    'DRS v1.5 RF-028: permiso de notificacion push del navegador, ligado a un turno. 1 a 0..1 con turnos; se retira al cerrarse el turno.';
+COMMENT ON COLUMN suscripciones_push.endpoint IS
+    'Endpoint del servicio push del navegador. Indice, NO UNIQUE: el mismo navegador puede tener dos turnos y reutiliza el endpoint.';
+COMMENT ON COLUMN suscripciones_push.clave_p256dh IS
+    'Clave publica p256dh de la suscripcion push (agrupacion local DH).';
+COMMENT ON COLUMN suscripciones_push.clave_auth IS
+    'Clave de autenticacion de la suscripcion push.';
