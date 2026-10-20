@@ -9,8 +9,15 @@ import { Aviso } from './components/ui'
 /**
  * SITUR — Enrutado.
  *
- * El panel del operador y el portal del ciudadano. El portal es anónimo:
- * no necesita cuenta, solo el token del QR.
+ * Tres superficies, separadas por completo (DRS §1):
+ *
+ *   /admin/*       Consola del operador. Requiere sesión de Supabase Auth.
+ *   /turno/:token  Portal del ciudadano. Anónimo: solo su token.
+ *   /pantalla      Pantalla pública. Opcional (DRS §5.1): sin televisor, la
+ *                  sección se apaga sola y nada más cambia.
+ *
+ * El panel se carga bajo demanda: el ciudadano entra por el móvil, a veces con
+ * mala conexión, y no tiene por qué descargar la consola de administración.
  */
 const Consola = lazy(() => import('./admin/Consola'))
 const GestionUsuarios = lazy(() => import('./admin/GestionUsuarios'))
@@ -18,7 +25,18 @@ const Catalogos = lazy(() => import('./admin/Catalogos'))
 const Historial = lazy(() => import('./admin/Historial'))
 const Estadisticas = lazy(() => import('./admin/Estadisticas'))
 const TurnoCiudadano = lazy(() => import('./ciudadano/TurnoCiudadano'))
+const PantallaPublica = lazy(() => import('./ciudadano/PantallaPublica'))
 
+/**
+ * SITUR — Enrutado.
+ *
+ * Tres superficies, separadas por completo (DRS §1):
+ *
+ *   /admin/*     Consola del operador. Requiere sesión de Supabase Auth.
+ *   /turno/:token  Portal del ciudadano. Anónimo: solo su token.
+ *   /pantalla    Pantalla pública. Opcional (DRS §5.1): sin televisor, la
+ *                sección se apaga sola y nada más cambia.
+ */
 export default function App() {
   const { pathname } = useLocation()
   useTitulo(tituloDeRuta(pathname))
@@ -55,6 +73,7 @@ export default function App() {
           <Route path="/admin/estadisticas" element={<Estadisticas />} />
 
           <Route path="/turno/:token" element={<TurnoCiudadano />} />
+          <Route path="/pantalla" element={<PantallaPublica />} />
 
           <Route path="*" element={<NoEncontrado />} />
         </Routes>
@@ -66,7 +85,7 @@ export default function App() {
 function Cargando() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-institucional-500">Cargando…</p>
+      <p className="text-sm text-institucional-400">Cargando…</p>
     </div>
   )
 }
@@ -102,6 +121,8 @@ function tituloDeRuta(ruta: string): string | null {
       return 'Historial'
     case '/admin/estadisticas':
       return 'Estadísticas'
+    case '/pantalla':
+      return 'Pantalla de llamadas'
     default:
       return null
   }
