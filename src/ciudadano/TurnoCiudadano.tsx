@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { consultarTurnoPublico, ErrorSitur, manifestarConsideraciones } from '../lib/rpc'
 import { CODIGO_TOKEN_EXPIRADO, CODIGO_TOKEN_INVALIDO } from '../lib/tipos'
@@ -227,13 +228,67 @@ export default function TurnoCiudadano() {
 
   return (
     <div className="min-h-screen bg-gris-50">
-      <header className="bg-navy-800 px-4 py-3 text-center">
-        <p className="text-sm font-bold text-white">SITUR</p>
-        <p className="text-[11px] text-gris-200">Dirección de Catastro · Durango</p>
+      {/*
+        LA CABECERA, con la marca y la hora.
+
+        Oscura y breve a propósito: el portal se lee en el teléfono, a
+        menudo en la calle y con la pantalla al sol. Un fondo oscuro entero
+        en un móvil es luz gastada y texto ilegible; la ficha de abajo va
+        en blanco, que es donde está la información que importa.
+      */}
+      <header className="bg-navy-800 px-4 py-3 text-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 7.2A2.2 2.2 0 0 1 6.2 5H20v5.4a2.6 2.6 0 0 0 0 3.2V19H6.2A2.2 2.2 0 0 1 4 16.8z" />
+                <path d="M15.6 5.6v12.8" strokeDasharray="2 2.4" />
+                <path d="M7.4 10.2h5M7.4 13.4h3.4" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold leading-tight">SITUR</p>
+              <p className="truncate text-[11px] text-white/60">
+                Dirección de Catastro · Durango
+              </p>
+            </div>
+          </div>
+          <p className="hidden text-right text-xs text-white/70 sm:block">
+            <span className="block font-semibold text-white">
+              {new Intl.DateTimeFormat('es-MX', {
+                timeZone: 'America/Mazatlan',
+                hour: '2-digit',
+                minute: '2-digit',
+              }).format(new Date())}
+            </span>
+            {new Intl.DateTimeFormat('es-MX', {
+              timeZone: 'America/Mazatlan',
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            }).format(new Date())}
+          </p>
+        </div>
       </header>
 
-      <main className="mx-auto max-w-lg p-4 pb-10">
-        {/* Código del turno */}
+      <main className="mx-auto max-w-5xl p-4 pb-10">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        {/*
+          La columna de la ficha: la ficha del turno, los avisos y los dos
+          desplegables (oponerse y aviso de privacidad).
+        */}
+        <div className="space-y-4">
+        {/* La ficha */}
         <div className="tarjeta overflow-hidden">
           {/*
             `role="status"` con `aria-live="polite"`: el estado del turno
@@ -246,43 +301,96 @@ export default function TurnoCiudadano() {
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            className={`px-6 py-6 text-center ${estilo.fondo}`}
+            className="px-6 py-6 text-center"
           >
-            <p className="text-xs font-semibold uppercase tracking-widest opacity-70">
+            <span
+              className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${estilo.fondo}`}
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {turno.estado === 'WAITING' ? (
+                  /* esperando: un reloj */
+                  <>
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </>
+                ) : turno.estado === 'CANCELLED' || turno.estado === 'SKIPPED' ? (
+                  /* retirado: una cruz */
+                  <>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </>
+                ) : (
+                  /* llamado o atendido: un visto bueno */
+                  <path d="M20 6 9 17l-5-5" />
+                )}
+              </svg>
+            </span>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gris-500">
               Su turno
             </p>
-            <h1 className={`mt-1 text-5xl font-black tracking-tight ${estilo.texto}`}>
-              {turno.codigo_turno}
-            </h1>
-            <p className={`mt-2 text-sm font-semibold ${estilo.texto}`}>{turno.mensaje}</p>
+            {/* El código, en su caja: es lo que el ciudadano viene a ver. */}
+            <div className={`mx-auto mt-2 max-w-xs rounded-xl px-6 py-4 ${estilo.fondo}`}>
+              <h1 className={`text-5xl font-black leading-none tracking-tight ${estilo.texto}`}>
+                {turno.codigo_turno}
+              </h1>
+              <p className={`mt-1.5 text-sm font-semibold ${estilo.texto}`}>
+                {turno.denominacion_tramite}
+              </p>
+            </div>
+            <p className={`mt-3 text-sm font-semibold ${estilo.texto}`}>{turno.mensaje}</p>
           </div>
 
-          <dl className="divide-y divide-gris-100">
-            <Dato etiqueta="Trámite" valor={turno.denominacion_tramite} />
+          <dl className="space-y-1 border-t border-gris-100 px-5 py-4">
             <Dato
               etiqueta="Estado"
               valor={etiquetaEstado(turno.estado)}
+              icono="info"
               destacado={turno.estado === 'CALLED'}
             />
             {turno.estado === 'WAITING' && (
               <>
-                <Dato etiqueta="Posición en la cola" valor={`${turno.posicion}`} />
+                <Dato
+                  etiqueta="Posición en la cola"
+                  valor={`${turno.posicion}`}
+                  icono="lista"
+                />
                 <Dato
                   etiqueta="Personas adelante"
                   valor={`${turno.personas_delante}`}
+                  icono="personas"
                 />
               </>
             )}
-            {turno.modulo && <Dato etiqueta="Módulo" valor={turno.modulo} />}
+            {turno.modulo && (
+              <Dato etiqueta="Módulo" valor={turno.modulo} icono="modulo" />
+            )}
             {turno.tiempo_estimado_minutos != null && (
               <Dato
                 etiqueta="Tiempo estimado"
                 valor={`${turno.tiempo_estimado_minutos} min`}
+                icono="reloj"
               />
             )}
-            <Dato etiqueta="Emitido" valor={formatearHora(turno.creado_en)} />
+            <Dato
+              etiqueta="Emitido"
+              valor={formatearHora(turno.creado_en)}
+              icono="calendario"
+            />
             {turno.llamado_en && (
-              <Dato etiqueta="Llamado" valor={formatearHora(turno.llamado_en)} />
+              <Dato
+                etiqueta="Llamado"
+                valor={formatearHora(turno.llamado_en)}
+                icono="reloj"
+              />
             )}
           </dl>
         </div>
@@ -454,19 +562,99 @@ export default function TurnoCiudadano() {
             </p>
           </div>
         </details>
+
+        </div>
+
+        {/*
+          EL RIEL.
+
+          En la referencia de diseño, este riel muestra «Próximos turnos» con
+          los códigos de los demás ciudadanos. **Aquí no**: el ciudadano de
+          SITUR es anónimo y el sistema no le enseña los turnos de nadie más
+          (RF-019, y la nota de protección de datos). Se mantiene la
+          FORMA del riel —que es lo que aporta la referencia— y se cambia el
+          contenido por los números del propio turno.
+        */}
+        <aside className="space-y-4">
+          <div className="rounded-2xl bg-navy-800 p-5 text-white">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-white/60">
+              Tu turno en números
+            </h2>
+            <div className="mt-3 space-y-0">
+              {turno.estado === 'WAITING' && (
+                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
+                  <span className="text-sm text-white/80">Posición</span>
+                  <b className="text-lg">{turno.posicion}</b>
+                </div>
+              )}
+              {turno.estado === 'WAITING' && (
+                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
+                  <span className="text-sm text-white/80">Personas delante</span>
+                  <b className="text-lg">{turno.personas_delante}</b>
+                </div>
+              )}
+              {turno.tiempo_estimado_minutos != null && (
+                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
+                  <span className="text-sm text-white/80">Tiempo estimado</span>
+                  <b className="text-lg">{turno.tiempo_estimado_minutos} min</b>
+                </div>
+              )}
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-white/80">Módulo</span>
+                <b className="text-lg">{turno.modulo ?? '—'}</b>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-white/60">
+              Solo ve los números de <strong className="text-white/80">su</strong>{' '}
+              turno. El sistema no muestra los turnos de los demás ciudadanos.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-gris-200 bg-white p-5">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gris-500">
+              Sin cuenta, sin datos
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-gris-700">
+              El código QR de su boleto es su única credencial. No se pide
+              nombre, correo ni teléfono, y el código deja de servir cuando el
+              turno se cierra.
+            </p>
+          </div>
+        </aside>
+        </div>
       </main>
     </div>
   )
 }
 
-function Dato({ etiqueta, valor, destacado }: {
+/**
+ * Una fila de datos, con su icono en un círculo.
+ *
+ * El icono no es decorativo: dice de un vistazo de qué campo se trata
+ * (un reloj es el tiempo, un calendario es la fecha, una lista son los
+ * datos del turno) y evita tener que leer la etiqueta.
+ */
+function Dato({ etiqueta, valor, icono, destacado }: {
   etiqueta: string
   valor: string
+  icono?: 'reloj' | 'calendario' | 'lista' | 'modulo' | 'personas' | 'info'
   destacado?: boolean
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-3">
-      <dt className="text-sm text-gris-700">{etiqueta}</dt>
+    /*
+      El icono va DENTRO del <dt>: un <div> dentro de un <dl> solo puede
+      contener <dt> y <dd> (HTML), y axe lo comprueba (regla
+      `definition-list`).
+    */
+    <div className="flex items-center gap-3 px-1 py-2">
+      <dt className="flex flex-1 items-center gap-3 text-sm text-gris-700">
+        {icono && (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
+            <IconoDato nombre={icono} />
+          </span>
+        )}
+        {etiqueta}
+      </dt>
       <dd
         className={`text-sm font-bold ${
           destacado ? 'text-ambar-600' : 'text-navy-800'
@@ -475,6 +663,59 @@ function Dato({ etiqueta, valor, destacado }: {
         {valor}
       </dd>
     </div>
+  )
+}
+
+/** Los iconos de las filas de datos, en línea (24x24, trazo 2). */
+function IconoDato({ nombre }: { nombre: 'reloj' | 'calendario' | 'lista' | 'modulo' | 'personas' | 'info' }) {
+  const trazos: Record<typeof nombre, ReactNode> = {
+    reloj: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    calendario: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M8 3v4M16 3v4M3 11h18" />
+      </>
+    ),
+    lista: <path d="M4 7h16M4 12h10M4 17h7" />,
+    modulo: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21a8 8 0 0 1 16 0" />
+      </>
+    ),
+    personas: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20a6 6 0 0 1 12 0" />
+        <path d="M16 5.5a3 3 0 0 1 0 5.6M18 20a6 6 0 0 0-2-4.5" />
+      </>
+    ),
+    info: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5M12 8h.01" />
+      </>
+    ),
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {trazos[nombre]}
+    </svg>
   )
 }
 
@@ -507,7 +748,9 @@ function estiloEstado(estado: TurnoPublico['estado']): { fondo: string; texto: s
     case 'SKIPPED':
       return { fondo: 'bg-rojo-50', texto: 'text-rojo-600' }
     default:
-      return { fondo: 'bg-gris-100', texto: 'text-navy-800' }
+      /* En espera: azul claro, como la caja del código en la referencia.
+         El estado en sí lo dice el texto de al lado. */
+      return { fondo: 'bg-azul-50', texto: 'text-navy-800' }
   }
 }
 
