@@ -9,15 +9,15 @@ import { Aviso } from './components/ui'
 /**
  * SITUR — Enrutado.
  *
- * El panel del operador, con sus cinco pantallas. El panel se carga bajo
- * demanda: el ciudadano entra por el móvil, a veces con mala conexión, y
- * no tiene por qué descargar la consola de administración.
+ * El panel del operador y el portal del ciudadano. El portal es anónimo:
+ * no necesita cuenta, solo el token del QR.
  */
 const Consola = lazy(() => import('./admin/Consola'))
 const GestionUsuarios = lazy(() => import('./admin/GestionUsuarios'))
 const Catalogos = lazy(() => import('./admin/Catalogos'))
 const Historial = lazy(() => import('./admin/Historial'))
 const Estadisticas = lazy(() => import('./admin/Estadisticas'))
+const TurnoCiudadano = lazy(() => import('./ciudadano/TurnoCiudadano'))
 
 export default function App() {
   const { pathname } = useLocation()
@@ -54,6 +54,8 @@ export default function App() {
           <Route path="/admin/historial" element={<Historial />} />
           <Route path="/admin/estadisticas" element={<Estadisticas />} />
 
+          <Route path="/turno/:token" element={<TurnoCiudadano />} />
+
           <Route path="*" element={<NoEncontrado />} />
         </Routes>
       </Suspense>
@@ -86,6 +88,7 @@ function NoEncontrado() {
  * historial de pestañas necesitan distinguir una pantalla de otra.
  */
 function tituloDeRuta(ruta: string): string | null {
+  if (ruta.startsWith('/turno/')) return 'Su turno'
   switch (ruta) {
     case '/admin':
       return 'Acceso'
