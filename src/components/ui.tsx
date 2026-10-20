@@ -12,12 +12,12 @@ import type { EstadoTurno, PrioridadTurno } from '../lib/tipos'
  */
 
 const ESTILO_ESTADO: Record<EstadoTurno, string> = {
-  WAITING: 'bg-institucional-100 text-institucional-700',
-  CALLED: 'bg-alerta-50 text-alerta-700',
-  SERVING: 'bg-ok-50 text-ok-700',
-  COMPLETED: 'bg-institucional-50 text-institucional-500',
-  CANCELLED: 'bg-peligro-50 text-peligro-700',
-  SKIPPED: 'bg-peligro-50 text-peligro-700',
+  WAITING: 'bg-gris-100 text-gris-700',
+  CALLED: 'bg-ambar-50 text-ambar-600',
+  SERVING: 'bg-verde-50 text-verde-600',
+  COMPLETED: 'bg-gris-50 text-gris-700',
+  CANCELLED: 'bg-rojo-50 text-rojo-600',
+  SKIPPED: 'bg-rojo-50 text-rojo-600',
 }
 
 /**
@@ -37,7 +37,7 @@ export function Marca({ tamano = 'md' }: { tamano?: 'md' | 'lg' }) {
   const grande = tamano === 'lg'
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-2xl bg-institucional-600 text-white ${
+      className={`flex shrink-0 items-center justify-center rounded-2xl bg-azul-500 text-white ${
         grande ? 'h-14 w-14' : 'h-9 w-9'
       }`}
       aria-hidden="true"
@@ -79,10 +79,10 @@ export function ChipPrioridad({ prioridad }: { prioridad: PrioridadTurno }) {
   const urgente = prioridad === 'URGENTE'
   const preferente = prioridad === 'PREFERENTE'
   const tono = urgente
-    ? 'bg-peligro-50 text-peligro-700'
+    ? 'bg-rojo-50 text-rojo-600'
     : preferente
-      ? 'bg-alerta-50 text-alerta-700'
-      : 'bg-institucional-100 text-institucional-600'
+      ? 'bg-ambar-50 text-ambar-600'
+      : 'bg-gris-100 text-gris-700'
   return (
     <span className={`etiqueta ${tono}`}>
       {ETIQUETA_PRIORIDAD[prioridad]}
@@ -95,10 +95,10 @@ export function Chip({ children, tono = 'neutro' }: {
   tono?: 'neutro' | 'ok' | 'alerta' | 'peligro'
 }) {
   const tonos = {
-    neutro: 'bg-institucional-100 text-institucional-700',
-    ok: 'bg-ok-50 text-ok-700',
-    alerta: 'bg-alerta-50 text-alerta-700',
-    peligro: 'bg-peligro-50 text-peligro-700',
+    neutro: 'bg-gris-100 text-gris-700',
+    ok: 'bg-verde-50 text-verde-600',
+    alerta: 'bg-ambar-50 text-ambar-600',
+    peligro: 'bg-rojo-50 text-rojo-600',
   }
   return <span className={`etiqueta ${tonos[tono]}`}>{children}</span>
 }
@@ -111,9 +111,9 @@ export function Vacio({ titulo, detalle, icono }: {
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-      {icono && <div className="text-institucional-300">{icono}</div>}
-      <p className="text-sm font-semibold text-institucional-700">{titulo}</p>
-      {detalle && <p className="max-w-sm text-sm text-institucional-400">{detalle}</p>}
+      {icono && <div className="text-gris-500">{icono}</div>}
+      <p className="text-sm font-semibold text-gris-700">{titulo}</p>
+      {detalle && <p className="max-w-sm text-sm text-gris-500">{detalle}</p>}
     </div>
   )
 }
@@ -124,9 +124,9 @@ export function Aviso({ tono, children }: {
   children: ReactNode
 }) {
   const tonos = {
-    ok: 'border-ok-500/30 bg-ok-50 text-ok-700',
-    alerta: 'border-alerta-500/30 bg-alerta-50 text-alerta-700',
-    peligro: 'border-peligro-500/30 bg-peligro-50 text-peligro-700',
+    ok: 'border-verde-500/30 bg-verde-50 text-verde-600',
+    alerta: 'border-ambar-500/30 bg-ambar-50 text-ambar-600',
+    peligro: 'border-rojo-500/30 bg-rojo-50 text-rojo-600',
   }
   return (
     <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${tonos[tono]}`}>
@@ -202,7 +202,7 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-institucional-900/50 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-navy-900/50 p-0 sm:items-center sm:p-4"
       onClick={onCerrar}
       role="presentation"
     >
@@ -214,12 +214,12 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
         aria-modal="true"
         aria-label={titulo}
       >
-        <div className="flex items-center justify-between border-b border-institucional-100 px-5 py-4">
-          <h2 className="text-base font-bold text-institucional-800">{titulo}</h2>
+        <div className="flex items-center justify-between border-b border-gris-100 px-5 py-4">
+          <h2 className="text-base font-bold text-navy-800">{titulo}</h2>
           <button
             type="button"
             onClick={onCerrar}
-            className="rounded-lg p-1.5 text-institucional-400 transition-colors hover:bg-institucional-50 hover:text-institucional-700"
+            className="rounded-lg p-1.5 text-gris-500 transition-colors hover:bg-gris-50 hover:text-gris-700"
             aria-label="Cerrar"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -241,11 +241,11 @@ export function Campo({ etiqueta, children, ayuda }: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-institucional-500">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gris-700">
         {etiqueta}
       </span>
       {children}
-      {ayuda && <span className="mt-1 block text-xs text-institucional-400">{ayuda}</span>}
+      {ayuda && <span className="mt-1 block text-xs text-gris-500">{ayuda}</span>}
     </label>
   )
 }

@@ -48,11 +48,11 @@ export default function PantallaPublica() {
   const masRecientes = turnos
 
   return (
-    <div className="flex min-h-screen flex-col bg-institucional-900 text-white">
+    <div className="flex min-h-screen flex-col bg-navy-900 text-white">
       <header className="flex items-center justify-between border-b border-white/10 px-8 py-5">
         <div>
           <p className="text-3xl font-black">SITUR</p>
-          <p className="text-base text-institucional-200">Dirección de Catastro · Durango</p>
+          <p className="text-base text-gris-200">Dirección de Catastro · Durango</p>
         </div>
         {/*
           El reloj va en la tipografia del sistema, no en una monoespaciada.
@@ -61,7 +61,7 @@ export default function PantallaPublica() {
           todo lo demas: una monoespaciada de sistema es una maquina de
           escribir al lado de un cartel.
         */}
-        <p className="text-4xl font-bold tabular-nums text-institucional-200">
+        <p className="text-4xl font-bold tabular-nums text-gris-200">
           {reloj.toLocaleTimeString('es-MX', {
             timeZone: 'America/Mazatlan',
             hour: '2-digit',
@@ -71,12 +71,12 @@ export default function PantallaPublica() {
       </header>
 
       <main className="flex-1 px-8 py-6">
-        <h1 className="mb-4 text-base font-bold uppercase tracking-widest text-institucional-200">
+        <h1 className="mb-4 text-base font-bold uppercase tracking-widest text-gris-200">
           Últimas llamadas
         </h1>
 
         {masRecientes.length === 0 ? (
-          <p className="text-3xl text-institucional-200">
+          <p className="text-3xl text-gris-200">
             Espere a que se llamen los turnos.
           </p>
         ) : (
@@ -87,10 +87,10 @@ export default function PantallaPublica() {
                 className="rounded-2xl border border-white/10 bg-white/5 p-6"
               >
                 <p className="text-7xl font-black leading-none">{t.codigo_turno}</p>
-                <p className="mt-3 text-2xl font-bold text-institucional-200">
+                <p className="mt-3 text-2xl font-bold text-gris-200">
                   Módulo {t.codigo_modulo ?? '—'}
                 </p>
-                <p className="mt-1 text-base text-institucional-200">
+                <p className="mt-1 text-base text-gris-200">
                   {t.denominacion_tramite}
                 </p>
               </li>
@@ -99,7 +99,7 @@ export default function PantallaPublica() {
         )}
       </main>
 
-      <footer className="border-t border-white/10 px-8 py-4 text-center text-base text-institucional-200">
+      <footer className="border-t border-white/10 px-8 py-4 text-center text-base text-gris-200">
         Consulte su turno con el código QR que le entregamos.
       </footer>
     </div>

@@ -197,24 +197,24 @@ export default function TurnoCiudadano() {
 
   if (cargando) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-institucional-50">
-        <p className="text-sm text-institucional-400">Consultando su turno…</p>
+      <div className="flex min-h-screen items-center justify-center bg-gris-50">
+        <p className="text-sm text-gris-500">Consultando su turno…</p>
       </div>
     )
   }
 
   if (error || !turno) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-institucional-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gris-50 p-4">
         <div className="tarjeta w-full max-w-md p-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-alerta-50 text-alerta-700">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-ambar-50 text-ambar-600">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4M12 16h.01" />
             </svg>
           </div>
-          <h1 className="text-lg font-bold text-institucional-800">{error?.titulo}</h1>
-          <p className="mt-2 text-sm text-institucional-500">{error?.detalle}</p>
+          <h1 className="text-lg font-bold text-navy-800">{error?.titulo}</h1>
+          <p className="mt-2 text-sm text-gris-700">{error?.detalle}</p>
           <button type="button" onClick={() => void cargar()} className="boton-secundario mt-5">
             Reintentar
           </button>
@@ -226,10 +226,10 @@ export default function TurnoCiudadano() {
   const estilo = estiloEstado(turno.estado)
 
   return (
-    <div className="min-h-screen bg-institucional-50">
-      <header className="bg-institucional-800 px-4 py-3 text-center">
+    <div className="min-h-screen bg-gris-50">
+      <header className="bg-navy-800 px-4 py-3 text-center">
         <p className="text-sm font-bold text-white">SITUR</p>
-        <p className="text-[11px] text-institucional-200">Dirección de Catastro · Durango</p>
+        <p className="text-[11px] text-gris-200">Dirección de Catastro · Durango</p>
       </header>
 
       <main className="mx-auto max-w-lg p-4 pb-10">
@@ -257,7 +257,7 @@ export default function TurnoCiudadano() {
             <p className={`mt-2 text-sm font-semibold ${estilo.texto}`}>{turno.mensaje}</p>
           </div>
 
-          <dl className="divide-y divide-institucional-100">
+          <dl className="divide-y divide-gris-100">
             <Dato etiqueta="Trámite" valor={turno.denominacion_tramite} />
             <Dato
               etiqueta="Estado"
@@ -291,7 +291,7 @@ export default function TurnoCiudadano() {
         {turno.estado === 'WAITING' || turno.estado === 'CALLED' ? (
           <div className="mt-4">
             {suscrito ? (
-              <div className="rounded-xl border border-ok-500/30 bg-ok-50 px-4 py-3 text-sm text-ok-700">
+              <div className="rounded-xl border border-verde-500/30 bg-verde-50 px-4 py-3 text-sm text-verde-600">
                 <p className="font-bold">Le avisaremos cuando se acerque su turno</p>
                 <p className="mt-0.5 text-xs">
                   Recibirá el aviso aunque cierre esta pestaña.
@@ -306,14 +306,14 @@ export default function TurnoCiudadano() {
                   type="button"
                   onClick={() => void dejarDeAvisar()}
                   disabled={cancelando}
-                  className="mt-2 text-xs font-semibold text-ok-700 underline underline-offset-2 hover:text-ok-500"
+                  className="mt-2 text-xs font-semibold text-verde-600 underline underline-offset-2 hover:text-verde-500"
                 >
                   {cancelando ? 'Cancelando…' : 'Dejar de avisarme'}
                 </button>
               </div>
             ) : rechazado ? (
-              <div className="rounded-xl border border-institucional-200 bg-white px-4 py-3 text-sm text-institucional-500">
-                <p className="font-semibold text-institucional-700">
+              <div className="rounded-xl border border-gris-200 bg-white px-4 py-3 text-sm text-gris-700">
+                <p className="font-semibold text-gris-700">
                   Sin problema: su turno se actualiza solo en esta pantalla
                 </p>
                 <p className="mt-0.5 text-xs">
@@ -322,10 +322,10 @@ export default function TurnoCiudadano() {
               </div>
             ) : pushSoportado() ? (
               <div className="tarjeta p-4">
-                <p className="text-sm font-bold text-institucional-800">
+                <p className="text-sm font-bold text-navy-800">
                   ¿Quiere que le avisemos cuando se acerque su turno?
                 </p>
-                <p className="mt-1 text-xs text-institucional-500">
+                <p className="mt-1 text-xs text-gris-700">
                   Le llega al navegador aunque tenga esta pestaña cerrada. Para
                   mandárselo, su navegador guarda una dirección de aviso que
                   pertenece a su proveedor de correo (en la mayoría de los
@@ -342,7 +342,7 @@ export default function TurnoCiudadano() {
                 </button>
               </div>
             ) : (
-              <div className="rounded-xl border border-institucional-200 bg-white px-4 py-3 text-sm text-institucional-500">
+              <div className="rounded-xl border border-gris-200 bg-white px-4 py-3 text-sm text-gris-700">
                 Este navegador no admite avisos. Deje la página abierta: se
                 actualiza sola.
               </div>
@@ -350,7 +350,7 @@ export default function TurnoCiudadano() {
           </div>
         ) : null}
 
-        <p className="mt-4 text-center text-[11px] text-institucional-500">
+        <p className="mt-4 text-center text-[11px] text-gris-700">
           {vivo ? 'Actualización en vivo activa' : 'Actualización automática'} · No
           requiere cuenta ni datos personales
         </p>
@@ -363,13 +363,13 @@ export default function TurnoCiudadano() {
           cancela con constancia de que fue el, no la ventanilla.
         */}
         {(turno.estado === 'WAITING' || turno.estado === 'CALLED') && (
-          <div className="mt-4 rounded-xl border border-institucional-100 bg-white px-4 py-3">
+          <div className="mt-4 rounded-xl border border-gris-100 bg-white px-4 py-3">
             <details>
-              <summary className="cursor-pointer text-xs font-semibold text-institucional-500">
+              <summary className="cursor-pointer text-xs font-semibold text-gris-700">
                 No quiero que se atienda mi turno
               </summary>
               <div className="mt-3 space-y-2">
-                <p className="text-xs leading-relaxed text-institucional-500">
+                <p className="text-xs leading-relaxed text-gris-700">
                   Puede oponerse a que se atienda su turno. Se registra su
                   consideracion y el turno se cancela. Si cree que hubo un
                   error, acuda a la ventanilla con su codigo.
@@ -383,7 +383,7 @@ export default function TurnoCiudadano() {
                   onChange={(e) => setConsideracion(e.target.value)}
                 />
                 {errorConsideracion && (
-                  <p className="text-xs font-semibold text-peligro-700">
+                  <p className="text-xs font-semibold text-rojo-600">
                     {errorConsideracion}
                   </p>
                 )}
@@ -420,11 +420,11 @@ export default function TurnoCiudadano() {
           navegador entrega una direccion de aviso que pertenece a su
           proveedor de correo, y eso es un tercero.
         */}
-        <details className="mt-4 rounded-xl border border-institucional-100 bg-white px-4 py-3 text-left">
-          <summary className="cursor-pointer text-xs font-semibold text-institucional-500">
+        <details className="mt-4 rounded-xl border border-gris-100 bg-white px-4 py-3 text-left">
+          <summary className="cursor-pointer text-xs font-semibold text-gris-700">
             Aviso de privacidad
           </summary>
-          <div className="mt-2 space-y-2 text-xs leading-relaxed text-institucional-500">
+          <div className="mt-2 space-y-2 text-xs leading-relaxed text-gris-700">
             <p>
               <strong>Que se guarda.</strong> El codigo de su turno, su estado y
               las horas en que se emitio, se llamo y se atendio.{' '}
@@ -466,10 +466,10 @@ function Dato({ etiqueta, valor, destacado }: {
 }) {
   return (
     <div className="flex items-center justify-between px-6 py-3">
-      <dt className="text-sm text-institucional-500">{etiqueta}</dt>
+      <dt className="text-sm text-gris-700">{etiqueta}</dt>
       <dd
         className={`text-sm font-bold ${
-          destacado ? 'text-alerta-700' : 'text-institucional-800'
+          destacado ? 'text-ambar-600' : 'text-navy-800'
         }`}
       >
         {valor}
@@ -498,16 +498,16 @@ function etiquetaEstado(estado: TurnoPublico['estado']): string {
 function estiloEstado(estado: TurnoPublico['estado']): { fondo: string; texto: string } {
   switch (estado) {
     case 'CALLED':
-      return { fondo: 'bg-alerta-50', texto: 'text-alerta-700' }
+      return { fondo: 'bg-ambar-50', texto: 'text-ambar-600' }
     case 'SERVING':
-      return { fondo: 'bg-ok-50', texto: 'text-ok-700' }
+      return { fondo: 'bg-verde-50', texto: 'text-verde-600' }
     case 'COMPLETED':
-      return { fondo: 'bg-institucional-100', texto: 'text-institucional-700' }
+      return { fondo: 'bg-gris-100', texto: 'text-gris-700' }
     case 'CANCELLED':
     case 'SKIPPED':
-      return { fondo: 'bg-peligro-50', texto: 'text-peligro-700' }
+      return { fondo: 'bg-rojo-50', texto: 'text-rojo-600' }
     default:
-      return { fondo: 'bg-institucional-100', texto: 'text-institucional-800' }
+      return { fondo: 'bg-gris-100', texto: 'text-navy-800' }
   }
 }
 

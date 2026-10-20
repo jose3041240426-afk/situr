@@ -338,10 +338,10 @@ export default function Consola() {
       <section className="tarjeta mb-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-institucional-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
               Periodo operativo
             </p>
-            <p className="mt-0.5 flex items-center gap-2 text-lg font-bold text-institucional-800">
+            <p className="mt-0.5 flex items-center gap-2 text-lg font-bold text-navy-800">
               {periodoAbierto ? periodoAbierto.clave : hoy}
               {periodoAbierto ? (
                 <Chip tono="ok">Abierto</Chip>
@@ -350,7 +350,7 @@ export default function Consola() {
               )}
             </p>
             {periodoAbierto?.hora_inicio && (
-              <p className="text-xs text-institucional-400">
+              <p className="text-xs text-gris-500">
                 Abierto a las {formatearSoloHora(periodoAbierto.hora_inicio)}
               </p>
             )}
@@ -395,12 +395,12 @@ export default function Consola() {
         {/* ------------------------------------------------ emitir turno */}
         <div className="min-w-0 space-y-4">
           <section className="tarjeta p-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Emitir turno
             </h2>
 
             {!periodoAbierto ? (
-              <p className="mt-3 rounded-lg bg-alerta-50 px-3 py-2.5 text-sm text-alerta-700">
+              <p className="mt-3 rounded-lg bg-ambar-50 px-3 py-2.5 text-sm text-ambar-600">
                 No hay periodo abierto. Sin él, la base rechaza cualquier alta de turno
                 (RF-025).
               </p>
@@ -448,17 +448,17 @@ export default function Consola() {
             <section className="tarjeta p-4 impresion-boleto">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
                     Turno emitido
                   </h2>
-                  <p className="mt-1 text-2xl font-black text-institucional-800">
+                  <p className="mt-1 text-2xl font-black text-navy-800">
                     {emitido.codigo}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEmitido(null)}
-                  className="no-imprimir rounded-lg p-1 text-institucional-300 hover:bg-institucional-50"
+                  className="no-imprimir rounded-lg p-1 text-gris-500 hover:bg-gris-50"
                   aria-label="Cerrar"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -469,7 +469,7 @@ export default function Consola() {
 
               <div className="mt-3 flex flex-col items-center">
                 <CodigoQR valor={`${window.location.origin}/turno/${emitido.token}`} />
-                <p className="mt-2 max-w-[15rem] break-all text-center font-mono text-[10px] text-institucional-300">
+                <p className="mt-2 max-w-[15rem] break-all text-center font-mono text-[10px] text-gris-500">
                   {emitido.token}
                 </p>
               </div>
@@ -479,7 +479,7 @@ export default function Consola() {
                 ciudadano: con el cualquiera puede ver su turno. Por eso
                 el QR va con una nota que lo dice.
               */}
-              <p className="mx-auto mt-3 max-w-[15rem] text-[10px] leading-relaxed text-institucional-400">
+              <p className="mx-auto mt-3 max-w-[15rem] text-[10px] leading-relaxed text-gris-500">
                 Este código es la credencial de su turno: no lo comparta ni
                 lo muestre en público.
               </p>
@@ -506,7 +506,7 @@ export default function Consola() {
 
           {/* Módulos */}
           <section className="tarjeta p-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Módulos
             </h2>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -518,7 +518,7 @@ export default function Consola() {
               ))}
             </div>
             {operador?.modulo && (
-              <p className="mt-2 text-xs text-institucional-400">
+              <p className="mt-2 text-xs text-gris-500">
                 Su módulo: <strong>{operador.modulo}</strong>. Si está activo, «llamar
                 siguiente» enruta ahí (RG-004).
               </p>
@@ -530,7 +530,7 @@ export default function Consola() {
         <div className="min-w-0 space-y-4">
           <section className="tarjeta p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
                 Llamar siguiente
               </h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -577,23 +577,23 @@ export default function Consola() {
               tres turnos con "posición 1" y ninguno era previsualizable.
             */}
             {propuesta?.hay_turnos && !turnoLlamado && (
-              <div className="mt-4 rounded-xl border-2 border-institucional-200 bg-institucional-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-institucional-400">
+              <div className="mt-4 rounded-xl border-2 border-gris-200 bg-gris-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
                   El sistema va a llamar a
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-3">
-                  <span className="text-3xl font-black text-institucional-800">
+                  <span className="text-3xl font-black text-navy-800">
                     {propuesta.codigo_turno}
                   </span>
-                  <span className="text-sm text-institucional-600">
+                  <span className="text-sm text-gris-700">
                     {propuesta.denominacion_tramite}
                   </span>
                   {propuesta.prioridad && <ChipPrioridad prioridad={propuesta.prioridad} />}
                 </div>
                 {propuesta.razon && (
-                  <p className="mt-2 text-sm text-institucional-600">{propuesta.razon}</p>
+                  <p className="mt-2 text-sm text-gris-700">{propuesta.razon}</p>
                 )}
-                <p className="mt-1 text-xs text-institucional-400">
+                <p className="mt-1 text-xs text-gris-500">
                   Posición {propuesta.posicion_global} de {propuesta.en_espera} en la cola
                   · {propuesta.minutos_esperando} min esperando
                 </p>
@@ -601,19 +601,19 @@ export default function Consola() {
             )}
 
             {!propuesta?.hay_turnos && !turnoLlamado && (
-              <p className="mt-3 text-sm text-institucional-400">
+              <p className="mt-3 text-sm text-gris-500">
                 {propuesta?.mensaje ?? 'No hay turnos en espera.'}
               </p>
             )}
 
             {turnoLlamado && (
-              <div className="mt-4 rounded-xl border-2 border-institucional-200 bg-institucional-50 p-4">
+              <div className="mt-4 rounded-xl border-2 border-gris-200 bg-gris-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-3xl font-black text-institucional-800">
+                    <p className="text-3xl font-black text-navy-800">
                       {turnoLlamado.codigo_turno}
                     </p>
-                    <p className="text-sm text-institucional-600">
+                    <p className="text-sm text-gris-700">
                       {turnoLlamado.denominacion_tramite} · {turnoLlamado.codigo_modulo}
                     </p>
                   </div>
@@ -685,26 +685,26 @@ export default function Consola() {
 
           {/* En atención ahora */}
           <section className="tarjeta overflow-hidden">
-            <div className="border-b border-institucional-100 px-4 py-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+            <div className="border-b border-gris-100 px-4 py-3">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
                 En atención ahora
               </h2>
             </div>
             {actuales.length === 0 ? (
               <Vacio titulo="No hay turnos en curso" detalle="Los turnos llamados y en atención aparecen aquí." />
             ) : (
-              <ul className="divide-y divide-institucional-100">
+              <ul className="divide-y divide-gris-100">
                 {actuales.map((t) => (
                   <li key={t.turno_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-institucional-800">
+                        <span className="text-base font-bold text-navy-800">
                           {t.codigo_turno}
                         </span>
                         <ChipEstado estado={t.estado} />
                         <ChipPrioridad prioridad={t.prioridad} />
                       </div>
-                      <p className="truncate text-xs text-institucional-400">
+                      <p className="truncate text-xs text-gris-500">
                         {t.denominacion_tramite}
                         {t.codigo_modulo ? ` · ${t.codigo_modulo}` : ''}
                         {t.nombre_trabajador ? ` · ${t.nombre_trabajador}` : ''}
@@ -809,31 +809,31 @@ export default function Consola() {
       */}
       {retirados.length > 0 && (
         <section className="tarjeta mb-4 overflow-hidden">
-          <div className="border-b border-institucional-100 px-4 py-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+          <div className="border-b border-gris-100 px-4 py-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Retirados por el titular
             </h2>
-            <p className="mt-0.5 text-xs text-institucional-400">
+            <p className="mt-0.5 text-xs text-gris-500">
               {retirados.length}{' '}
               {retirados.length === 1 ? 'ciudadano se opuso' : 'ciudadanos se opusieron'}{' '}
               a que se atendiera su turno. No se llamarán.
             </p>
           </div>
-          <ul className="divide-y divide-institucional-100">
+          <ul className="divide-y divide-gris-100">
             {retirados.map((r) => (
               <li key={r.turno_id} className="px-4 py-3">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-bold text-institucional-800">{r.codigo_turno}</span>
-                  <span className="text-sm text-institucional-600">
+                  <span className="font-bold text-navy-800">{r.codigo_turno}</span>
+                  <span className="text-sm text-gris-700">
                     {r.denominacion_tramite}
                   </span>
                   {r.codigo_modulo && (
-                    <span className="text-xs text-institucional-400">
+                    <span className="text-xs text-gris-500">
                       módulo {r.codigo_modulo}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 rounded bg-alerta-50 px-2 py-1.5 text-sm text-alerta-700">
+                <p className="mt-1 rounded bg-ambar-50 px-2 py-1.5 text-sm text-ambar-600">
                   «{r.consideracion}»
                 </p>
               </li>
@@ -844,13 +844,13 @@ export default function Consola() {
 
       {/* Cola de espera */}
       <section className="tarjeta overflow-hidden">
-        <div className="flex items-center justify-between border-b border-institucional-100 px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+        <div className="flex items-center justify-between border-b border-gris-100 px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
             Cola de espera
           </h2>
-          <span className="text-xs text-institucional-400">
+          <span className="text-xs text-gris-500">
             {cola.length} {cola.length === 1 ? 'turno' : 'turnos'} ·{' '}
-            <strong className="text-institucional-600">Nº de llamada</strong> y{' '}
+            <strong className="text-gris-700">Nº de llamada</strong> y{' '}
             posición por trámite (RN-014)
             {actualizado && (
               <>
@@ -878,7 +878,7 @@ export default function Consola() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-institucional-50 text-left text-xs text-institucional-500">
+              <thead className="bg-gris-50 text-left text-xs text-gris-700">
                 <tr>
                   <th
                     className="px-3 py-2 font-medium whitespace-nowrap"
@@ -901,9 +901,9 @@ export default function Consola() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-institucional-100">
+              <tbody className="divide-y divide-gris-100">
                 {cola.map((f) => (
-                  <tr key={f.turno_id} className="hover:bg-institucional-50">
+                  <tr key={f.turno_id} className="hover:bg-gris-50">
                     <td className="px-3 py-2.5">
                       {/*
                         El círculo se reserva para el que decide a quién
@@ -914,29 +914,29 @@ export default function Consola() {
                       <span
                         className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                           f.posicion_global === 1
-                            ? 'bg-ok-50 text-ok-700 ring-2 ring-ok-500/40'
-                            : 'bg-institucional-100 text-institucional-700'
+                            ? 'bg-verde-50 text-verde-600 ring-2 ring-verde-500/40'
+                            : 'bg-gris-100 text-gris-700'
                         }`}
                       >
                         {f.posicion_global}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-sm tabular-nums text-institucional-500">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-sm tabular-nums text-gris-700">
                       {f.posicion}
                       <span className="sr-only">
                         {' '}
                         (posición dentro de su trámite)
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap font-bold text-institucional-800">
+                    <td className="px-3 py-2.5 whitespace-nowrap font-bold text-navy-800">
                       {f.codigo_turno}
                     </td>
-                    <td className="min-w-[9rem] px-3 py-2.5 text-institucional-600">
+                    <td className="min-w-[9rem] px-3 py-2.5 text-gris-700">
                       {f.denominacion_tramite}
                       
                     </td>
                     <td
-                      className="px-3 py-2.5 whitespace-nowrap text-xs tabular-nums text-institucional-500"
+                      className="px-3 py-2.5 whitespace-nowrap text-xs tabular-nums text-gris-700"
                       title={formatearFechaHora(f.creado_en)}
                     >
                       {formatearSoloHora(f.creado_en)}
@@ -972,7 +972,7 @@ export default function Consola() {
                           type="button"
                           onClick={() => setCancelando(f)}
                           disabled={ocupado || !periodoAbierto}
-                          className="rounded-lg px-2 py-1.5 text-xs font-semibold text-institucional-400 transition-colors hover:bg-peligro-50 hover:text-peligro-700"
+                          className="rounded-lg px-2 py-1.5 text-xs font-semibold text-gris-500 transition-colors hover:bg-rojo-50 hover:text-rojo-600"
                           title="Cancelar este turno (el ciudadano verá que su turno fue cancelado)"
                         >
                           Cancelar
@@ -997,10 +997,10 @@ export default function Consola() {
       {confirmandoCierre && periodoAbierto && (
         <Modal titulo="Cerrar el periodo" onCerrar={() => setConfirmandoCierre(false)}>
           <div className="space-y-4">
-            <p className="text-sm text-institucional-600">
+            <p className="text-sm text-gris-700">
               Al cerrar el periodo <strong>{periodoAbierto.clave}</strong>:
             </p>
-            <ul className="space-y-2 rounded-lg bg-alerta-50 p-3 text-sm text-alerta-700">
+            <ul className="space-y-2 rounded-lg bg-ambar-50 p-3 text-sm text-ambar-600">
               <li>
                 <strong>{cola.length}</strong>{' '}
                 {cola.length === 1 ? 'turno en espera' : 'turnos en espera'} quedarán como
@@ -1013,7 +1013,7 @@ export default function Consola() {
               </li>
               <li>No se podrán emitir más turnos hoy.</li>
             </ul>
-            <p className="text-xs text-institucional-400">
+            <p className="text-xs text-gris-500">
               Los ciudadanos afectados verán que su turno no fue atendido y podrán
               reponerse en ventanilla.
             </p>
@@ -1065,12 +1065,12 @@ export default function Consola() {
             }}
             className="space-y-4"
           >
-            <p className="text-sm text-institucional-600">
+            <p className="text-sm text-gris-700">
               Se cancela el turno <strong>{cancelando.codigo_turno}</strong> (
               {cancelando.denominacion_tramite}). El ciudadano verá:{' '}
               <em>«Su turno fue cancelado»</em>.
             </p>
-            <p className="text-xs text-institucional-400">
+            <p className="text-xs text-gris-500">
               Para un turno emitido con el trámite equivocado, esta es la forma
               correcta: no llega a llamarse y no ocupa lugar en la cola.
             </p>
@@ -1119,7 +1119,7 @@ export default function Consola() {
             }}
             className="space-y-4"
           >
-            <p className="text-sm text-institucional-600">
+            <p className="text-sm text-gris-700">
               {modalMotivo.accion === 'omitir'
                 ? 'El ciudadano NO se presentó. Su turno queda como omitido y el ve: ' +
                   'Su turno no fue atendido. Acuda a ventanilla para reposición. ' +
@@ -1127,9 +1127,9 @@ export default function Consola() {
                 : 'Se CANCELA la solicitud. El ciudadano ve: ' +
                   'Su turno fue cancelado. Esta accion no se puede reponer.'}
             </p>
-            <p className="text-xs text-institucional-400">
+            <p className="text-xs text-gris-500">
               El motivo queda registrado en el historial del turno (RF-012, RF-016).
-              <strong className="block text-alerta-700">
+              <strong className="block text-ambar-600">
                 No escriba aquí el nombre ni el teléfono del ciudadano: el motivo
                 queda guardado y no se puede modificar después.
               </strong>

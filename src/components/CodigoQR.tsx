@@ -39,7 +39,7 @@ export default function CodigoQR({
 
   if (error) {
     return (
-      <p className="rounded-lg border border-peligro-500/30 bg-peligro-50 px-4 py-3 text-sm text-peligro-700">
+      <p className="rounded-lg border border-rojo-500/30 bg-rojo-50 px-4 py-3 text-sm text-rojo-600">
         {error}
       </p>
     )
@@ -48,7 +48,7 @@ export default function CodigoQR({
   if (!url) {
     return (
       <div
-        className="animate-pulse rounded-lg bg-institucional-100"
+        className="animate-pulse rounded-lg bg-gris-100"
         style={{ width: tamano, height: tamano }}
       />
     )
@@ -60,7 +60,7 @@ export default function CodigoQR({
       alt={`Código QR del turno ${valor}`}
       width={tamano}
       height={tamano}
-      className="rounded-lg border border-institucional-100 bg-white p-1"
+      className="rounded-lg border border-gris-100 bg-white p-1"
     />
   )
 }

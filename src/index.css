@@ -10,45 +10,72 @@
  */
 
 @theme {
-  --color-institucional-50: #f2f5f9;
-  --color-institucional-100: #e3eaf3;
-  --color-institucional-200: #c3d2e6;
   /*
-   * Rampa de TEXTO sobre fondo claro. Los pasos 300, 400 y 500 son los que
-   * se usan como texto secundario: los tres pasan 4.5:1 sobre #f2f5f9 y sobre
-   * blanco (WCAG 1.4.3, nivel AA). Comprobado con calculo de contraste, no
-   * a ojo: 300 -> 5.04, 400 -> 5.55, 500 -> 8.27.
+   * La rampa INSTITUCIONAL, con la paleta que se propone a partir de la
+   * referencia de diseño.
    *
-   * Sobre fondo OSCURO (barra lateral, login, pantalla publica) el texto usa
-   * los pasos 100 y 200, no estos: #c3d2e6 da 8.67 sobre la barra y 10.24
-   * sobre la pantalla.
+   * Lo que cambia de fondo: el color de la ACCIÓN pasa a ser un azul
+   * brillante (#1273ea) y el navy (#092648) queda reservado para las
+   * superficies oscuras (barra lateral, login, pantalla pública). Antes el
+   * navy era el color de los botones y las acciones se veían apagadas.
+   *
+   * Los contrastes NO son a ojo: están calculados (WCAG 1.4.3, nivel AA).
+   *
+   *   blanco sobre azul-500 ......... 4.50:1
+   *   azul-500 como texto .......... 4.50:1
+   *   blanco sobre verde-500 ....... 5.08:1
+   *   verde-600 sobre verde-50 ..... 4.59:1
+   *   navy-900 como texto .......... 15.19:1
+   *   gris-500 como texto .......... 5.44:1
+   *
+   * La paleta de la referencia original (#1a79ed, #05a283) se queda en
+   * 4.20:1 y 3.23:1: no pasa AA para texto normal. De ahí el medio punto de
+   * luminosidad de menos.
    */
-  --color-institucional-300: #4a6a99;
-  --color-institucional-400: #3f639a;
-  --color-institucional-500: #2f4a6d;
-  --color-institucional-600: #263c59;
-  --color-institucional-700: #1f3049;
-  --color-institucional-800: #16233a;
-  --color-institucional-900: #0f1929;
 
-  /*
-   * Colores de estado. Los que se usan de FONDO con texto blanco
-   * (boton-ok, boton-peligro) estan oscurecidos hasta pasar 4.5:1 con
-   * blanco: el verde de #10b981 se quedaba en 2.54 y no se leia
-   * (WCAG 1.4.3). Los tonos claros se reservan para texto sobre fondo
-   * blanco o para bordes.
-   */
-  --color-ok-50: #ecfdf5;
-  --color-ok-500: #047857;
-  --color-ok-700: #065f46;
+  /* --- Neutros: fondos, bordes y texto --- */
+  --color-gris-50: #f5f8fd;
+  --color-gris-100: #eef3f9;
+  --color-gris-200: #e1e8f1;
+  --color-gris-300: #c9d4e2;
+  --color-gris-400: #a8b7c9;
+  --color-gris-500: #5b6b80;
+  --color-gris-700: #33475e;
+  --color-gris-900: #14202f;
 
-  --color-alerta-50: #fffbeb;
-  --color-alerta-500: #b45309;
-  --color-alerta-700: #92400e;
+  /* --- Azul de acción --- */
+  --color-azul-50: #ecf6ff;
+  --color-azul-100: #ddedfd;
+  --color-azul-200: #b2cefd;
+  --color-azul-300: #7db1f5;
+  --color-azul-400: #3f8ef0;
+  --color-azul-500: #1273ea;
+  --color-azul-600: #0f66d4;
+  --color-azul-700: #104a8c;
 
-  --color-peligro-50: #fef2f2;
-  --color-peligro-500: #dc2626;
-  --color-peligro-700: #991b1b;
+  /* --- Navy: superficies oscuras --- */
+  --color-navy-600: #1963ce;
+  --color-navy-700: #104a8c;
+  --color-navy-800: #0d3a6b;
+  --color-navy-900: #092648;
+
+  /* --- Estados ---
+     El verde se oscureció para pasar AA con texto blanco: el de la
+     referencia (#05a283) se quedaba en 3.23:1. */
+  --color-verde-50: #e6f6f1;
+  --color-verde-500: #047d66;
+  --color-verde-600: #027c6b;
+
+  --color-ambar-50: #fffbeb;
+  --color-ambar-500: #b45309;
+  --color-ambar-600: #92400e;
+
+  --color-rojo-50: #fef2f2;
+  --color-rojo-500: #dc2626;
+  --color-rojo-600: #991b1b;
+
+  --color-morado-50: #f0ecfd;
+  --color-morado-500: #7a58e2;
 
   /*
    * Tipografia: PILA DEL SISTEMA, deliberadamente.
@@ -73,7 +100,7 @@
   }
 
   body {
-    @apply bg-institucional-50 text-institucional-900 font-sans antialiased;
+    @apply bg-gris-50 text-navy-900 font-sans antialiased;
   }
 
   /* Los objetivos táctiles del panel son grandes: se opera en ventanilla,
@@ -87,7 +114,7 @@
   }
 
   :focus-visible {
-    @apply ring-2 ring-institucional-400 ring-offset-2 ring-offset-white;
+    @apply ring-2 ring-azul-400 ring-offset-2 ring-offset-white;
   }
 }
 
@@ -106,20 +133,20 @@
   }
 
   .boton-primario {
-    @apply bg-institucional-600 text-white hover:bg-institucional-700;
+    @apply bg-azul-500 text-white hover:bg-azul-600;
   }
 
   .boton-secundario {
-    @apply border border-institucional-200 bg-white text-institucional-700
-           hover:border-institucional-300 hover:bg-institucional-50;
+    @apply border border-gris-200 bg-white text-gris-700
+           hover:border-gris-500 hover:bg-gris-50;
   }
 
   .boton-peligro {
-    @apply bg-peligro-500 text-white hover:bg-peligro-700;
+    @apply bg-rojo-500 text-white hover:bg-rojo-600;
   }
 
   .boton-ok {
-    @apply bg-ok-500 text-white hover:bg-ok-700;
+    @apply bg-verde-500 text-white hover:bg-verde-600;
   }
 
   /*
@@ -129,9 +156,9 @@
    */
   .campo,
   .selector {
-    @apply w-full min-w-0 rounded-lg border border-institucional-200 bg-white px-3 py-2.5
-           text-sm text-institucional-900 placeholder:text-institucional-300
-           focus:border-institucional-400 focus:ring-2 focus:ring-institucional-100;
+    @apply w-full min-w-0 rounded-lg border border-gris-200 bg-white px-3 py-2.5
+           text-sm text-navy-900 placeholder:text-gris-500
+           focus:border-azul-400 focus:ring-2 focus:ring-gris-100;
   }
 
   /*
@@ -149,7 +176,7 @@
   }
 
   .tarjeta {
-    @apply rounded-xl border border-institucional-100 bg-white shadow-sm;
+    @apply rounded-xl border border-gris-100 bg-white shadow-sm;
   }
 
   /*

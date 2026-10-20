@@ -101,20 +101,20 @@ export default function Historial() {
         <section className="tarjeta impresion-boleto mb-4 p-4">
           <div className="impresion-boleto-fila flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-institucional-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
                 Reposición emitida
               </p>
-              <p className="mt-1 text-3xl font-black text-institucional-800">
+              <p className="mt-1 text-3xl font-black text-navy-800">
                 {reposicion.codigo_turno}
               </p>
-              <p className="mt-1 text-sm text-institucional-500">
+              <p className="mt-1 text-sm text-gris-700">
                 {reposicion.denominacion_tramite} · en lugar de{' '}
                 {reposicion.codigo_origen}
               </p>
             </div>
             <div className="flex flex-col items-center gap-2">
               <CodigoQR valor={`${window.location.origin}/turno/${reposicion.token_publico}`} />
-              <p className="max-w-[15rem] text-center text-[10px] leading-relaxed text-institucional-400">
+              <p className="max-w-[15rem] text-center text-[10px] leading-relaxed text-gris-500">
                 Este código es la credencial de su turno: no lo comparta ni
                 lo muestre en público.
               </p>
@@ -141,8 +141,8 @@ export default function Historial() {
       )}
 
       <section className="tarjeta overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 border-b border-institucional-100 px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+        <div className="flex flex-wrap items-center gap-3 border-b border-gris-100 px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
             Transiciones registradas
           </h2>
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
@@ -171,7 +171,7 @@ export default function Historial() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-institucional-50 text-left text-xs text-institucional-500">
+              <thead className="bg-gris-50 text-left text-xs text-gris-700">
                 <tr>
                   <th className="px-3 py-2 font-medium">Fecha</th>
                   <th className="px-3 py-2 font-medium">Turno</th>
@@ -184,29 +184,29 @@ export default function Historial() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-institucional-100">
+              <tbody className="divide-y divide-gris-100">
                 {filas.map((f) => (
-                  <tr key={`${f.turno_id}-${f.fecha}`} className="hover:bg-institucional-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-institucional-500">
+                  <tr key={`${f.turno_id}-${f.fecha}`} className="hover:bg-gris-50">
+                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-gris-700">
                       {formatearFechaHora(f.fecha)}
                     </td>
-                    <td className="px-4 py-2.5 font-bold text-institucional-800">
+                    <td className="px-4 py-2.5 font-bold text-navy-800">
                       {f.codigo_turno}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1.5">
                         {f.estado_anterior && <ChipEstado estado={f.estado_anterior} />}
-                        <span className="text-institucional-300">→</span>
+                        <span className="text-gris-500">→</span>
                         <ChipEstado estado={f.estado_nuevo} />
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-institucional-600">
+                    <td className="px-4 py-2.5 text-gris-700">
                       {f.nombre_usuario ?? '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-institucional-600">
+                    <td className="px-4 py-2.5 text-gris-700">
                       {f.codigo_modulo ?? '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-institucional-500">
+                    <td className="px-4 py-2.5 text-xs text-gris-700">
                       {f.motivo ?? '—'}
                     </td>
                     <td className="px-4 py-2.5 text-right">

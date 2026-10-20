@@ -43,7 +43,7 @@ export default function Entrar() {
   if (cargando) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-institucional-200">Cargando…</p>
+        <p className="text-sm text-gris-200">Cargando…</p>
       </div>
     )
   }
@@ -56,17 +56,17 @@ export default function Entrar() {
     // `main` como landmark: sin él, el contenido del login no está dentro de
     // ninguna región (WCAG 1.3.1) y un lector de pantalla no puede saltar
     // al contenido.
-    <main className="flex min-h-screen items-center justify-center bg-institucional-800 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-navy-800 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3">
             <Marca tamano="lg" />
           </div>
           <h1 className="text-2xl font-black text-white">SITUR</h1>
-          <p className="mt-1 text-sm text-institucional-200">
+          <p className="mt-1 text-sm text-gris-200">
             Sistema de Gestión y Seguimiento de Turnos
           </p>
-          <p className="text-xs text-institucional-200">Dirección de Catastro · Durango</p>
+          <p className="text-xs text-gris-200">Dirección de Catastro · Durango</p>
         </div>
 
         <form onSubmit={enviar} className="tarjeta space-y-4 p-6">
@@ -99,7 +99,7 @@ export default function Entrar() {
             {enviando ? 'Entrando…' : 'Entrar'}
           </button>
 
-          <p className="text-center text-xs text-institucional-500">
+          <p className="text-center text-xs text-gris-700">
             Acceso restringido a personal autorizado (RF-001).
           </p>
         </form>
@@ -154,13 +154,13 @@ function InscripcionMFA() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-institucional-800 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-navy-800 p-4">
       <div className="w-full max-w-md">
         <div className="tarjeta p-6">
-          <h1 className="text-lg font-bold text-institucional-800">
+          <h1 className="text-lg font-bold text-navy-800">
             Active la verificación en dos pasos
           </h1>
-          <p className="mt-1 text-sm text-institucional-500">
+          <p className="mt-1 text-sm text-gris-700">
             {operador?.nombres}, su cuenta todavía no tiene MFA. Es obligatorio en el
             primer acceso (RF-026); con ello, las funciones privilegiadas quedan
             habilitadas.
@@ -183,7 +183,7 @@ function InscripcionMFA() {
                 </button>
               ) : (
                 <form onSubmit={confirmar} className="space-y-4">
-                  <div className="rounded-lg border border-institucional-100 bg-institucional-50 p-4 text-center">
+                  <div className="rounded-lg border border-gris-100 bg-gris-50 p-4 text-center">
                     {qr && (
                       <img
                         src={qr}
@@ -193,7 +193,7 @@ function InscripcionMFA() {
                     )}
                   </div>
                   {secreto && (
-                    <p className="break-all rounded-lg bg-institucional-50 px-3 py-2 font-mono text-xs text-institucional-600">
+                    <p className="break-all rounded-lg bg-gris-50 px-3 py-2 font-mono text-xs text-azul-500">
                       {secreto}
                     </p>
                   )}
@@ -214,7 +214,7 @@ function InscripcionMFA() {
                 </form>
               )}
 
-              <button type="button" onClick={salir} className="w-full text-center text-xs text-institucional-200 hover:text-institucional-100">
+              <button type="button" onClick={salir} className="w-full text-center text-xs text-gris-200 hover:text-gris-100">
                 Cerrar sesión
               </button>
             </div>

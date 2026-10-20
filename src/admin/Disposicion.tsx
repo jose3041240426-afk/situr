@@ -41,14 +41,14 @@ export default function Disposicion({
       <aside
         className={`${
           abierto ? 'block' : 'hidden'
-        } w-full shrink-0 bg-institucional-800 text-institucional-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-72`}
+        } w-full shrink-0 bg-navy-800 text-gris-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-72`}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
             <Marca />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">SITUR</p>
-              <p className="truncate text-[11px] text-institucional-200">
+              <p className="truncate text-[11px] text-gris-200">
                 Dirección de Catastro
               </p>
             </div>
@@ -63,8 +63,8 @@ export default function Disposicion({
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
                     isActive
-                      ? 'bg-institucional-600 text-white'
-                      : 'text-institucional-200 hover:bg-white/10 hover:text-white'
+                      ? 'bg-azul-500 text-white'
+                      : 'text-gris-200 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -79,18 +79,18 @@ export default function Disposicion({
               <p className="truncate text-sm font-semibold text-white">
                 {operador?.nombres ?? 'Operador'}
               </p>
-              <p className="truncate text-[11px] text-institucional-200">
+              <p className="truncate text-[11px] text-gris-200">
                 {operador?.numero_empleado}
                 {operador?.modulo ? ` · Módulo ${operador.modulo}` : ''}
               </p>
-              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-institucional-200">
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gris-200">
                 {esAdministrador ? 'Administrador' : operador?.rol ?? 'Operador'}
               </p>
             </div>
             <button
               type="button"
               onClick={cerrarSesion}
-              className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-institucional-200 transition-colors hover:bg-white/10 hover:text-white"
+              className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-gris-200 transition-colors hover:bg-white/10 hover:text-white"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -104,18 +104,18 @@ export default function Disposicion({
 
       {/* Contenido */}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-institucional-100 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-gris-100 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
           <button
             type="button"
             onClick={() => setAbierto((v) => !v)}
-            className="rounded-lg p-2 text-institucional-500 hover:bg-institucional-50 lg:hidden"
+            className="rounded-lg p-2 text-gris-700 hover:bg-gris-50 lg:hidden"
             aria-label="Abrir menú"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
-          <h1 className="truncate text-lg font-bold text-institucional-800">{titulo}</h1>
+          <h1 className="truncate text-lg font-bold text-navy-800">{titulo}</h1>
         </header>
         <main className="p-4 lg:p-8">{children}</main>
       </div>

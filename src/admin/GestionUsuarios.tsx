@@ -74,11 +74,11 @@ export default function GestionUsuarios() {
         <Aviso tono="alerta">Solo los administradores pueden ver la lista completa de usuarios.</Aviso>
       ) : (
         <section className="tarjeta overflow-hidden">
-          <div className="flex items-center justify-between border-b border-institucional-100 px-4 py-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+          <div className="flex items-center justify-between border-b border-gris-100 px-4 py-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Personal con acceso
             </h2>
-            <span className="text-xs text-institucional-400">{usuarios.length}</span>
+            <span className="text-xs text-gris-500">{usuarios.length}</span>
           </div>
 
           {cargando ? (
@@ -91,7 +91,7 @@ export default function GestionUsuarios() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-institucional-50 text-left text-xs text-institucional-500">
+                <thead className="bg-gris-50 text-left text-xs text-gris-700">
                   <tr>
                     <th className="px-3 py-2 font-medium">Empleado</th>
                     <th className="px-3 py-2 font-medium">Nombre</th>
@@ -101,18 +101,18 @@ export default function GestionUsuarios() {
                     <th className="px-3 py-2 font-medium">Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-institucional-100">
+                <tbody className="divide-y divide-gris-100">
                   {usuarios.map((u) => (
-                    <tr key={u.id} className="hover:bg-institucional-50">
-                      <td className="px-4 py-2.5 font-mono text-xs text-institucional-600">
+                    <tr key={u.id} className="hover:bg-gris-50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-azul-500">
                         {u.numero_empleado}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className="font-semibold text-institucional-800">
+                        <span className="font-semibold text-navy-800">
                           {u.nombres} {u.apellido_paterno}
                         </span>
                         <br />
-                        <span className="text-xs text-institucional-400">{u.email}</span>
+                        <span className="text-xs text-gris-500">{u.email}</span>
                       </td>
                       <td className="px-4 py-2.5">
                         <Chip>{u.rol_clave}</Chip>
@@ -121,7 +121,7 @@ export default function GestionUsuarios() {
                         {u.modulo_codigo ? (
                           <Chip tono="ok">{u.modulo_codigo}</Chip>
                         ) : (
-                          <span className="text-xs text-institucional-300">sin módulo</span>
+                          <span className="text-xs text-gris-500">sin módulo</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5">
@@ -155,7 +155,7 @@ export default function GestionUsuarios() {
           onCerrar={() => setEditando(null)}
         >
           <div className="space-y-4">
-            <p className="text-sm text-institucional-500">
+            <p className="text-sm text-gris-700">
               El módulo define a dónde se enrutan los turnos cuando esta persona
               pulsa «llamar siguiente» (RG-004). Si el módulo está pausado, la base
               elige otro activo.

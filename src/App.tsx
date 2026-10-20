@@ -85,7 +85,7 @@ export default function App() {
 function Cargando() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-institucional-400">Cargando…</p>
+      <p className="text-sm text-gris-500">Cargando…</p>
     </div>
   )
 }
@@ -93,8 +93,8 @@ function Cargando() {
 function NoEncontrado() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
-      <p className="text-4xl font-black text-institucional-200">404</p>
-      <h1 className="text-lg font-bold text-institucional-700">Esta página no existe</h1>
+      <p className="text-4xl font-black text-gris-200">404</p>
+      <h1 className="text-lg font-bold text-gris-700">Esta página no existe</h1>
       <a href="/admin" className="boton-secundario">
         Ir al panel
       </a>

@@ -56,8 +56,8 @@ export default function Estadisticas() {
       </div>
 
       <section className="tarjeta overflow-hidden">
-        <div className="border-b border-institucional-100 px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+        <div className="border-b border-gris-100 px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
             Por trámite
           </h2>
         </div>
@@ -68,7 +68,7 @@ export default function Estadisticas() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-institucional-50 text-left text-xs text-institucional-500">
+              <thead className="bg-gris-50 text-left text-xs text-gris-700">
                 <tr>
                   <th className="px-3 py-2 font-medium">Trámite</th>
                   <th className="px-3 py-2 font-medium">Generados</th>
@@ -78,23 +78,23 @@ export default function Estadisticas() {
                   <th className="px-3 py-2 font-medium">Tiempo prom.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-institucional-100">
+              <tbody className="divide-y divide-gris-100">
                 {filas.map((f) => (
-                  <tr key={f.clave_tramite} className="hover:bg-institucional-50">
+                  <tr key={f.clave_tramite} className="hover:bg-gris-50">
                     <td className="px-4 py-2.5">
-                      <span className="font-semibold text-institucional-800">
+                      <span className="font-semibold text-navy-800">
                         {f.denominacion_tramite}
                       </span>
                       <br />
-                      <span className="font-mono text-xs text-institucional-400">
+                      <span className="font-mono text-xs text-gris-500">
                         {f.clave_tramite}
                       </span>
                     </td>
                     <td className="px-4 py-2.5">{f.generados ?? 0}</td>
-                    <td className="px-4 py-2.5 text-ok-700">{f.atendidos ?? 0}</td>
-                    <td className="px-4 py-2.5 text-peligro-700">{f.cancelados ?? 0}</td>
-                    <td className="px-4 py-2.5 text-alerta-700">{f.omitidos ?? 0}</td>
-                    <td className="px-4 py-2.5 text-institucional-500">
+                    <td className="px-4 py-2.5 text-verde-600">{f.atendidos ?? 0}</td>
+                    <td className="px-4 py-2.5 text-rojo-600">{f.cancelados ?? 0}</td>
+                    <td className="px-4 py-2.5 text-ambar-600">{f.omitidos ?? 0}</td>
+                    <td className="px-4 py-2.5 text-gris-700">
                       {f.tiempo_promedio_atencion != null
                         ? `${Math.round(f.tiempo_promedio_atencion)} min`
                         : '—'}
@@ -116,14 +116,14 @@ function Tarjeta({ titulo, valor, tono = 'neutro' }: {
   tono?: 'neutro' | 'ok' | 'alerta' | 'peligro'
 }) {
   const colores = {
-    neutro: 'text-institucional-800',
-    ok: 'text-ok-700',
-    alerta: 'text-alerta-700',
-    peligro: 'text-peligro-700',
+    neutro: 'text-navy-800',
+    ok: 'text-verde-600',
+    alerta: 'text-ambar-600',
+    peligro: 'text-rojo-600',
   }
   return (
     <div className="tarjeta p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-institucional-400">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
         {titulo}
       </p>
       <p className={`mt-1 text-3xl font-black ${colores[tono]}`}>{valor}</p>

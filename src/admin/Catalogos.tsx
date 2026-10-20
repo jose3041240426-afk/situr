@@ -49,11 +49,11 @@ export default function Catalogos() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="tarjeta overflow-hidden">
-          <div className="border-b border-institucional-100 px-4 py-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+          <div className="border-b border-gris-100 px-4 py-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Trámites
             </h2>
-            <p className="mt-0.5 text-xs text-institucional-400">
+            <p className="mt-0.5 text-xs text-gris-500">
               El prefijo es único en toda la base: es lo que impide que el código
               visible <code className="font-mono">A-001</code> se repita entre dos
               trámites distintos.
@@ -62,12 +62,12 @@ export default function Catalogos() {
           {cargando ? (
             <Vacio titulo="Cargando…" />
           ) : (
-            <ul className="divide-y divide-institucional-100">
+            <ul className="divide-y divide-gris-100">
               {tramites.map((t) => (
                 <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-institucional-800">{t.denominacion}</p>
-                    <p className="font-mono text-xs text-institucional-400">
+                    <p className="font-semibold text-navy-800">{t.denominacion}</p>
+                    <p className="font-mono text-xs text-gris-500">
                       {t.clave} · prefijo {t.prefijo}
                       {t.tiempo_estimado_minutos != null
                         ? ` · ${t.tiempo_estimado_minutos} min`
@@ -82,11 +82,11 @@ export default function Catalogos() {
         </section>
 
         <section className="tarjeta overflow-hidden">
-          <div className="border-b border-institucional-100 px-4 py-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-institucional-500">
+          <div className="border-b border-gris-100 px-4 py-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Módulos
             </h2>
-            <p className="mt-0.5 text-xs text-institucional-400">
+            <p className="mt-0.5 text-xs text-gris-500">
               «estado» es la disponibilidad operativa (RN-013) y «activo» la
               habilitación administrativa: son cosas distintas.
             </p>
@@ -94,11 +94,11 @@ export default function Catalogos() {
           {cargando ? (
             <Vacio titulo="Cargando…" />
           ) : (
-            <ul className="divide-y divide-institucional-100">
+            <ul className="divide-y divide-gris-100">
               {modulos.map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-institucional-800">
+                    <p className="font-semibold text-navy-800">
                       {m.codigo} — {m.denominacion}
                     </p>
                   </div>
@@ -113,7 +113,7 @@ export default function Catalogos() {
       </div>
 
       {!esAdministrador && (
-        <p className="mt-4 text-xs text-institucional-400">
+        <p className="mt-4 text-xs text-gris-500">
           Está viendo los catálogos en modo lectura. Solo el administrador puede
           modificarlos.
         </p>
