@@ -91,6 +91,15 @@ export default function Consola() {
   const [turnoLlamado, setTurnoLlamado] = useState<FilaActual | null>(null)
   /** La propuesta del sistema, con su razón (P5). */
   const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
+  /**
+   * La confirmacion de la llamada (RF-029).
+   *
+   * Antes, «Llamar» llamaba directamente: un clic y el estado de un turno
+   * de un ciudadano cambiaba a «En atención». Ahora el boton abre un
+   * dialogo con a quien va a llamar el sistema y con lo que va a pasar, y
+   * la llamada solo sale de ahi. Es una confirmacion, no un adorno.
+   */
+  const [confirmandoLlamada, setConfirmandoLlamada] = useState(false)
   const [modalMotivo, setModalMotivo] = useState<
     { turno: FilaActual; accion: 'omitir' | 'cancelar' } | null
   >(null)
@@ -616,7 +625,7 @@ export default function Consola() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => void llamar()}
+                  onClick={() => setConfirmandoLlamada(true)}
                   disabled={ocupado || !periodoAbierto}
                   className="boton-primario px-6 py-3 text-base"
                 >
@@ -1043,6 +1052,87 @@ export default function Consola() {
           </div>
         )}
       </section>
+
+      {/*
+        LA CONFIRMACIÓN DE LA LLAMADA (RF-029).
+
+        Llamar cambia el estado de un turno de un ciudadano. Con un solo
+        clic, en una pantalla con tres filas, ese clic se puede dar sin
+        querer. Aquí se ve a quién va a llamar el sistema, con su código y
+        su módulo, y se explica lo que va a pasar. La llamada sale del
+        botón de dentro, no del de fuera.
+      */}
+      {confirmandoLlamada && propuesta?.hay_turnos && (
+          <Modal
+            titulo="Llamar al siguiente turno"
+            onCerrar={() => setConfirmandoLlamada(false)}
+            ancho="max-w-md"
+          >
+            <div className="text-center">
+              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-azul-50 text-azul-500">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                </svg>
+              </span>
+
+              <p className="text-2xl font-black tracking-tight text-navy-800">
+                ¿Llamar al siguiente turno?
+              </p>
+              <p className="mx-auto mt-2 max-w-xs text-sm text-gris-700">
+                Se asignará a la ventanilla actual y cambiará su estado a «En
+                atención».
+              </p>
+
+              <div className="mt-4 rounded-xl bg-azul-50 px-5 py-4">
+                <p className="text-3xl font-black leading-none tracking-tight text-navy-800">
+                  {propuesta.codigo_turno}
+                </p>
+                <p className="mt-1.5 text-sm text-gris-700">
+                  {propuesta.denominacion_tramite}
+                </p>
+                <p className="mt-2">
+                  <span className="etiqueta bg-azul-50 text-azul-600">En espera</span>
+                </p>
+              </div>
+
+              {propuesta.razon && (
+                <p className="mt-3 text-sm text-gris-700">{propuesta.razon}</p>
+              )}
+
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoLlamada(false)
+                    void llamar()
+                  }}
+                  disabled={ocupado}
+                  className="boton-primario w-full py-3"
+                >
+                  Llamar turno
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoLlamada(false)}
+                  className="boton-secundario w-full py-3"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </Modal>
+      )}
 
       {/*
         CIERRE DE PERIODO (Nielsen H5: prevención de errores).
