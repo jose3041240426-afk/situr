@@ -294,6 +294,22 @@ export interface RespuestaPeriodo {
  * `proponer_siguiente_turno()` — la propuesta que el operador aprueba antes
  * de llamar. No cambia nada: es una lectura, con la razón.
  */
+/**
+ * Las cifras del periodo en curso (RF-022).
+ *
+ * Es la fila de tarjetas de la consola: el turno que se está atendiendo, el
+ * siguiente y cuántos se han atendido hoy. Vienen de la misma vista que las
+ * estadísticas, así que el número que ve el operador es el mismo que ve el
+ * supervisor.
+ */
+export interface CifrasPeriodo {
+  generados: number
+  atendidos: number
+  cancelados: number
+  omitidos: number
+  en_espera: number
+}
+
 export interface PropuestaSiguiente {
   ok: true
   hay_turnos: boolean

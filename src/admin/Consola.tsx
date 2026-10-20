@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Disposicion from './Disposicion'
 import CodigoQR from '../components/CodigoQR'
@@ -17,6 +18,7 @@ import {
   listarModulos,
   listarPeriodos,
   listarTramites,
+  listarCifrasDelPeriodo,
   listarTurnosActuales,
   listarTurnosRetirados,
   llamarSiguiente,
@@ -26,6 +28,7 @@ import {
   repetirLlamada,
 } from '../lib/rpc'
 import type {
+  CifrasPeriodo,
   FilaActual,
   FilaCola,
   FilaRetirado,
@@ -56,7 +59,15 @@ export default function Consola() {
   const [cola, setCola] = useState<FilaCola[]>([])
   /** Turnos que el titular retiró oponiéndose (RF-033). */
   const [retirados, setRetirados] = useState<FilaRetirado[]>([])
+  /** Las cifras del dia, para la fila de tarjetas (RF-022). */
+  const [cifras, setCifras] = useState<CifrasPeriodo | null>(null)
   const [actuales, setActuales] = useState<FilaActual[]>([])
+  /** El turno que esta en atencion ahora, si hay alguno. */
+  const enAtencion =
+    actuales.find((t) => t.estado === 'SERVING') ??
+    actuales.find((t) => t.estado === 'CALLED') ??
+    null
+
   const [tramites, setTramites] = useState<Tramite[]>([])
   const [modulos, setModulos] = useState<Modulo[]>([])
 
@@ -97,18 +108,20 @@ export default function Consola() {
 
   const cargar = useCallback(async () => {
     try {
-      const [ps, c, a, ts, ms, rt] = await Promise.all([
+      const [ps, c, a, ts, ms, rt, cf] = await Promise.all([
         listarPeriodos(),
         listarCola(),
         listarTurnosActuales(),
         listarTramites(),
         listarModulos(),
         listarTurnosRetirados(),
+        listarCifrasDelPeriodo(),
       ])
       setPeriodoAbierto(ps.find((p) => p.estado === 'ABIERTO') ?? null)
       setCola(c)
       setActuales(a)
       setRetirados(rt)
+      setCifras(cf)
       setTramites(ts)
       setModulos(ms)
       setActualizado(new Date())
@@ -387,6 +400,50 @@ export default function Consola() {
           <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
         </div>
       )}
+
+      {/*
+        LA FILA DE CIFRAS.
+
+        Lo primero que mira el operador al llegar a la ventanilla: qué turno
+        tiene delante, a cuál le toca ahora y cómo va la mañana. Antes eso
+        estaba repartido en tres sitios (la propuesta, «En atención ahora» y
+        las estadísticas); aquí está junto, arriba, y se lee de un vistazo.
+
+        La primera tarjeta va en azul: es la que mira, la que cambia.
+      */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TarjetaCifra
+          rotulo="Turno actual"
+          valor={enAtencion?.codigo_turno ?? '—'}
+          pie={
+            enAtencion
+              ? `${enAtencion.denominacion_tramite} · módulo ${enAtencion.codigo_modulo ?? '—'}`
+              : 'No hay ningún turno en atención'
+          }
+          icono="persona"
+          destacado
+        />
+        <TarjetaCifra
+          rotulo="Siguiente turno"
+          valor={propuesta?.hay_turnos ? (propuesta.codigo_turno ?? '—') : '—'}
+          pie={
+            propuesta?.hay_turnos
+              ? `${propuesta.denominacion_tramite ?? ''} · en espera`
+              : 'No hay turnos en espera'
+          }
+          icono="lista"
+        />
+        <TarjetaCifra
+          rotulo="Atendidos hoy"
+          valor={cifras ? String(cifras.atendidos) : '—'}
+          pie={
+            cifras
+              ? `${cifras.generados} generados · ${cifras.en_espera} en espera`
+              : 'Cargando…'
+          }
+          icono="grafico"
+        />
+      </div>
 
       {/* `min-w-0` en los hijos: sin eso, un hijo de la rejilla no baja del
           ancho de su contenido (un <select> con opciones largas) y la pagina
@@ -1162,5 +1219,78 @@ export default function Consola() {
         </Modal>
       )}
     </Disposicion>
+  )
+}
+
+/**
+ * Una tarjeta de cifra (la de la fila de arriba de la consola).
+ *
+ * La primera va en azul: es la que el operador mira de un vistazo, la que
+ * cambia con cada llamada. Las demas se quedan en blanco para que la
+ * jerarquia se lea sin ayuda.
+ */
+function TarjetaCifra({
+  rotulo,
+  valor,
+  pie,
+  icono,
+  destacado = false,
+}: {
+  rotulo: string
+  valor: string
+  pie: string
+  icono: 'persona' | 'lista' | 'grafico'
+  destacado?: boolean
+}) {
+  const trazos: Record<typeof icono, ReactNode> = {
+    persona: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21a8 8 0 0 1 16 0" />
+      </>
+    ),
+    lista: <path d="M4 7h16M4 12h10M4 17h7" />,
+    grafico: (
+      <>
+        <path d="M3 20h18" />
+        <rect x="5" y="10" width="3.4" height="7" rx="1" />
+        <rect x="10.3" y="6" width="3.4" height="11" rx="1" />
+        <rect x="15.6" y="13" width="3.4" height="4" rx="1" />
+      </>
+    ),
+  }
+  return (
+    <div
+      className={`rounded-xl border p-4 shadow-sm ${
+        destacado
+          ? 'border-azul-600 bg-azul-600 text-white'
+          : 'border-gris-200 bg-white text-navy-800'
+      }`}
+    >
+      <p
+        className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
+          destacado ? 'text-azul-100' : 'text-gris-500'
+        }`}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          {trazos[icono]}
+        </svg>
+        {rotulo}
+      </p>
+      <p className="mt-1.5 text-3xl font-black leading-none tracking-tight">{valor}</p>
+      <p className={`mt-1.5 text-xs ${destacado ? 'text-azul-100' : 'text-gris-500'}`}>
+        {pie}
+      </p>
+    </div>
   )
 }

@@ -3,6 +3,7 @@ import type {
   EstadoTurno,
   FilaCola,
   FilaActual,
+  CifrasPeriodo,
   FilaRetirado,
   FilaHistorial,
   FilaEstadistica,
@@ -280,6 +281,35 @@ export async function listarCola(): Promise<FilaCola[]> {
  * función NO se usa desde la pantalla pública: allí no hay sesión, y la
  * RLS lo negaría (ver `listarUltimasLlamadas`).
  */
+/**
+ * Las cifras del periodo en curso (RF-022): generados, atendidos, cancelados,
+ * omitidos y en espera.
+ *
+ * Se suman las filas por tramite de `vista_estadisticas_tramites`: la vista
+ * trae una fila por tramite, y la tarjeta de la consola wants el total del
+ * dia.
+ */
+export async function listarCifrasDelPeriodo(): Promise<CifrasPeriodo> {
+  const { data, error } = await supabase.from('vista_estadisticas_tramites').select('*')
+  if (error) throw traducirError(error)
+  const filas = (data ?? []) as {
+    turnos_generados: number
+    turnos_atendidos: number
+    turnos_cancelados: number
+    turnos_omitidos: number
+    turnos_sin_atender: number
+  }[]
+  const sumar = (k: keyof (typeof filas)[number]) =>
+    filas.reduce((total, f) => total + Number(f[k] ?? 0), 0)
+  return {
+    generados: sumar('turnos_generados'),
+    atendidos: sumar('turnos_atendidos'),
+    cancelados: sumar('turnos_cancelados'),
+    omitidos: sumar('turnos_omitidos'),
+    en_espera: sumar('turnos_sin_atender'),
+  }
+}
+
 /**
  * Los turnos que el titular retiró oponiéndose al tratamiento (RF-033).
  *
