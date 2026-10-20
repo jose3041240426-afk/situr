@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Disposicion from './Disposicion'
 import { Aviso, ChipEstado, Vacio } from '../components/ui'
 import CodigoQR from '../components/CodigoQR'
 import { ErrorSitur, formatearFechaHora, listarHistorial, reponerTurno } from '../lib/rpc'
+import { ETIQUETA_ESTADO } from '../lib/tipos'
 import type { FilaHistorial, RespuestaReposicion } from '../lib/tipos'
 
 /**
@@ -27,6 +28,28 @@ export default function Historial() {
   /** El turno repuesto, con su QR: sin esto, la reposición no cierra el
    *  círculo, porque el ciudadano necesita un código nuevo. */
   const [reposicion, setReposicion] = useState<RespuestaReposicion | null>(null)
+
+  /*
+    AGRUPAR POR TURNO.
+
+    La vista es una línea de tiempo POR TURNO (como en la referencia de
+    diseño), no una tabla plana de transiciones: lo que el operador quiere
+    ver es «qué le pasó a este turno», con su recorrido completo —generado,
+    llamado, en atención, finalizado— y no 400 filas mezcladas.
+
+    Se agrupan las transiciones conservando el orden en que llegaron (la
+    vista viene ordenada por fecha) y se mantiene la más reciente de cada
+    turno, que es la que lleva el botón de reponer.
+  */
+  const porTurno = useMemo(() => {
+    const grupos = new Map<string, FilaHistorial[]>()
+    for (const f of filas) {
+      const lista = grupos.get(f.turno_id)
+      if (lista) lista.push(f)
+      else grupos.set(f.turno_id, [f])
+    }
+    return [...grupos.values()]
+  }, [filas])
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -169,69 +192,90 @@ export default function Historial() {
             detalle="Cada llamada, omisión, atención y cierre queda registrada aquí."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gris-50 text-left text-xs text-gris-700">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Turno</th>
-                  <th className="px-3 py-2 font-medium">Cambio</th>
-                  <th className="px-3 py-2 font-medium">Operador</th>
-                  <th className="px-3 py-2 font-medium">Módulo</th>
-                  <th className="px-3 py-2 font-medium">Motivo</th>
-                  <th className="px-3 py-2 font-medium">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gris-100">
-                {filas.map((f) => (
-                  <tr key={`${f.turno_id}-${f.fecha}`} className="hover:bg-gris-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-gris-700">
-                      {formatearFechaHora(f.fecha)}
-                    </td>
-                    <td className="px-4 py-2.5 font-bold text-navy-800">
-                      {f.codigo_turno}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        {f.estado_anterior && <ChipEstado estado={f.estado_anterior} />}
-                        <span className="text-gris-500">→</span>
-                        <ChipEstado estado={f.estado_nuevo} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-gris-700">
-                      {f.nombre_usuario ?? '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-gris-700">
-                      {f.codigo_modulo ?? '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gris-700">
-                      {f.motivo ?? '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      {/*
-                        El carril de recurso (P12). El mensaje del ciudadano
-                        dice "acuda a ventanilla para reposicion": aquí está
-                        lo que hace falta para cumplirlo. Solo en la fila
-                        más reciente de cada turno.
-                      */}
-                      {reclamables.get(f.turno_id) === f &&
-                      (f.estado_actual === 'SKIPPED' || f.estado_actual === 'CANCELLED') ? (
-                        <button
-                          type="button"
-                          onClick={() => void reponer(f.turno_id)}
-                          disabled={reponiendo !== null}
-                          className="boton-secundario px-3 py-1.5 text-xs"
+          <div className="space-y-4">
+            {porTurno.map((transiciones) => {
+              const primera = transiciones[0]
+              const ultima = transiciones[transiciones.length - 1]
+              const reponerTurno =
+                reclamables.get(ultima.turno_id) === ultima &&
+                (ultima.estado_actual === 'SKIPPED' ||
+                  ultima.estado_actual === 'CANCELLED')
+              return (
+                <section key={primera.turno_id} className="tarjeta overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gris-100 px-5 py-3.5">
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-xl font-black tracking-tight text-navy-800">
+                        {primera.codigo_turno}
+                      </span>
+                      <ChipEstado estado={ultima.estado_actual} />
+                    </div>
+                    {reponerTurno && (
+                      <button
+                        type="button"
+                        onClick={() => void reponer(ultima.turno_id)}
+                        disabled={reponiendo !== null}
+                        className="boton-secundario px-3 py-1.5 text-xs"
+                      >
+                        {reponiendo === ultima.turno_id ? 'Reponiendo…' : 'Reponer'}
+                      </button>
+                    )}
+                  </div>
+
+                  <ol className="relative px-5 py-4">
+                    {/*
+                      La línea vertical que une los hitos, en una columna
+                      propia para que no dependa de los iconos.
+                    */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute bottom-8 left-[2.05rem] top-8 w-0.5 rounded bg-gris-200"
+                    />
+                    {transiciones.map((f) => (
+                      <li key={`${f.turno_id}-${f.fecha}`} className="relative flex gap-4 py-3">
+                        <span
+                          className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                            f.estado_nuevo === 'COMPLETED'
+                              ? 'bg-verde-500 text-white'
+                              : f.estado_nuevo === 'CANCELLED' || f.estado_nuevo === 'SKIPPED'
+                                ? 'bg-rojo-500 text-white'
+                                : 'bg-azul-500 text-white'
+                          }`}
                         >
-                          {reponiendo === f.turno_id ? 'Reponiendo…' : 'Reponer'}
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          <svg
+                            width="15"
+                            height="15"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-navy-800">
+                            {f.estado_anterior
+                              ? `${ETIQUETA_ESTADO[f.estado_anterior]} → ${ETIQUETA_ESTADO[f.estado_nuevo]}`
+                              : `Turno generado (${ETIQUETA_ESTADO[f.estado_nuevo]})`}
+                          </p>
+                          <p className="text-xs text-gris-500">
+                            {formatearFechaHora(f.fecha)}
+                            {f.nombre_usuario ? ` · ${f.nombre_usuario}` : ''}
+                            {f.codigo_modulo ? ` · módulo ${f.codigo_modulo}` : ''}
+                          </p>
+                          {f.motivo && (
+                            <p className="mt-1 text-xs text-gris-700">«{f.motivo}»</p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )
+            })}
           </div>
         )}
       </section>
