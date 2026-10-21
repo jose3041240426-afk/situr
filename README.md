@@ -2,7 +2,7 @@
 
 **Dirección de Catastro · Durango**
 
-Aplicación del **DRS v1.8** (documento de requisitos). React 19 + TypeScript
+Aplicación del **DRS v1.9** (documento de requisitos). React 19 + TypeScript
 sobre Vercel, con Supabase (PostgreSQL) como autoridad de los turnos.
 
 > **Qué es este repositorio**: **la aplicación**. El DRS, las migraciones en
@@ -733,7 +733,13 @@ app/
 ```bash
 npm run typecheck             # TypeScript en modo estricto
 npm run alto-impacto          # accesibilidad y comportamiento, 8 pantallas
+npm run colores               # toda clase de color usada existe en el CSS
 ```
+
+`npm run colores` comprueba que **toda** clase de color que aparece en el
+código existe en el CSS compilado. En Tailwind una clase mal escrita **no
+da error**: se queda sin estilo y nadie se entera hasta que lo mira. Con
+316 clases en el sistema visual, eso no es un riesgo teórico.
 
 `pruebas/alto-impacto.mjs` recorre la aplicación con un navegador real:
 comprueba el árbol de accesibilidad con axe-core, el recorrido con teclado,
