@@ -65,8 +65,6 @@ const navegador = await chromium.launch({
   args: [
     '--no-sandbox',
     '--disable-dev-shm-usage',
-    '--renderer-process-limit=1',
-    '--js-flags=--max-old-space-size=384',
   ],
 })
 

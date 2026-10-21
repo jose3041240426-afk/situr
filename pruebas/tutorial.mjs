@@ -121,8 +121,6 @@ const navegador = await chromium.launch({
   args: [
     '--no-sandbox',
     '--disable-dev-shm-usage',
-    '--renderer-process-limit=1',
-    '--js-flags=--max-old-space-size=384',
     '--disable-extensions',
     '--disable-background-networking',
   ],
@@ -326,6 +324,20 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
 }
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Cierra el contexto del móvil entero.
+ *
+ * Cada visita del ciudadano abre un contexto nuevo, para que la memoria del
+ * anterior se libere: en una máquina con 8 GB, tenerlos abiertos a la vez
+ * multiplica los renderizadores de Chromium y el kernel acaba matándolos.
+ * El contexto del operador, en cambio, se mantiene: es el que sostiene el
+ * estado de la partida.
+ */
+async function cerrarMovil() {
+  await contextoMovil?.close().catch(() => undefined)
+  contextoMovil = null
+}
 
 /**
  * Pulsa un boton esperando a que exista. Si no aparece, el error dice QUE
@@ -554,6 +566,10 @@ await capturar(
 )
 await ciudad.locator('summary:has-text("Aviso de privacidad")').click()
 await ciudad.waitForTimeout(500)
+// El portal del ciudadano ya no hace falta hasta el paso del turno llamado:
+// se cierra entero (el contexto incluido) para no acumular renderizadores.
+await ciudad.close()
+await cerrarMovil()
 
 // ===========================================================================
 // 5. El operador llama a un turno
@@ -705,8 +721,7 @@ await capturar(
 // El segundo portal y el contexto del movil ya han hecho su papel: se
 // cierran para no acumular renderizadores (la memoria es el limite aqui).
 await ciudad2.close()
-await contextoMovil?.close().catch(() => undefined)
-contextoMovil = null
+await cerrarMovil()
 
 // ===========================================================================
 // 10. El operador lo ve
