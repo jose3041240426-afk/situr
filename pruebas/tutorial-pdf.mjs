@@ -56,49 +56,26 @@ if (!chrome) {
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 
-// --- 1) las imagenes ligeras ---
-const carpetaPdf = path.join(destino, 'pdf')
-mkdirSync(carpetaPdf, { recursive: true })
-
+// --- 1) el navegador ---
 const navegador = await chromium.launch({
   executablePath: chrome,
   args: [
     '--no-sandbox',
-    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-extensions',
+    '--disable-background-networking',
   ],
 })
 
-{
-  const pagina = await navegador.newPage()
-  const jpegs = await pagina.evaluate(
-    async ([archivos, base]) => {
-      const salida = []
-      for (const archivo of archivos) {
-        const img = new Image()
-        img.src = `${base}/${archivo}`
-        await img.decode()
-        const escala = Math.min(1, 1000 / img.width)
-        const lienzo = document.createElement('canvas')
-        lienzo.width = Math.round(img.width * escala)
-        lienzo.height = Math.round(img.height * escala)
-        lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height)
-        salida.push({
-          nombre: archivo.replace(/\.png$/, '.jpg'),
-          datos: lienzo.toDataURL('image/jpeg', 0.82).split(',')[1],
-        })
-      }
-      return salida
-    },
-    [
-      pasos.map((p) => p.archivo),
-      'file://' + capturas,
-    ],
-  )
-  await pagina.close()
-  for (const j of jpegs) {
-    writeFileSync(path.join(carpetaPdf, j.nombre), Buffer.from(j.datos, 'base64'))
-  }
-}
+/**
+ * El texto de los pasos va en markdown (`**negrita**`), porque así queda bien
+ * en el `.md`. Al pasarlo al HTML hay que convertirlo: si no, el asterisco
+ * sale literal en el PDF.
+ */
+const aHtml = (texto) =>
+  texto
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
 
 // --- 2) el HTML ---
 const html = `<!doctype html>
@@ -160,9 +137,9 @@ ${pasos
   <div class="texto">
     <p class="num">Paso ${p.n}</p>
     <h3>${p.titulo}</h3>
-    <p>${p.texto}</p>
+    <p>${aHtml(p.texto)}</p>
   </div>
-  <div class="figura"><img src="pdf/${p.archivo.replace(/\.png$/, '.jpg')}"></div>
+  <div class="figura"><img src="capturas/${p.archivo}"></div>
 </div>`,
   )
   .join('\n')}
@@ -184,17 +161,6 @@ que <strong>no</strong> se ha podido enseñar aquí, y por qué:</p>
   servidor de Realtime, así que aquí solo se ve el sondeo.</li>
 </ul>
 
-<h2>Cómo se generó este documento</h2>
-<p>Las capturas no están hechas a mano: las produce <code>app/pruebas/tutorial.mjs</code>, que recorre la
-aplicación con un navegador real (Playwright), hace las mismas pulsaciones que haría un operador y una
-ciudadana, y fotografía cada paso. Cada captura <strong>comprueba antes</strong> que el texto que tiene que
-aparecer en pantalla está ahí: una foto de una página vacía es una foto que no enseña nada, y el recorrido
-falla en vez de dejar una imagen en blanco.</p>
-<pre><code>cd app &amp;&amp; pruebas/tutorial.sh          # base limpia + recorrido + PDF</code></pre>
-<p>Y las comprobaciones que respaldan lo que se ve aquí:</p>
-<pre><code>bash migracion/verificar-todo.sh   # 138 aserciones, migración, concurrencia, DRS
-npm run alto-impacto                # accesibilidad y comportamiento, 8 pantallas
-npm run colores                    # toda clase de color existe en el CSS</code></pre>
 </div>
 </body></html>`
 

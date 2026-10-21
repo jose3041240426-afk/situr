@@ -120,7 +120,6 @@ const navegador = await chromium.launch({
   executablePath: chrome,
   args: [
     '--no-sandbox',
-    '--disable-dev-shm-usage',
     '--disable-extensions',
     '--disable-background-networking',
   ],
@@ -614,9 +613,12 @@ await op.waitForTimeout(3000)
 // ===========================================================================
 console.log('      esperando el sondeo del portal (10 s)…')
 await espera(12000)
-await abrir(ciudad, `/turno/${token}`)
+// Pagina nueva: la del primer paso se cerro con su contexto, para que la
+// memoria se libere entre visitas.
+const ciudadActualizada = await (await movil()).newPage()
+await abrir(ciudadActualizada, `/turno/${token}`)
 await capturar(
-  ciudad,
+  ciudadActualizada,
   'llamado',
   'El turno se actualiza solo en el teléfono',
   'El teléfono se repinta solo: el portal sondea su turno cada diez ' +
@@ -624,7 +626,7 @@ await capturar(
     '«cambió», nunca lleva datos). Nadie tiene que recargar, y el ciudadano ' +
     'no ve nada de otros turnos.',
   'SU TURNO',
-  [[ciudad.locator('h1.text-5xl').first(), 'ya llamado']],
+  [[ciudadActualizada.locator('h1.text-5xl').first(), 'ya llamado']],
 )
 
 // ===========================================================================
