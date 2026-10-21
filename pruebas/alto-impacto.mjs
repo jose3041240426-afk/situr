@@ -97,7 +97,16 @@ console.log('')
 
 const navegador = await chromium.launch({
   executablePath: chrome,
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  args: [
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    // Con 8 GB y `vm.overcommit_memory` en 0, el kernel mata el renderizador
+    // y Playwright ve «Target crashed». Un solo proceso de render y un
+    // limite de memoria para el JS lo evitan.
+    '--renderer-process-limit=1',
+    '--js-flags=--max-old-space-size=384',
+  ],
 })
 const contexto = await navegador.newContext({ viewport: { width: 1440, height: 900 } })
 

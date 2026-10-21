@@ -118,20 +118,61 @@ let n = 0
 
 const navegador = await chromium.launch({
   executablePath: chrome,
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  args: [
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    // En una maquina con 8 GB y varios navegadores abiertos, el renderizador
+    // de Chromium se queda sin memoria y revienta («Target crashed») a la
+    // hora de capturar. Con el software rasterizado y sin extensiones aguanta.
+    '--disable-gpu',
+    // La maquina tiene 8 GB y `vm.overcommit_memory` esta en 0: cuando el
+    // kernel no puede sobrecomprometer, mata el renderizador de Chromium y
+    // Playwright ve «Target crashed». Con un solo proceso de render y un
+    // limite de堆 para JS, el navegador aguanta.
+    '--renderer-process-limit=1',
+    '--js-flags=--max-old-space-size=384',
+    '--disable-software-rasterizer',
+    '--disable-extensions',
+    '--disable-background-networking',
+  ],
 })
 
-// Un contexto de escritorio (el operador) y uno de teléfono (el ciudadano).
+/*
+  Dos contextos: el del operador (escritorio) y el del ciudadano (teléfono).
+
+  El del móvil se crea **cuando hace falta** y se cierra al terminar. En una
+  máquina con 8 GB tener los dos abiertos a la vez multiplica los
+  renderizadores de Chromium, y el kernel acaba matándolos («Target
+  crashed»): es un problema de memoria, no del código.
+*/
 const escritorio = await navegador.newContext({
-  viewport: { width: 1440, height: 900 },
-  deviceScaleFactor: 2,
+  /*
+    1280x800 y escala 1. A 1440x900 con escala 2 (2880x1800) el rasterizador
+    de Chromium se queda sin memoria en esta máquina y el renderizador
+    muere a mitad del recorrido («Target crashed»). Para el PDF da igual: la
+    imagen se escala al ancho de la página.
+  */
+  viewport: { width: 1280, height: 800 },
+  /*
+    Escala 1, no 2. A 2880x1800 el rasterizador de Chromium se queda sin
+    memoria en esta máquina y la captura falla con «Unable to capture
+    screenshot». Para el PDF da igual: la imagen se escala al ancho de la
+    página. El móvil sí va a escala 2, que a 780x1688 aguanta.
+  */
+  deviceScaleFactor: 1,
 })
-const movil = await navegador.newContext({
-  viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 3,
-  isMobile: true,
-  hasTouch: true,
-})
+let contextoMovil = null
+const movil = async () => {
+  if (!contextoMovil) {
+    contextoMovil = await navegador.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+    })
+  }
+  return contextoMovil
+}
 
 /**
  * Marca un elemento sobre la propia captura: un recuadro rosa con una
@@ -207,16 +248,80 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
         state: 'visible',
         timeout: 25000,
       })
+    } catch (e) {
+      /*
+        Reintento con recarga.
+
+        Hay dos motivos por los que esto falla de verdad:
+
+        1. `levantar.sh` reescribe `.env.local`, y eso reinicia el servidor
+           de desarrollo. Si la pagina se carga mientras Vite se reinicia, se
+           queda a medio autenticar y aparece el aviso de «no tiene
+           permiso para operar».
+        2. En una maquina con 8 GB el renderizador de Chromium se queda sin
+           memoria a veces («Target crashed»).
+
+        En los dos casos, recargar y esperar otra vez lo arregla; y es
+        preferible a que el tutorial entero se caiga.
+      */
+      for (let intento = 1; intento <= 3; intento++) {
+        await pagina.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined)
+        await espera(3000)
+        try {
+          await pagina.getByText(debeVerse, { exact: false }).first().waitFor({
+            state: 'visible',
+            timeout: 20000,
+          })
+          break
+        } catch (e2) {
+          if (intento === 3) {
+            const texto = await pagina
+              .evaluate(() => document.body?.innerText?.slice(0, 300) ?? '')
+              .catch(() => '(no se pudo leer la pagina)')
+            throw new Error(
+              `El paso «${titulo}» no muestra «${debeVerse}».\n` +
+                `      Lo que si se ve: ${texto.replace(/\n/g, ' | ')}`,
+            )
+          }
+        }
+      }
+    }
+    try {
+      await pagina.getByText(debeVerse, { exact: false }).first().waitFor({
+        state: 'visible',
+        timeout: 25000,
+      })
     } catch {
+      // Que el error diga QUE se ve: si no, solo dice que falta un texto y
+      // no hay por dónde empezar.
+      const texto = await pagina
+        .evaluate(() => document.body?.innerText?.slice(0, 400) ?? '')
+        .catch(() => '(no se pudo leer la pagina)')
       throw new Error(
-        `El paso «${titulo}» no muestra «${debeVerse}»: la captura saldría en blanco.`,
+        `El paso «${titulo}» no muestra «${debeVerse}»: la captura saldría en blanco.\n` +
+          `      Lo que si se ve: ${texto.replace(/\n/g, ' | ')}`,
       )
     }
   }
   n += 1
   const archivo = `${String(n).padStart(2, '0')}-${slug}.png`
   for (const [objetivo, etiqueta] of marcas) await marcar(pagina, objetivo, etiqueta)
-  await pagina.screenshot({ path: path.join(capturas, archivo), fullPage: false })
+  // La captura se reintenta: si el renderizador se queda sin memoria a
+  // media foto, antes que dejar el tutorial a medias se prueba otra vez.
+  let capturada = false
+  for (let intento = 1; intento <= 4 && !capturada; intento++) {
+    try {
+      await pagina.screenshot({
+        path: path.join(capturas, archivo),
+        fullPage: false,
+        timeout: 25000,
+      })
+      capturada = true
+    } catch (e) {
+      if (intento === 4) throw e
+      await espera(1500)
+    }
+  }
   await quitarMarcas(pagina)
   pasos.push({ n, archivo, titulo, texto })
   console.log(`  ${String(n).padStart(2, '0')}  ${titulo}`)
@@ -224,6 +329,25 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
 }
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Pulsa un boton esperando a que exista. Si no aparece, el error dice QUE
+ * se ve en pantalla: si no, uno se queda mirando un timeout sin pistas.
+ */
+async function pulsar(pagina, texto) {
+  const boton = pagina.locator(`button:has-text("${texto}")`).first()
+  try {
+    await boton.waitFor({ state: 'visible', timeout: 25000 })
+    await boton.click()
+  } catch (e) {
+    const visto = await pagina
+      .evaluate(() => document.body?.innerText?.slice(0, 300) ?? '')
+      .catch(() => '(no se pudo leer la pagina)')
+    throw new Error(
+      `No se pudo pulsar «${texto}».\n      Lo que si se ve: ${visto.replace(/\n/g, ' | ')}`,
+    )
+  }
+}
 
 /**
  * Abre una ruta y espera a que la aplicacion este montada de verdad.
@@ -313,8 +437,12 @@ await capturar(
 // ===========================================================================
 const botonAbrir = op.locator('button:has-text("Abrir periodo de hoy")')
 if (await botonAbrir.count()) {
+  // Se espera a que la consola haya cargado de verdad: pulsar antes de que
+  // lleguen los datos no abre el periodo.
+  await op.getByText('PERIODO OPERATIVO').first().waitFor({ state: 'visible', timeout: 25000 })
   await botonAbrir.click()
-  await op.waitForTimeout(2500)
+  await op.getByText('Cerrar periodo').first().waitFor({ state: 'visible', timeout: 25000 })
+  await op.waitForTimeout(1200)
   await capturar(
     op,
     'periodo',
@@ -332,7 +460,7 @@ if (await botonAbrir.count()) {
 // ===========================================================================
 await op.selectOption('select.selector', { index: 0 }).catch(() => {})
 await op.waitForTimeout(300)
-await op.locator('button:has-text("Emitir turno")').first().click()
+await pulsar(op, 'Emitir turno')
 await op.waitForTimeout(2800)
 await capturar(
   op,
@@ -374,7 +502,7 @@ await op.waitForTimeout(400)
 // ===========================================================================
 // 4. El ciudadano escanea el QR
 // ===========================================================================
-const ciudad = await movil.newPage()
+const ciudad = await (await movil()).newPage()
 await abrir(ciudad, `/turno/${token}`)
 await capturar(
   ciudad,
@@ -420,7 +548,7 @@ await capturar(
   'EL SISTEMA VA A LLAMAR A',
   [[op.locator('button:has-text("Llamar")').first(), '«Llamar»']],
 )
-await op.locator('button:has-text("Llamar")').first().click()
+await pulsar(op, 'Llamar')
 await op.waitForTimeout(3000)
 
 // ===========================================================================
@@ -495,7 +623,7 @@ await capturar(
 // ===========================================================================
 await abrir(op, '/admin/turnos')
 await op.waitForTimeout(2000)
-await op.locator('button:has-text("Emitir turno")').first().click()
+await pulsar(op, 'Emitir turno')
 await op.waitForTimeout(2500)
 const token2 = (
   await op
@@ -504,7 +632,7 @@ const token2 = (
     .innerText()
 ).trim()
 
-const ciudad2 = await movil.newPage()
+const ciudad2 = await (await movil()).newPage()
 await abrir(ciudad2, `/turno/${token2}`)
 await capturar(
   ciudad2,
@@ -532,6 +660,11 @@ await capturar(
     'titular y no del operador.',
   'cancelado',
 )
+// El segundo portal y el contexto del movil ya han hecho su papel: se
+// cierran para no acumular renderizadores (la memoria es el limite aqui).
+await ciudad2.close()
+await contextoMovil?.close().catch(() => undefined)
+contextoMovil = null
 
 // ===========================================================================
 // 10. El operador lo ve
@@ -811,4 +944,5 @@ console.log(`\n  ${pasos.length} capturas en ${capturas}`)
 console.log(`  tutorial en ${path.join(destino, 'TUTORIAL.md')}`)
 console.log(`  PDF en ${path.join(destino, 'TUTORIAL.pdf')}`)
 
+await contextoMovil?.close().catch(() => undefined)
 await navegador.close()

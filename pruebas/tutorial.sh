@@ -49,5 +49,12 @@ fi
 # solo. Se le da un respiro para que se estabilice antes de empezar, o la
 # primera carga cae en mitad del reinicio.
 echo "==> 3/3. Recorrido con capturas"
+# `levantar.sh` reescribe `.env.local` y eso reinicia el servidor de
+# desarrollo. Se espera a que la aplicacion vuelva a responder, o el
+# recorrido carga paginas a medio reiniciar.
+for i in $(seq 1 40); do
+  if curl -s -o /dev/null "http://127.0.0.1:5173/" 2>/dev/null; then break; fi
+  sleep 1
+done
 sleep 3
 node "$DIR/tutorial.mjs" --base="$BASE"
