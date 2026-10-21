@@ -14,7 +14,8 @@
     "secretos": "node scripts/generar-secretos.mjs",
     "enlace": "node scripts/enlace-local.mjs",
     "arrancar": "node scripts/arrancar.mjs",
-    "desplegar": "bash scripts/desplegar.sh"
+    "desplegar": "bash scripts/desplegar.sh",
+    "colores": "node pruebas/comprobar-colores.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
