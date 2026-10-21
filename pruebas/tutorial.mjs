@@ -462,8 +462,10 @@ await capturar(
   op,
   'consola',
   'La consola del operador',
-  'Aquí ocurre todo el trabajo del día: emitir, llamar, atender. La ' +
-    'columna izquierda emite; la derecha, llama. Abajo, la cola.',
+  'Aquí ocurre todo el trabajo del día: emitir, llamar, atender. Arriba, ' +
+    '**tres cifras**: el turno que está en atención, el que sigue y los ' +
+    'atendidos hoy. A la izquierda se emite; a la derecha, se llama. Abajo, ' +
+    'la cola.',
   'PERIODO OPERATIVO',
 )
 
@@ -543,10 +545,11 @@ await capturar(
   ciudad,
   'ciudadano',
   'El ciudadano escanea el QR',
-  'Al escanear el QR, el teléfono abre el portal y aparece el **código ' +
-    'de turno**. **No hay cuenta, ni registro, ni correo, ni teléfono**: el ' +
-    'token del QR es la única credencial, y solo mientras el turno siga ' +
-    'vivo.',
+  'Al escanear el QR, el teléfono abre el portal: el **estado** arriba, ' +
+    'el **código de turno** en su caja, y debajo los datos del turno con ' +
+    'su icono. A la derecha, **«Tu turno en números»**. **No hay cuenta, ' +
+    'ni registro, ni correo, ni teléfono**: el token del QR es la única ' +
+    'credencial, y solo mientras el turno siga vivo.',
   'SU TURNO',
   [[ciudad.locator('h1.text-5xl').first(), 'su código']],
 )
@@ -750,8 +753,9 @@ for (const [ruta, slug, titulo, texto, debe] of [
     '/admin/historial',
     'historial',
     'El historial',
-    'Quién hizo qué, cuándo y por qué. Cada cambio de estado queda ' +
-      'registrado, y la auditoría es inmutable por diseño.',
+    'Quién hizo qué, cuándo y por qué. Cada turno tiene su **recorrido**: ' +
+      'una línea de tiempo con sus transiciones, en orden. Cada cambio de ' +
+      'estado queda registrado, y la auditoría es inmutable por diseño.',
     'Historial',
   ],
   [
@@ -845,7 +849,7 @@ md.push('  *llegue* el aviso necesita un VAPID real y un navegador con el')
 md.push('  permiso concedido. En el arnés local no hay push service.')
 md.push('- **El paso directo a Supabase.** Todo lo de aquí corre contra un')
 md.push('  PostgreSQL real con PostgREST y un GoTrue propio: la misma')
-md.push('  arquitectura, pero no el serviciogestionado. Lo que solo se puede')
+md.push('  arquitectura, pero no el servicio gestionado. Lo que solo se puede')
 md.push('  probar en Supabase es que `pg_cron` esté instalado y corra, que')
 md.push('  `realtime.send()` difunda, y que exista la publicación')
 md.push('  `supabase_realtime`.')
