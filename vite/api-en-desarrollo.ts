@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { Plugin, ViteDevServer } from 'vite'
+import type { Plugin, PreviewServer, ViteDevServer } from 'vite'
 
 /**
  * SITUR — Monta las funciones de `api/` en el servidor de desarrollo.
@@ -23,20 +23,21 @@ export function apiEnDesarrollo(
   const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const carpeta = path.resolve(raiz, rutaApi)
 
-  return {
-    name: 'situr:api-en-desarrollo',
-    apply: 'serve',
-    configureServer(servidor: ViteDevServer) {
-      // Las funciones de `api/` leen de `process.env`. En desarrollo se
-      // inyectan desde el mismo `.env.local` que usa el navegador.
-      for (const [clave, valor] of Object.entries(entorno)) {
-        if (valor && !process.env[clave]) process.env[clave] = valor
-      }
+  // Las funciones de `api/` leen de `process.env`. En desarrollo se
+  // inyectan desde el mismo `.env.local` que usa el navegador.
+  const inyectarEntorno = () => {
+    for (const [clave, valor] of Object.entries(entorno)) {
+      if (valor && !process.env[clave]) process.env[clave] = valor
+    }
+  }
 
-      if (!fs.existsSync(carpeta)) return
-
-      servidor.middlewares.use(
-        async (req: IncomingMessage, res: ServerResponse, siguiente: () => void) => {
+  // El middleware, en una función aparte, para poder montarlo tanto en
+  // desarrollo como en la vista previa del build.
+  const middleware = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    siguiente: () => void,
+  ) => {
           const url = req.url ?? '/'
           if (!url.startsWith('/api/')) return siguiente()
 
@@ -68,13 +69,33 @@ export function apiEnDesarrollo(
             res.end(cuerpo)
           } catch (e) {
             const mensaje = e instanceof Error ? e.message : String(e)
-            servidor.config.logger.error(`[api] ${nombre}: ${mensaje}`)
             res.statusCode = 500
             res.setHeader('content-type', 'application/json')
             res.end(JSON.stringify({ error: mensaje }))
           }
-        },
-      )
+  }
+
+  return {
+    name: 'situr:api-en-desarrollo',
+    apply: 'serve',
+    configureServer(servidor: ViteDevServer) {
+      inyectarEntorno()
+      if (!fs.existsSync(carpeta)) return
+      servidor.middlewares.use(middleware)
+    },
+    /*
+      La VISTA PREVIA del build (`vite preview`) monta el mismo middleware.
+
+      Sin esto, `vite preview` no sirve las rutas `/api/`: la peticion
+      devuelve el `index.html` de la SPA en vez de la respuesta de la
+      funcion. Y sin la vista previa **no se puede probar el build de
+      produccion en local**, que es justo lo que hay que probar antes de
+      desplegar.
+    */
+    configurePreviewServer(servidor: PreviewServer) {
+      inyectarEntorno()
+      if (!fs.existsSync(carpeta)) return
+      servidor.middlewares.use(middleware)
     },
   }
 }

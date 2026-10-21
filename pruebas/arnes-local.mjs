@@ -382,6 +382,32 @@ const proxy = http.createServer((req, res) => {
   req.pipe(peticion)
 })
 
+/*
+  El arnés local NO habla WebSocket: el cliente de Realtime de Supabase lo
+  pide al conectarse, y el proxy lo reenvía a PostgREST como una petición
+  normal. PostgREST no contesta a un `Upgrade`, así que **la conexión se
+  queda colgada**.
+
+  Y ahí está el problema: el cliente de Realtime reintenta solo, con
+  backoff, y cada reintento deja un socket abierto para siempre. A los
+  pocos minutos el navegador se queda **sin descriptores de fichero**
+  (`ERR_INSUFFICIENT_RESOURCES`), deja de poder cargar ni un módulo, se
+  queda en blanco y el renderizador muere. Era también la causa de que el
+  tutorial se cayera cada vez más tarde: no era memoria, eran descriptores.
+
+  Aquí el `upgrade` se rechaza limpio y el socket se cierra, que es lo que
+  el cliente necesita para reintentar sin dejar nada colgando.
+*/
+proxy.on('upgrade', (req, socket) => {
+  socket.write(
+    'HTTP/1.1 501 Not Implemented\r\n' +
+      'Connection: close\r\n' +
+      'Content-Length: 0\r\n' +
+      '\r\n',
+  )
+  socket.destroy()
+})
+
 // ---------------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------------

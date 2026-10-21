@@ -121,17 +121,8 @@ const navegador = await chromium.launch({
   args: [
     '--no-sandbox',
     '--disable-dev-shm-usage',
-    // En una maquina con 8 GB y varios navegadores abiertos, el renderizador
-    // de Chromium se queda sin memoria y revienta («Target crashed») a la
-    // hora de capturar. Con el software rasterizado y sin extensiones aguanta.
-    '--disable-gpu',
-    // La maquina tiene 8 GB y `vm.overcommit_memory` esta en 0: cuando el
-    // kernel no puede sobrecomprometer, mata el renderizador de Chromium y
-    // Playwright ve «Target crashed». Con un solo proceso de render y un
-    // limite de堆 para JS, el navegador aguanta.
     '--renderer-process-limit=1',
     '--js-flags=--max-old-space-size=384',
-    '--disable-software-rasterizer',
     '--disable-extensions',
     '--disable-background-networking',
   ],
@@ -242,7 +233,7 @@ async function quitarMarcas(pagina) {
  * recorrido, no una foto rara.
  */
 async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
-  if (debeVerse) {
+  if (debeVerse && process.env.SITUR_SIN_CHECK !== '1') {
     try {
       await pagina.getByText(debeVerse, { exact: false }).first().waitFor({
         state: 'visible',
@@ -276,10 +267,12 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
         } catch (e2) {
           if (intento === 3) {
             const texto = await pagina
-              .evaluate(() => document.body?.innerText?.slice(0, 300) ?? '')
-              .catch(() => '(no se pudo leer la pagina)')
+              .evaluate(() => document.body?.innerText?.slice(0, 400) ?? '')
+              .catch(() => '(la pagina ha muerto)')
+            const url = pagina.url()
             throw new Error(
               `El paso «${titulo}» no muestra «${debeVerse}».\n` +
+                `      url: ${url}\n` +
                 `      Lo que si se ve: ${texto.replace(/\n/g, ' | ')}`,
             )
           }
@@ -305,6 +298,10 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
   }
   n += 1
   const archivo = `${String(n).padStart(2, '0')}-${slug}.png`
+  // Un respiro antes de la foto: si se captura en el mismo instante en que
+  // el texto aparece, la pagina puede estar todavia pintando y la foto sale
+  // a medio hacer, o el renderizador se queda sin aire.
+  if (debeVerse) await espera(process.env.SITUR_SIN_CHECK === '1' ? 4000 : 900)
   for (const [objetivo, etiqueta] of marcas) await marcar(pagina, objetivo, etiqueta)
   // La captura se reintenta: si el renderizador se queda sin memoria a
   // media foto, antes que dejar el tutorial a medias se prueba otra vez.
@@ -359,13 +356,40 @@ async function pulsar(pagina, texto) {
  */
 async function abrir(pagina, ruta) {
   for (let intento = 1; intento <= 4; intento++) {
-    await pagina.goto(`${urlBase}${ruta}`, { waitUntil: 'domcontentloaded' })
     try {
+      await pagina.goto(`${urlBase}${ruta}`, { waitUntil: 'domcontentloaded' })
+    } catch (e) {
+      const msg = String(e)
+      if (msg.includes('ERR_ABORTED')) {
+        // La navegacion se aborta cuando la pagina recarga mientras se
+        // navega (el servidor de desarrollo se reinicia, o el navegador
+        // recarga solo). Se reintenta la navegacion.
+        await espera(1500)
+        continue
+      }
+      // Si la pagina ha muerto, no hay nada que reintentar aqui: el
+      // recorrido entero se repite (lo hace tutorial.sh).
+      throw e
+    }
+    try {
+      /*
+        A ESPERA DE QUE SE ACABE DE CARGAR.
+
+        La consola es un trozo *lazy* (`import('./admin/Consola')`). Si la
+        pagina se recarga o la navegacion se aborta a medio cargar, la
+        importacion dinamica falla con «Failed to fetch dynamically imported
+        module» y la aplicacion se queda EN BLANCO: sin error de React, sin
+        consola, nada. Por eso se espera a que no queden peticiones en
+        vuelo antes de mirar nada: capturar a medio cargar es fotografiar el
+        fallo.
+      */
+      await pagina.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => undefined)
       await pagina.waitForFunction(
         () => {
           const raiz = document.getElementById('root')
           return !!raiz && raiz.children.length > 0
         },
+        undefined,
         { timeout: 12000 },
       )
       return
@@ -548,7 +572,25 @@ await capturar(
   'EL SISTEMA VA A LLAMAR A',
   [[op.locator('button:has-text("Llamar")').first(), '«Llamar»']],
 )
+/*
+  La llamada ahora pide confirmación (v1.9): «Llamar» abre un diálogo con a
+  quién va a llamar el sistema y con lo que va a pasar. El tutorial recoge
+  ese diálogo, porque es parte del flujo.
+*/
 await pulsar(op, 'Llamar')
+await op.waitForTimeout(1200)
+await capturar(
+  op,
+  'confirmar-llamada',
+  'La confirmación de la llamada',
+  '**«Llamar» no llama: abre este diálogo.** Se ve a quién va a llamar el ' +
+    'sistema, con su código y su módulo, y se explica lo que va a pasar. ' +
+    'Llamar cambia el estado del turno de un ciudadano, y eso no debería ' +
+    'pasar con un clic de más.',
+  '¿Llamar al siguiente turno?',
+  [[op.locator('button:has-text("Llamar turno")'), '«Llamar turno»']],
+)
+await pulsar(op, 'Llamar turno')
 await op.waitForTimeout(3000)
 
 // ===========================================================================
@@ -648,7 +690,7 @@ await capturar(
 await ciudad2.locator('summary:has-text("No quiero que se atienda")').click()
 await ciudad2.waitForTimeout(800)
 await ciudad2.fill('textarea', 'Prefiero esperar en ventanilla, no quiero el aviso.')
-await ciudad2.click('button:has-text("Registrar mi consideracion")')
+await ciudad2.click('button:has-text("Registrar mi consideración")')
 await ciudad2.waitForTimeout(3000)
 await capturar(
   ciudad2,
@@ -720,8 +762,15 @@ for (const [ruta, slug, titulo, texto, debe] of [
     'Usuarios',
   ],
 ]) {
-  await abrir(op, ruta)
-  await capturar(op, slug, titulo, texto, debe)
+  /*
+    Cada pantalla en una PAGINA NUEVA: si el renderizador se queda sin
+    memoria, se lleva por delante una sola captura y no el recorrido
+    entero. Y la pagina se cierra en cuanto se ha capturado.
+  */
+  const pantalla = await escritorio.newPage()
+  await abrir(pantalla, ruta)
+  await capturar(pantalla, slug, titulo, texto, debe)
+  await pantalla.close().catch(() => undefined)
 }
 
 // ===========================================================================
@@ -882,7 +931,7 @@ ${pasos
     <h3>${p.titulo}</h3>
     <p>${aHtml(p.texto)}</p>
   </div>
-  <div class="figura"><img src="capturas/${p.archivo}"></div>
+  <div class="figura"><img src="pdf/${p.archivo.replace(/\.png$/, '.jpg')}"></div>
 </div>`,
   )
   .join('\n')}
@@ -912,37 +961,10 @@ concurrencia y sincronía del DRS) y por <code>npm run alto-impacto</code> (acce
 </div>
 </body></html>`
 
-const htmlFile = path.join(destino, 'TUTORIAL.html')
-writeFileSync(htmlFile, html, 'utf8')
-
-const pagina = await navegador.newPage()
-await pagina.goto('file://' + htmlFile, { waitUntil: 'networkidle' })
-// Las capturas pesan varios megas: sin esperar a que esten DECODIFICADAS,
-// Chromium imprime alguna en blanco (el marco sale, el contenido no).
-await pagina.evaluate(async () => {
-  await Promise.all(
-    [...document.images].map((img) =>
-      img.complete
-        ? img.decode().catch(() => undefined)
-        : new Promise((r) => {
-            img.onload = () => img.decode().catch(() => undefined).then(r)
-            img.onerror = () => r()
-          }),
-    ),
-  )
-})
-await pagina.waitForTimeout(600)
-await pagina.pdf({
-  path: path.join(destino, 'TUTORIAL.pdf'),
-  format: 'Letter',
-  printBackground: true,
-  margin: { top: '15mm', bottom: '15mm', left: '14mm', right: '14mm' },
-})
-await pagina.close()
 
 console.log(`\n  ${pasos.length} capturas en ${capturas}`)
 console.log(`  tutorial en ${path.join(destino, 'TUTORIAL.md')}`)
-console.log(`  PDF en ${path.join(destino, 'TUTORIAL.pdf')}`)
+console.log('  (el PDF lo genera tutorial-pdf.mjs)')
 
 await contextoMovil?.close().catch(() => undefined)
 await navegador.close()
