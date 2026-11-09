@@ -170,7 +170,7 @@ cat > "$APP/.env.local" <<EOF
 #
 # Las variables VITE_* van al navegador. Las de SUPABASE_* NO: Vite solo
 # expone al bundle las que empiezan por VITE_, así que la service_role se
-# queda en el servidor (lo comprueba `npm run build` con un grep sobre dist/).
+# queda en el servidor (lo comprueba «npm run build» con un grep sobre dist/).
 VITE_SUPABASE_URL=http://$ANFITRION:$PUERTO_PROXY
 VITE_SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_URL=http://$ANFITRION:$PUERTO_PROXY
