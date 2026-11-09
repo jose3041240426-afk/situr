@@ -6,7 +6,7 @@ Aplicación del **DRS v1.9** (documento de requisitos). React 19 + TypeScript
 sobre Vercel, con Supabase (PostgreSQL) como autoridad de los turnos.
 
 > **Qué es este repositorio**: **la aplicación**. El DRS, las migraciones en
-> SQL plano, la suite de 138 aserciones y el tutorial con capturas viven en
+> SQL plano, la suite de 144 aserciones y el tutorial con capturas viven en
 > el proyecto completo, en las carpetas hermanas `migracion/`, `tutorial/` y
 > en la raíz. Lo que sí está aquí es todo lo que hace falta para
 > **desplegar**: el código, las migraciones en el formato de la CLI de
@@ -328,6 +328,38 @@ factor es el de tu aplicación de autenticación.
 | `FATAL: no existe el rol "postgres"` | El `PGUSER` no es el del sistema. `export PGUSER=postgres`. |
 | «La migración falló» | Revisa `psql -X -d situr_app -c "\d+ turnos"`: si la tabla existe, es que la base no estaba vacía. |
 
+#### Escanear el QR del turno desde el celular
+
+El QR se genera con `window.location.origin`. Si abres la consola en
+`http://localhost:5173`, el QR guarda `localhost`, y al escanearlo el teléfono
+busca el servidor **en sí mismo**: no encuentra nada. Hay que abrir la consola
+con la dirección de la computadora en la red local.
+
+```bash
+# 1. El arnés, apuntando a la IP de la PC (no a 127.0.0.1)
+SITUR_ANFITRION=192.168.1.50 pruebas/levantar.sh situr_app
+
+# 2. En otra terminal, la aplicación (ya escucha en toda la red: host: true)
+npm run dev
+
+# 3. Comprobar que el celular va a llegar, y ver el QR de la dirección
+pruebas/qr-local.sh
+```
+
+Abre la consola en `http://192.168.1.50:5173/admin` (esa misma dirección, no
+`localhost`), emite un turno e imprime el boleto: el QR ya apunta a
+`http://192.168.1.50:5173/turno/<token>` y el teléfono lo abre.
+
+Tres condiciones: el teléfono y la PC en **la misma red Wi-Fi**; el cortafuegos
+de la PC dejando pasar los puertos **5173** y **54321**; y el arnés arrancado
+con `SITUR_ANFITRION`, porque para el teléfono `127.0.0.1` es el teléfono.
+
+> **El aviso push no funciona por `http://`.** El navegador exige un contexto
+> seguro (HTTPS o `localhost`) para el service worker y las notificaciones. Por
+> la IP local el portal del ciudadano funciona entero, pero el botón de avisos
+> falla. Para probar el push en el celular hace falta un túnel HTTPS o el
+> despliegue en Vercel.
+
 ---
 
 ### 3.3 Variables de entorno
@@ -374,7 +406,7 @@ supabase db push          # aplica supabase/migrations/ en orden
 ```
 
 En el proyecto completo hay además una carpeta `migracion/` con las mismas
-migraciones en SQL plano, la **suite de 138 aserciones** y el volcado
+migraciones en SQL plano, la **suite de 144 aserciones** y el volcado
 restaurable. No está en este repositorio porque aquí está únicamente la
 aplicación.
 
@@ -477,7 +509,7 @@ solo está la aplicación):
 ```bash
 cd ../migracion
 psql -X -v ON_ERROR_STOP=1 -d situr -f prueba/01_pruebas.sql
-# debe imprimir: TODAS LAS PRUEBAS PASARON   (138 aserciones)
+# debe imprimir: TODAS LAS PRUEBAS PASARON   (144 aserciones)
 ```
 
 ---
@@ -771,7 +803,7 @@ pruebas/levantar.sh situr_app   # migra la base, levanta PostgREST, auth y proxy
   `service_role` de Supabase y el token de Upstash. Se generan con
   `scripts/generar-secretos.mjs` y viven en `secretos.env` (permisos 600,
   fuera del repositorio).
-- **La suite de 138 aserciones y `verificar-todo.sh`**: están en la carpeta
+- **La suite de 144 aserciones y `verificar-todo.sh`**: están en la carpeta
   hermana `migracion/` del proyecto completo.
 - **El DRS, el tutorial y el volcado**: igual, en el proyecto completo.
 - **La instalación en Supabase**: sigue pendiente de decidir de quién es la

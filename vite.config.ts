@@ -66,6 +66,18 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      // Escucha en toda la red local, no solo en `localhost`. Es lo que
+      // permite abrir la aplicación desde el celular y escanear el QR del
+      // turno: el QR se genera con `window.location.origin`, así que si se
+      // abre en `localhost`, el teléfono apunta a su propio `localhost` y no
+      // encuentra nada. Abriendo en `http://<ip-de-la-pc>:5173`, el QR apunta
+      // a esa misma dirección y sí funciona.
+      host: true,
+    },
+    preview: {
+      port: 4173,
+      strictPort: true,
+      host: true,
     },
     // Sin `define` para process.env: las funciones de `api/` leen de
     // `process.env` de verdad (en desarrollo, el plugin lo inyecta desde

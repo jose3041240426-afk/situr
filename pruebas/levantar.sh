@@ -149,10 +149,17 @@ if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE" ]; then
   exit 1
 fi
 
+# --- 4.5) Desde qué dirección se abre la aplicación -------------------------
+# Por defecto, 127.0.0.1: solo esta computadora. Para escanear el QR desde el
+# celular hace falta que el teléfono llegue a la API, y para el teléfono
+# `127.0.0.1` es él mismo. Con `SITUR_ANFITRION=<ip-de-la-pc>` el navegador del
+# teléfono apunta a la PC.
+ANFITRION="${SITUR_ANFITRION:-127.0.0.1}"
+
 verde "Todo en pie."
 echo
 echo "  Base      : $BASE"
-echo "  API       : http://127.0.0.1:$PUERTO_PROXY"
+echo "  API       : http://$ANFITRION:$PUERTO_PROXY"
 
 # --- 5) Apuntar la aplicación al arnés -------------------------------------
 # Se escribe el `.env.local` con las variables PUBLICAS. Lo que el navegador
@@ -164,9 +171,9 @@ cat > "$APP/.env.local" <<EOF
 # Las variables VITE_* van al navegador. Las de SUPABASE_* NO: Vite solo
 # expone al bundle las que empiezan por VITE_, así que la service_role se
 # queda en el servidor (lo comprueba `npm run build` con un grep sobre dist/).
-VITE_SUPABASE_URL=http://127.0.0.1:$PUERTO_PROXY
+VITE_SUPABASE_URL=http://$ANFITRION:$PUERTO_PROXY
 VITE_SUPABASE_ANON_KEY=$ANON_KEY
-SUPABASE_URL=http://127.0.0.1:$PUERTO_PROXY
+SUPABASE_URL=http://$ANFITRION:$PUERTO_PROXY
 SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE
 EOF
@@ -192,6 +199,16 @@ echo "    cd '$APP' && npm run dev"
 echo
 echo "Y entrar con:"
 echo "    admin@situr.local / situr-admin-2026    (MFA: 123456)"
+echo
+if [ "$ANFITRION" = "127.0.0.1" ]; then
+  echo "Para abrir la aplicación desde el celular y escanear el QR del turno:"
+  echo "    SITUR_ANFITRION=<ip-de-esta-pc> pruebas/levantar.sh"
+  echo "    (la misma red Wi-Fi; el QR se genera con la dirección desde la que"
+  echo "    se abre la consola, así que ábrela en http://<ip-de-esta-pc>:5173)"
+else
+  echo "Abre la aplicación en:  http://$ANFITRION:5173"
+  echo "  (el QR del turno apuntará a esa misma dirección)"
+fi
 
 # --- 6) Esperar a que los paren --------------------------------------------
 trap 'echo; echo "==> Parando"; kill -9 $PGRST_PID $ARNES_PID 2>/dev/null || true; exit 0' INT TERM

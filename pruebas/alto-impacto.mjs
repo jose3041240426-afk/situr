@@ -166,7 +166,7 @@ for (const pantalla of PANTALLAS) {
     if (axeViolations.length) {
       h.problemas.push({
         tipo: 'axe',
-        detalle: axeViolations.map((v) => `${v.id} (${v.impacto}): ${v.mensaje.slice(0, 110)}`),
+        detalle: axeViolations.map((v) => `${v.id} (${v.impacto}): ${v.mensaje}`),
       })
     }
 
