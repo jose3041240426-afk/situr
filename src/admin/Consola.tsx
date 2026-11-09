@@ -76,7 +76,7 @@ import { supabase } from '../lib/supabase'
  * lo que la pantalla muestra es lo que la base respondió (RF-008, RN-011).
  */
 export default function Consola() {
-  const { operador, puedeOperar, mfaPendiente } = useAuth()
+  const { operador, puedeOperar, esAdministrador, mfaPendiente } = useAuth()
   const navegar = useNavigate()
 
   const [periodoAbierto, setPeriodoAbierto] = useState<PeriodoOperativo | null>(null)
@@ -728,8 +728,18 @@ export default function Consola() {
             acción es cerrar (rojo, destructiva); con el periodo cerrado la
             acción es abrir (verde, habilita la jornada). Así el operador sabe
             qué va a pasar antes de leer el texto.
+
+            Solo el administrador ve estos dos botones. Abrir y cerrar la
+            jornada es suyo (RF-025) y las RPC lo comprueban; para un AGENTE
+            el botón siempre acabaría en «Solo administradores…». Un botón que
+            no puede funcionar no es una opción: es una trampa. Al operador se
+            le dice quién puede hacerlo en vez de ofrecerle la puerta cerrada.
           */}
-          {periodoAbierto ? (
+          {!esAdministrador ? (
+            <p className="max-w-56 text-right text-xs leading-relaxed text-gris-500">
+              Solo un administrador abre o cierra la jornada.
+            </p>
+          ) : periodoAbierto ? (
             <BotonChispa
               tono="rojo"
               onClick={() => setConfirmandoCierre(true)}
