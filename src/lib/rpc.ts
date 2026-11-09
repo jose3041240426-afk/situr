@@ -158,11 +158,13 @@ export async function generarTurnosMasivos(
 }
 
 /**
- * Programa el aviso push del siguiente turno de la cola (migración 009).
+ * Programa el aviso push de los próximos turnos de la cola (migración 014).
  *
- * Los minutos permitidos los decide la dependencia en `configuracion`; la
- * consola los pide con `opcionesAviso()` para no ofrecer un valor que la
- * base vaya a rechazar.
+ * Se avisa a tantos turnos como lugares de atención ocupados haya ahora
+ * (CALLED + SERVING), con un mínimo de uno: con tres turnos abiertos se
+ * avisa a los tres siguientes. Los minutos permitidos los decide la
+ * dependencia en `configuracion`; la consola los pide con `opcionesAviso()`
+ * para no ofrecer un valor que la base vaya a rechazar.
  */
 export async function programarAvisoSiguiente(
   minutos: number,

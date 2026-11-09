@@ -152,9 +152,11 @@ export default function Consola() {
 
   // Aviso programado al siguiente (migración 009).
   const [minutosAviso, setMinutosAviso] = useState<number[]>([])
-  const [avisoProgramado, setAvisoProgramado] = useState<
-    { codigo: string; minutos: number; turnoId: string } | null
-  >(null)
+  const [avisoProgramado, setAvisoProgramado] = useState<{
+    codigos: string[]
+    minutos: number
+    turnos: Array<{ codigo: string; turnoId: string }>
+  } | null>(null)
 
   // Llamada
   const [moduloFiltro, setModuloFiltro] = useState('')
@@ -498,24 +500,38 @@ export default function Consola() {
   }
 
   /**
-   * Programa el aviso push del siguiente turno (migración 009).
+   * Programa el aviso push de los próximos turnos (migración 014).
    *
-   * El operador elige 5, 10 o 15 minutos y al ciudadano que está en esa
-   * posición le llega la notificación cuando se cumple el plazo.
+   * El operador elige 5, 10 o 15 minutos y la base avisa a tantos turnos
+   * como lugares de atención tenga ocupados ahora (CALLED + SERVING, mínimo
+   * uno): con tres abiertos, a los tres siguientes; no solo al primero. Al
+   * cumplirse el plazo les llega la notificación a todos.
    */
   async function programarAviso(minutos: number) {
     setOcupado(true)
     setAviso(null)
     try {
       const r = await programarAvisoSiguiente(minutos)
+      const turnos = r.turnos.map((t) => ({ codigo: t.codigo, turnoId: t.turno_id }))
+      const lista =
+        turnos.length === 1
+          ? turnos[0].codigo
+          : `${turnos
+              .slice(0, -1)
+              .map((t) => t.codigo)
+              .join(', ')} y ${turnos[turnos.length - 1].codigo}`
+
       setAvisoProgramado({
-        codigo: r.codigo_turno,
+        codigos: turnos.map((t) => t.codigo),
         minutos: r.minutos,
-        turnoId: r.turno_id,
+        turnos,
       })
       setAviso({
         tono: 'ok',
-        texto: `Aviso programado: al turno ${r.codigo_turno} le llegará la notificación en ${r.minutos} minutos.`,
+        texto:
+          turnos.length === 1
+            ? `Aviso programado: al turno ${lista} le llegará la notificación en ${r.minutos} minutos.`
+            : `Aviso programado: a los turnos ${lista} les llegará la notificación en ${r.minutos} minutos.`,
       })
       await cargar()
     } catch (e) {
@@ -528,14 +544,26 @@ export default function Consola() {
     }
   }
 
-  /** Deshace el aviso programado antes de que salga. */
+  /** Deshace los avisos programados antes de que salgan. */
   async function cancelarAviso() {
     if (!avisoProgramado) return
     setOcupado(true)
     try {
-      await cancelarAvisoSiguiente(avisoProgramado.turnoId)
+      const resultados = await Promise.all(
+        avisoProgramado.turnos.map((t) =>
+          cancelarAvisoSiguiente(t.turnoId).catch(() => false),
+        ),
+      )
       setAvisoProgramado(null)
-      setAviso({ tono: 'ok', texto: 'Aviso cancelado.' })
+      setAviso({
+        tono: 'ok',
+        texto:
+          resultados.every(Boolean)
+            ? resultados.length === 1
+              ? 'Aviso cancelado.'
+              : 'Avisos cancelados.'
+            : 'Se cancelaron los que seguían pendientes; alguno ya había salido.',
+      })
     } catch (e) {
       setAviso({
         tono: 'peligro',
@@ -2541,11 +2569,12 @@ function EmisionMasiva({
 }
 
 /**
- * Aviso programado al siguiente turno (migración 009).
+ * Aviso programado a los próximos turnos (migraciones 009 y 014).
  *
  * El operador ve las opciones que la dependencia habilitó en `configuracion`
- * (5, 10 y 15 minutos por defecto) y elige una. Al cumplirse el plazo, al
- * ciudadano que está en esa posición de la cola le llega la notificación.
+ * (5, 10 y 15 minutos por defecto) y elige una. Al cumplirse el plazo les
+ * llega la notificación a tantos turnos de la cola como lugares de atención
+ * haya ocupados en ese momento (mínimo uno), no solo al primero.
  */
 export function PanelAviso({
   minutos,
@@ -2557,7 +2586,7 @@ export function PanelAviso({
   cargando,
 }: {
   minutos: number[]
-  programado: { codigo: string; minutos: number } | null
+  programado: { codigos: string[]; minutos: number } | null
   onProgramar: (m: number) => void
   onCancelar: () => void
   ocupado: boolean
@@ -2568,11 +2597,11 @@ export function PanelAviso({
   return (
     <section className="tarjeta p-6">
       <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-        Avisar al siguiente
+        Avisar a los próximos
       </h2>
       {cargando ? (
         <div className="mt-3 space-y-3" aria-busy="true">
-          <span className="sr-only">Cargando el aviso al siguiente turno…</span>
+          <span className="sr-only">Cargando el aviso a los próximos turnos…</span>
           <div aria-hidden="true" className="esqueleto-bloque h-3 w-full rounded" />
           <div aria-hidden="true" className="esqueleto-bloque h-3 w-4/5 rounded" />
           <div aria-hidden="true" className="mt-4 grid grid-cols-3 gap-3">
@@ -2584,14 +2613,24 @@ export function PanelAviso({
       ) : (
       <>
       <p className="mt-1 text-xs leading-snug text-gris-500">
-        Elige con cuánta anticipación quiere que le llegue el aviso al turno que
-        sigue en la cola.
+        Elige con cuánta anticipación quieres que les llegue el aviso a los
+        próximos turnos: se avisa a uno por cada lugar de atención ocupado
+        ahora (mínimo uno).
       </p>
 
       {programado && (
-        <div className="mt-3 flex items-center justify-between rounded-lg bg-verde-50 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-verde-50 px-3 py-2">
           <span className="text-xs text-navy-800">
-            <span className="font-bold">{programado.codigo}</span> avisado en{' '}
+            {programado.codigos.length === 1 ? (
+              <>
+                <span className="font-bold">{programado.codigos[0]}</span> avisado en{' '}
+              </>
+            ) : (
+              <>
+                <span className="font-bold">{programado.codigos.length}</span> avisados (
+                {programado.codigos.join(', ')}) en{' '}
+              </>
+            )}
             <span className="font-bold">{programado.minutos} min</span>
           </span>
           <button

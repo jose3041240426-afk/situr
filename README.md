@@ -6,7 +6,7 @@ Aplicación del **DRS v1.9** (documento de requisitos). React 19 + TypeScript
 sobre Vercel, con Supabase (PostgreSQL) como autoridad de los turnos.
 
 > **Qué es este repositorio**: **la aplicación**. El DRS, las migraciones en
-> SQL plano, la suite de 149 aserciones y el tutorial con capturas viven en
+> SQL plano, la suite de 151 aserciones y el tutorial con capturas viven en
 > el proyecto completo, en las carpetas hermanas `migracion/`, `tutorial/` y
 > en la raíz. Lo que sí está aquí es todo lo que hace falta para
 > **desplegar**: el código, las migraciones en el formato de la CLI de
@@ -406,7 +406,7 @@ supabase db push          # aplica supabase/migrations/ en orden
 ```
 
 En el proyecto completo hay además una carpeta `migracion/` con las mismas
-migraciones en SQL plano, la **suite de 149 aserciones** y el volcado
+migraciones en SQL plano, la **suite de 151 aserciones** y el volcado
 restaurable. No está en este repositorio porque aquí está únicamente la
 aplicación.
 
@@ -509,7 +509,7 @@ solo está la aplicación):
 ```bash
 cd ../migracion
 psql -X -v ON_ERROR_STOP=1 -d situr -f prueba/01_pruebas.sql
-# debe imprimir: TODAS LAS PRUEBAS PASARON   (149 aserciones)
+# debe imprimir: TODAS LAS PRUEBAS PASARON   (151 aserciones)
 ```
 
 ---
@@ -803,7 +803,7 @@ pruebas/levantar.sh situr_app   # migra la base, levanta PostgREST, auth y proxy
   `service_role` de Supabase y el token de Upstash. Se generan con
   `scripts/generar-secretos.mjs` y viven en `secretos.env` (permisos 600,
   fuera del repositorio).
-- **La suite de 149 aserciones y `verificar-todo.sh`**: están en la carpeta
+- **La suite de 151 aserciones y `verificar-todo.sh`**: están en la carpeta
   hermana `migracion/` del proyecto completo.
 - **El DRS, el tutorial y el volcado**: igual, en el proyecto completo.
 - **La instalación en Supabase**: sigue pendiente de decidir de quién es la

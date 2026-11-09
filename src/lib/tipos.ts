@@ -247,15 +247,22 @@ export interface RespuestaGenerarTurnosMasivos {
   }>
 }
 
-/** `programar_aviso_siguiente(minutos, tramite?)` */
-export interface RespuestaProgramarAviso {
-  ok: true
+/** Un turno alcanzado por `programar_aviso_siguiente` (migración 014). */
+export interface TurnoAvisado {
   turno_id: string
-  codigo_turno: string
+  codigo: string
   folio: number
   clave_tramite: string
+}
+
+/** `programar_aviso_siguiente(minutos, tramite?)` (migraciones 009 y 014). */
+export interface RespuestaProgramarAviso {
+  ok: true
   minutos: number
   aviso_programado_en: string
+  lugares_ocupados: number
+  total: number
+  turnos: TurnoAvisado[]
 }
 
 /** `llamar_siguiente_turno(modulo_id?, tramite_id?)` */
