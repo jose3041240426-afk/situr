@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { Marca } from '../components/ui'
 
 /**
  * Marco del panel administrativo.
@@ -11,24 +10,175 @@ import { Marca } from '../components/ui'
  * el menú es grande, el texto tiene cuerpo y el contenido no se esconde en
  * submenús.
  */
+/*
+ * `soloAdmin` marca las secciones que un agente NO debe ver.
+ *
+ * El menú se filtra con esto y no con una lista aparte: si una sección nueva
+ * es de administración, basta añadir la marca aquí y desaparece sola para los
+ * agentes. Ocultar es solo la mitad: la RLS y las funciones de la base son las
+ * que de verdad impiden que un agente lea o cambie lo que no le toca. El menú
+ * existe para no ofrecer puertas que no se abren.
+ */
 const SECCIONES = [
-  { a: '/admin/turnos', txt: 'Turnos', icono: IconoTurnos },
-  { a: '/admin/usuarios', txt: 'Usuarios', icono: IconoUsuarios },
-  { a: '/admin/catalogos', txt: 'Catálogos', icono: IconoCatalogos },
-  { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial },
-  { a: '/admin/estadisticas', txt: 'Estadísticas', icono: IconoEstadisticas },
+  { a: '/admin/turnos', txt: 'Turnos', icono: IconoTurnos, soloAdmin: false },
+  { a: '/admin/usuarios', txt: 'Usuarios', icono: IconoUsuarios, soloAdmin: true },
+  { a: '/admin/catalogos', txt: 'Catálogos', icono: IconoCatalogos, soloAdmin: true },
+  { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial, soloAdmin: false },
+  { a: '/admin/estadisticas', txt: 'Estadísticas', icono: IconoEstadisticas, soloAdmin: false },
 ]
+
+/**
+ * Menú con deslizador de cristal.
+ *
+ * Adaptación del patrón «glass radio group» a navegación por rutas. El
+ * original usa radios con `:checked ~ .glass-glider` para mover el brillo; aquí
+ * no hay radios que marcar, así que el deslizador se posiciona con un índice
+ * calculado y `transform: translateY(índice * 100%)`.
+ *
+ * Por qué no usar los radios igual:
+ *
+ *   - Un radio marca una opción de un formulario; aquí se navega. Un lector de
+ *     pantalla anunciaría «Turnos, botón de opción, marcado», que describe mal
+ *     lo que pasa. `aria-current="page"` es lo correcto para una navegación.
+ *   - Con radios, el foco de teclado se movería con las flechas dentro del
+ *     grupo; en un menú se espera Tab entre enlaces.
+ *
+ * La animación se conserva entera: mismo easing con rebote, mismo degradado,
+ * mismo halo.
+ */
+function MenuCristal({
+  secciones,
+  onNavegar,
+}: {
+  secciones: typeof SECCIONES
+  onNavegar: () => void
+}) {
+  const { pathname } = useLocation()
+  const indice = Math.max(0, secciones.findIndex((s) => pathname.startsWith(s.a)))
+
+  /*
+   * DE DÓNDE VIENE EL DESLIZADOR, no dónde está.
+   *
+   * Aquí es donde se rompía la animación. Al cambiar de ruta, `Disposicion`
+   * vuelve a renderizar y crea un array de secciones nuevo; ese cambio de
+   * identidad hacía que este menú se remontara. Un nodo recién montado ya
+   * nace en su `translateY` final, y una transición no se dispara si el valor
+   * no cambia después del montaje: por eso saltaba de golpe.
+   *
+   * Se guarda el índice anterior y se pinta primero en él; un frame después se
+   * pasa al nuevo y la transición sí corre. Si el índice no cambió, no hay
+   * nada que animar.
+   */
+  const anterior = useRef(indice)
+  const [posicion, setPosicion] = useState(anterior.current)
+
+  useEffect(() => {
+    if (posicion === indice) return
+    const t = requestAnimationFrame(() => setPosicion(indice))
+    anterior.current = indice
+    return () => cancelAnimationFrame(t)
+  }, [indice, posicion])
+
+  return (
+    <div className="glass-menu">
+      {/*
+        El deslizador va primero y debajo en z-index: los enlaces quedan
+        encima, así el texto nunca lo tapa ni recibe el clic. `aria-hidden`
+        porque es decoración pura.
+      */}
+      <div
+        className="glass-menu-glider"
+        style={{ transform: `translateY(${posicion * 100}%)` }}
+        aria-hidden="true"
+      />
+      {secciones.map(({ a, txt, icono: Icono }) => {
+        const activo = pathname.startsWith(a)
+        return (
+          <NavLink
+            key={a}
+            to={a}
+            onClick={onNavegar}
+            aria-current={activo ? 'page' : undefined}
+            className={`glass-menu-item ${activo ? 'is-activo' : ''}`}
+          >
+            <Icono />
+            {txt}
+          </NavLink>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Lo que se ve mientras llega el chunk de la pantalla.
+ *
+ * Es un esqueleto, no un «Cargando…» centrado: así el hueco tiene la forma del
+ * contenido y no hay salto cuando aparece. Dura pocos milisegundos, pero es
+ * justo el instante en que antes se veía la pantalla anterior.
+ */
+function CargandoPantalla() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Cargando pantalla…</span>
+      <div aria-hidden="true" className="tarjeta p-6">
+        <div className="esqueleto-bloque mb-4 h-4 w-40 rounded" />
+        <div className="esqueleto-bloque mb-2 h-5 w-2/3 rounded" />
+        <div className="esqueleto-bloque h-5 w-1/2 rounded" />
+      </div>
+      <div aria-hidden="true" className="tarjeta p-6">
+        <div className="esqueleto-bloque mb-4 h-4 w-32 rounded" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="esqueleto-bloque mb-2 h-4 rounded" style={{ width: `${100 - (i % 3) * 9}%` }} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function Disposicion({
   titulo,
   children,
 }: {
-  titulo: string
-  children: ReactNode
+  /** Si se omite, se toma de la sección activa (uso como contenedor de ruta). */
+  titulo?: string
+  children?: ReactNode
 }) {
   const { operador, salir, esAdministrador } = useAuth()
+
+  /*
+   * Las secciones que este usuario puede ver, memorizadas.
+   *
+   * Sin `useMemo`, `.filter()` devuelve un array nuevo en cada render y el
+   * menú se remonta: se perdería la posición del deslizador (y con ella la
+   * animación) cada vez que cambia cualquier cosa en la pantalla.
+   */
+  const visibles = useMemo(
+    () => SECCIONES.filter((s) => !s.soloAdmin || esAdministrador),
+    [esAdministrador],
+  )
   const navegar = useNavigate()
   const [abierto, setAbierto] = useState(false)
+  /**
+   * La ruta actual, como `key` del contenido.
+   *
+   * Sin esto, React reutiliza los nodos entre pantallas y la animación de
+   * entrada solo se vería la primera vez: los elementos ya existen, así que
+   * el navegador no vuelve a ejecutar la animación. Con la ruta como clave,
+   * cada pantalla es un árbol nuevo y la animación corre en cada cambio.
+   */
+  const { pathname } = useLocation()
+
+  /*
+   * El título sale de la ruta cuando el layout se usa como contenedor.
+   *
+   * Así el <aside> y el <header> NO se desmontan al cambiar de pantalla: solo
+   * cambia lo de dentro del <main>. Antes cada página montaba su propio
+   * `Disposicion`, de modo que navegar destruía y recreaba la barra entera —
+   * y con ella el menú, que por eso nunca alcanzaba a animar su deslizador.
+   */
+  const tituloActual =
+    titulo ?? visibles.find((s) => pathname.startsWith(s.a))?.txt ?? 'Panel'
 
   async function cerrarSesion() {
     await salir()
@@ -44,34 +194,20 @@ export default function Disposicion({
         } w-full shrink-0 bg-navy-800 text-gris-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-72`}
       >
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-            <Marca />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-white">SITUR</p>
-              <p className="truncate text-[11px] text-gris-200">
-                Dirección de Catastro
-              </p>
-            </div>
+          <div className="border-b border-white/10 px-5 py-4">
+            <p className="text-sm font-bold leading-snug text-white">
+              Sistema de toma de turnos
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-gris-200">
+              Dirección de Catastro
+            </p>
           </div>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-            {SECCIONES.map(({ a, txt, icono: Icono }) => (
-              <NavLink
-                key={a}
-                to={a}
-                onClick={() => setAbierto(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-                    isActive
-                      ? 'bg-azul-500 text-white'
-                      : 'text-gris-200 hover:bg-white/10 hover:text-white'
-                  }`
-                }
-              >
-                <Icono />
-                {txt}
-              </NavLink>
-            ))}
+          <nav className="flex-1 overflow-y-auto p-3">
+            <MenuCristal
+              secciones={visibles}
+              onNavegar={() => setAbierto(false)}
+            />
           </nav>
 
           <div className="border-t border-white/10 p-3">
@@ -104,20 +240,43 @@ export default function Disposicion({
 
       {/* Contenido */}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-gris-100 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+        {/*
+          Cabecera en navy OPACO, no translúcida.
+
+          Con el fondo plateado claro, un `bg-navy-900/70` dejaba pasar la
+          plata y el título blanco caía a 1.82:1. El velo translúcido funciona
+          sobre un fondo oscuro, pero aquí el fondo es claro: la transparencia
+          lo aclara y se come el contraste. Opaco, el navy se mantiene y el
+          blanco vuelve a leerse.
+
+          El `backdrop-blur` se queda: sirve para el contenido que pasa por
+          debajo al hacer scroll, aunque el relleno ya no sea translúcido.
+        */}
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-navy-900 px-4 py-3 backdrop-blur-md lg:px-8">
           <button
             type="button"
             onClick={() => setAbierto((v) => !v)}
-            className="rounded-lg p-2 text-gris-700 hover:bg-gris-50 lg:hidden"
+            className="rounded-lg p-2 text-gris-200 hover:bg-white/10 hover:text-white lg:hidden"
             aria-label="Abrir menú"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
-          <h1 className="truncate text-lg font-bold text-navy-800">{titulo}</h1>
+          <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
         </header>
-        <main className="p-4 lg:p-8">{children}</main>
+        {/*
+          El `Suspense` va AQUÍ DENTRO y no envolviendo todo el layout.
+          Las pantallas se cargan con `lazy`, así que al cambiar de sección el
+          chunk de la nueva aún no está. Con el `Suspense` por fuera, React
+          suspendía el árbol entero y dejaba a la vista la pantalla ANTERIOR
+          durante un instante: se veía «Turnos» con el menú ya marcando
+          «Estadísticas». Acotándolo al `main`, lo de arriba (barra lateral y
+          cabecera) nunca se suspende y el contenido muestra su esqueleto.
+        */}
+        <main key={pathname} className="entrada-escalonada p-4 lg:p-8">
+          <Suspense fallback={<CargandoPantalla />}>{children ?? <Outlet />}</Suspense>
+        </main>
       </div>
     </div>
   )

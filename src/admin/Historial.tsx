@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Disposicion from './Disposicion'
-import { Aviso, ChipEstado, Vacio } from '../components/ui'
+import { Aviso, ChipEstado, Esqueleto, Vacio } from '../components/ui'
 import CodigoQR from '../components/CodigoQR'
 import { ErrorSitur, formatearFechaHora, listarHistorial, reponerTurno } from '../lib/rpc'
 import { ETIQUETA_ESTADO } from '../lib/tipos'
@@ -102,7 +101,7 @@ export default function Historial() {
   }
 
   return (
-    <Disposicion titulo="Historial">
+    <>
       {aviso && (
         <div className="mb-4">
           <Aviso tono="ok">{aviso}</Aviso>
@@ -185,7 +184,22 @@ export default function Historial() {
         </div>
 
         {cargando ? (
-          <Vacio titulo="Cargando…" />
+          /*
+           * Esqueleto con la forma de las tarjetas de transición: cada
+           * `tarjeta` real lleva su fila de títulos y sus líneas de detalle,
+           * así que el hueco mide lo mismo y la lista no salta al llegar.
+           */
+          <div className="space-y-4 p-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="tarjeta p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="esqueleto-bloque h-5 w-24 rounded" />
+                  <div className="esqueleto-bloque h-5 w-20 rounded-full" />
+                </div>
+                <Esqueleto filas={3} alto="h-3" />
+              </div>
+            ))}
+          </div>
         ) : filas.length === 0 ? (
           <Vacio
             titulo="Sin transiciones que mostrar"
@@ -279,6 +293,6 @@ export default function Historial() {
           </div>
         )}
       </section>
-    </Disposicion>
+    </>
   )
 }

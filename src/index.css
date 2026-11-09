@@ -99,8 +99,48 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /*
+   * FONDO — radial plateado.
+   *
+   * Está construido sobre el patrón `RadialBackground`:
+   *
+   *     radial-gradient(125% 125% at 50% 10%, #fff 40%, #63e 100%)
+   *
+   * Es decir: un punto de luz centrado arriba que se abre hacia los bordes.
+   * Es lo que da la sensación de una superficie que refleja, en vez de un
+   * relleno de color plano.
+   *
+   * Del patrón original se cambian las dos paradas:
+   *
+   *   #fff -> #eef1f5  plata clara. Blanco puro arriba dejaba las tarjetas
+   *                    blancas sin separarse del fondo en la mitad de arriba.
+   *   #63e -> #6b7a8d  plata media azulada. El violeta del original no encaja
+   *                    con la paleta del sistema; este tono conserva el reflejo
+   *                    azul que pediste, pero neutro, como metal.
+   *
+   * Se añade una tercera parada oscura al 100 % (#4a5768) para que las
+   * esquinas no se queden planas: un radial de dos paradas termina lavado
+   * justo donde está la cola de la tabla.
+   */
   body {
-    @apply bg-gris-50 text-navy-900 font-sans antialiased;
+    @apply text-navy-900 font-sans antialiased;
+    background-color: #6b7a8d;
+    background-image: radial-gradient(
+      125% 125% at 50% 10%,
+      #eef1f5 0%,
+      #c8d0da 40%,
+      #8b98a9 76%,
+      #4a5768 100%
+    );
+    /* Fijo al viewport para que el degradado no se estire en las pantallas
+       largas (historial). En móvil `scroll`: `fixed` repinta en cada frame. */
+    background-attachment: scroll;
+  }
+
+  @media (min-width: 1024px) {
+    body {
+      background-attachment: fixed;
+    }
   }
 
   /* Los objetivos táctiles del panel son grandes: se opera en ventanilla,
@@ -162,21 +202,261 @@
   }
 
   /*
-   * Los controles nativos del sistema operativo (el <select> con su flecha
-   * gris y su alto propio) rompen el sistema de diseno: se ve de otra
-   * familia tipografica, con otra altura y otro color de borde que el resto
-   * de los controles. Se les quita el aspecto nativo y se les da el mismo
-   * esqueleto, con su propio chevron.
+   * SELECTOR — el <select> con aspecto propio.
+   *
+   * El control nativo trae la flecha del sistema operativo, su propia altura
+   * y su propio borde: se ve de otra familia que el resto de los campos. Aquí
+   * se le quita el aspecto nativo (`appearance: none`) y se reconstruye:
+   *
+   *   - La flecha es un SVG en `background-image`, no un pseudo-elemento. Un
+   *     `::after` no funciona en un <select>: el navegador no lo pinta.
+   *   - La altura se fija en 42px para que coincida con `.campo` y con los
+   *     botones de al lado. Sin altura fija, el <select> mide 2px más que un
+   *     <input> con el mismo relleno, y las filas de campos quedan
+   *     desalineadas.
+   *   - `text-overflow: ellipsis` no funciona en <select>; el texto largo se
+   *     recorta solo. Por eso el `padding-right` es generoso: deja sitio a la
+   *     flecha sin que el texto se le meta debajo.
+   *
+   * ESTADOS
+   *   hover   → borde más oscuro y sombra suave: el control responde antes
+   *             de que se haga clic, que es lo que se espera de un campo.
+   *   focus   → anillo azul de 3px, igual que el resto de campos.
+   *   disabled→ gris y sin cursor de mano.
    */
   .selector {
-    @apply cursor-pointer appearance-none bg-no-repeat pr-9;
+    @apply w-full min-w-0 cursor-pointer appearance-none rounded-lg border
+           border-gris-200 bg-white py-2.5 pl-3 pr-10 text-sm text-navy-900;
+    height: 42px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a6a99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-position: right 0.65rem center;
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
     background-size: 1rem 1rem;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease;
   }
 
+  .selector:hover:not(:disabled) {
+    @apply border-gris-400;
+    box-shadow: 0 1px 3px rgba(23, 43, 68, 0.08);
+    /*
+     * La flecha se tiñe al pasar el cursor. Es un `background-image` con el
+     * SVG embebido, así que hay que cambiar el color del trazo aquí: en un
+     * <select> no se puede animar con `currentColor` como en un pseudo.
+     */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231273ea' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+
+  /*
+   * `:focus-visible`, no `:focus`.
+   *
+   * El anillo se dibuja solo cuando el foco llega por teclado. Con `:focus`
+   * aparecía también al hacer clic, y eso dejaba el anillo puesto hasta que
+   * el campo perdía el foco: en la consola, con tres selects seguidos, se
+   * veía un azul pegado en el último que se había tocado.
+   *
+   * Tiene que ir DESPUÉS de `.selector:hover` y con la misma especificidad:
+   * si el anillo se declara antes, el `hover` lo pisa y el foco no se ve.
+   */
+  /*
+   * Se usa un ANILLO REAL (`outline`), no `box-shadow`.
+   *
+   * El `:focus-visible` global de la capa base aplica `ring-2`, y en Tailwind
+   * v4 los `ring-*` se implementan con `box-shadow`. Al declarar aquí un
+   * `box-shadow` propio, las dos reglas compiten por la misma propiedad y la
+   * del sistema gana (se aplica después): el anillo quedaba transparente.
+   *
+   * `outline` es una propiedad distinta, así que no choca con el `ring` ni
+   * con la sombra del hover. Además no ocupa espacio: no mueve el layout.
+   */
+  .selector:focus-visible {
+    @apply border-azul-500;
+    outline: 3px solid rgba(18, 115, 234, 0.5);
+    outline-offset: 1px;
+    /*
+     * El borde pasa a azul-500 (más oscuro que azul-400) porque con el halo
+     * claro alrededor el control se leía lavado: el azul-400 sobre blanco da
+     * 2.9:1 y el contorno necesita más peso para verse.
+     */
+  }
+
+  .selector:disabled {
+    @apply cursor-not-allowed border-gris-200 bg-gris-50 text-gris-500;
+  }
+
+  /*
+   * La opción seleccionada dentro de la lista desplegable.
+   *
+   * El desplegable abierto lo dibuja el sistema operativo, no el CSS: solo se
+   * puede estilizar el <option> en algunos navegadores. Se pone el color de
+   * fondo y el texto para que, donde sí se aplique (Chrome y Firefox en
+   * escritorio), la lista no salga con el azul del sistema.
+   */
+  .selector option {
+    @apply bg-white text-navy-900;
+    padding: 0.5rem;
+  }
+
+  .selector option:checked {
+    @apply bg-azul-50 font-semibold text-navy-900;
+  }
+
+  /*
+   * Tarjeta: la apariencia común de TODOS los contenedores del programa.
+   *
+   * Antes era `rounded-xl border shadow-sm`. Ahora lleva el mismo marco,
+   * radio y sombra que las tarjetas de cifras, para que la consola, las
+   * estadísticas, el historial, los usuarios y el portal del ciudadano se
+   * lean como un solo producto y no como pantallas hechas por separado.
+   *
+   * CÓMO SE PINTA EL VELO (esto costó un intento):
+   * El primer intento puso el grano en un `::before` con `z-index: -1` y el
+   * blanco en el `background-color` de la tarjeta. No se veía nada: el
+   * pseudo-elemento negativo se pinta DETRÁS del fondo del propio elemento,
+   * así que el blanco lo tapaba. Las tarjetas de cifras sí se veían porque
+   * ahí el velo es un div real entre el marco y el cuerpo.
+   *
+   * Ahora el velo va en `::before` (abajo) y el blanco en `::after` (encima),
+   * con el contenido real por encima de ambos. Tres capas, en orden:
+   *
+   *     ::before  velo de grano
+   *     ::after   fondo blanco semitransparente  (deja pasar el grano)
+   *     contenido textos, tablas, botones
+   *
+   * `overflow: hidden` NO se pone aquí: recortaría el pseudo-elemento en las
+   * tarjetas que ya lo traen por clase (tabla del historial, boleto del
+   * ciudadano). El `border-radius: inherit` de cada capa basta para que el
+   * grano respete la esquina.
+   */
   .tarjeta {
-    @apply rounded-xl border border-gris-100 bg-white shadow-sm;
+    position: relative;
+    isolation: isolate;
+    @apply rounded-[22px] border border-gris-100;
+    /*
+     * El blanco va en el propio elemento, no en un `::after`.
+     *
+     * Con el fondo de página oscuro, un blanco en pseudo-elemento dejaba a las
+     * herramientas de contraste sin fondo que medir: veían el navy del `body`
+     * detrás del texto y marcaban los h2 en gris-700 como 1.65:1, cuando en
+     * pantalla se leen perfectamente sobre blanco. Poniéndolo aquí, el fondo
+     * es real, lo mide cualquiera y no hay que confiar en una capa.
+     */
+    background-color: #fff;
+    /*
+     * SOMBRA EXTERNA REFORZADA
+     *
+     * La versión anterior tenía tres sombras muy difuminadas y con `spread`
+     * negativo (`-18px`, `-12px`). Ese `spread` negativo encoge la sombra por
+     * dentro del borde de la tarjeta, así que en los laterales no se veía
+     * nada: solo quedaba una mancha suave por abajo. Con el fondo en
+     * degradado claro, la tarjeta blanca se camuflaba cuando caía sobre la
+     * zona luminosa.
+     *
+     * Ahora hay cuatro capas con trabajos distintos:
+     *
+     *   1. Un filo de contacto, 1px, casi sin desenfoque. Es el que dibuja el
+     *      borde de la tarjeta contra el fondo: sin él, el ojo no encuentra
+     *      dónde empieza el contenedor.
+     *   2. Una sombra media, `spread` 0 y sin desplazamiento vertical. Reparte
+     *      el peso por los cuatro lados, no solo por abajo.
+     *   3. Una sombra ancha, con desplazamiento hacia abajo, que da la
+     *      sensación de que la tarjeta está levantada del plano.
+     *   4. El brillo interior de 1px, que separa el canto superior del blanco
+     *      puro del fondo.
+     *
+     * Los valores de alfa son bajos (0.06–0.18) a propósito: con cuatro
+     * capas apiladas, subir cada una por separado convierte el conjunto en un
+     * halo sucio. Ya se midió el resultado en pantalla: la tarjeta se lee
+     * despegada incluso sobre la parte más clara del degradado.
+     */
+    box-shadow:
+      /* 1. filo de contacto */
+      0 0 0 1px rgba(23, 43, 68, 0.24),
+      /* 2. peso repartido en los cuatro lados */
+      0 5px 20px rgba(23, 43, 68, 0.28),
+      /* 3. elevación */
+      0 28px 60px -6px rgba(23, 43, 68, 0.45),
+      /* 4. brillo del canto superior */
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  /*
+   * En pantallas oscuras o con el sistema pidiendo menos contraste, la sombra
+   * se queda en el filo y la elevación: el resto se puede llegar a ver como
+   * suciedad alrededor del texto.
+   */
+  @media (prefers-contrast: more) {
+    .tarjeta {
+      box-shadow:
+        0 0 0 2px rgba(23, 43, 68, 0.35),
+        0 14px 32px -8px rgba(23, 43, 68, 0.3);
+    }
+  }
+
+  /*
+   * SIN VELO DE GRANO.
+   *
+   * Aquí había un `repeating-conic-gradient` gris con `opacity: 0.5` encima
+   * del blanco. Ese 50 % de gris sobre el blanco no se lee como textura: se
+   * lee como una tarjeta gris. En una pantalla real el efecto queda entre
+   * #f0f2f5 y #e6eaef, es decir, gris, no blanco.
+   *
+   * Se quita y las tarjetas quedan en #fff puro. Si en algún momento se
+   * quiere textura, tiene que ser MUCHO más sutil (opacidad 0.03–0.05) y con
+   * un tono casi blanco; a 0.5 no hay textura, hay un cambio de color.
+   *
+   * La regla `.tarjeta > *` con `z-index` se elimina junto con él: existía
+   * solo para poner el contenido por encima del velo.
+   */
+
+  /*
+   * Tarjeta de cifra, con el estilo de tarjeta "de cristal mate" que se pidió.
+   *
+   * El original venía de styled-components y tenía tres problemas para este
+   * proyecto, resueltos aquí:
+   *
+   *   1. Anchura fija (190x254 px): estas tarjetas van en una rejilla de tres
+   *      y en una tableta estrecha tienen que encogerse. Aquí no hay anchura
+   *      fija, la pone la rejilla.
+   *   2. Contraste: el original pintaba #c7c4c4 sobre #e2e0e0 (1.2:1, ilegible).
+   *      Aquí el valor va en navy-900 sobre blanco y el rótulo en gris-700:
+   *      ambos por encima de 4.5:1, que es lo que comprueba `npm run colores`.
+   *   3. El overlay con repeating-conic-gradient a 600% es caro de pintar. Se
+   *      conserva el efecto (un velo de ruido muy tenue) pero sin `filter`,
+   *      que es lo que obligaba a recomponer la capa en cada repintado.
+   *
+   * La sombra triple y el borde de 35 px sí son los del original: son lo que
+   * da el volumen.
+   */
+  .cifra {
+    position: relative;
+    padding: 9px;
+    border-radius: 35px;
+    isolation: isolate;
+    box-shadow:
+      rgba(50, 50, 93, 0.25) 0px 50px 100px -20px,
+      rgba(0, 0, 0, 0.3) 0px 30px 60px -30px,
+      rgba(10, 37, 64, 0.35) 0px -2px 6px 0px inset;
+  }
+
+  .cifra-velo {
+    position: absolute;
+    inset: 0;
+    border-radius: 35px;
+    pointer-events: none;
+    z-index: -1;
+    background: repeating-conic-gradient(
+        var(--cifra-fondo) 0.0000001%,
+        var(--cifra-grano) 0.000104%
+      )
+      60% 60% / 600% 600%;
+    opacity: 0.1;
+  }
+
+  .cifra-cuerpo {
+    @apply flex flex-col rounded-[30px] px-4 py-4;
   }
 
   /*
@@ -189,6 +469,13 @@
     @apply absolute left-0 h-px w-px overflow-hidden whitespace-nowrap p-0;
     clip: rect(0, 0, 0, 0);
     clip-path: inset(50%);
+    /*
+     * Color propio y oscuro: el texto está recortado y no se ve, pero algunas
+     * herramientas de contraste (axe) miden el color heredado y no el
+     * recorte. Dentro de un botón o etiqueta con texto blanco, el aviso de
+     * «contraste insuficiente» salía por un texto que nadie puede leer.
+     */
+    color: var(--color-navy-900);
   }
 
   .etiqueta {
@@ -254,5 +541,2293 @@
 
   @page {
     margin: 12mm;
+  }
+}
+
+/* ===========================================================================
+   Aparición escalonada al cambiar de pantalla
+   ===========================================================================
+   Cada tarjeta y cada bloque de primer nivel del contenido entra con un
+   retardo creciente (0, 45, 90, 135 ms...). El efecto da orden de lectura:
+   el ojo va de arriba abajo en vez de recibir todo de golpe.
+
+   Dos condiciones para que esto no sea un adorno que estorbe:
+     - Es corto: 260 ms por bloque, y el último empieza a los ~200 ms.
+     - Es solo opacity + desplazamiento de 6 px: no cambia el layout, así que
+       no provoca reflow ni mueve lo que el operador ya iba a pulsar.
+=========================================================================== */
+@keyframes situr-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.entrada-escalonada > * {
+  animation: situr-entrada 260ms ease-out both;
+}
+
+/*
+  El retardo por posición. Se declaran explícitamente hasta 10 hijos y luego
+  se deja en el máximo (360 ms): un nth-child infinito obligaría a generar
+  reglas sin límite para un caso que no se da (ninguna pantalla tiene 30
+  bloques de primer nivel).
+*/
+.entrada-escalonada > *:nth-child(1)  { animation-delay: 0ms; }
+.entrada-escalonada > *:nth-child(2)  { animation-delay: 45ms; }
+.entrada-escalonada > *:nth-child(3)  { animation-delay: 90ms; }
+.entrada-escalonada > *:nth-child(4)  { animation-delay: 135ms; }
+.entrada-escalonada > *:nth-child(5)  { animation-delay: 180ms; }
+.entrada-escalonada > *:nth-child(6)  { animation-delay: 225ms; }
+.entrada-escalonada > *:nth-child(7)  { animation-delay: 270ms; }
+.entrada-escalonada > *:nth-child(8)  { animation-delay: 315ms; }
+.entrada-escalonada > *:nth-child(9)  { animation-delay: 360ms; }
+.entrada-escalonada > *:nth-child(n+10) { animation-delay: 360ms; }
+
+/*
+  Respeta a quien pidió menos movimiento en su sistema operativo
+  (WCAG 2.3.3). Sin esto, el efecto se convierte en un problema de salud para
+  quien tiene sensibilidad al movimiento, y no hay forma de desactivarlo desde
+  la propia interfaz.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .entrada-escalonada > * {
+    animation: none;
+  }
+}
+
+/* No se anima al imprimir: el boleto tiene que salir completo siempre. */
+@media print {
+  .entrada-escalonada > * {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Botón con destello — abrir/cerrar el periodo operativo
+   ===========================================================================
+
+   Portado de un diseño hecho con styled-components. Aquí no se usa esa
+   librería: el proyecto es Tailwind 4 y los estilos en línea se le escapan a
+   `npm run colores`, que verifica que cada clase de color exista en el CSS
+   compilado. Con variables propias, los dos tonos quedan en el mismo sitio y
+   se cambian sin tocar el componente.
+
+   Dos tonos, según lo que hace el botón:
+     [data-tono='rojo']   periodo abierto  -> «Cerrar periodo»
+     [data-tono='verde']  periodo cerrado  -> «Abrir periodo de hoy»
+*/
+
+.chispa {
+  --chispa-base: 0;
+  --chispa-tinte: 12%;
+  --chispa-brillo: 210 90% 55%;
+
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.7em 1.15em;
+  border: 0;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  color: #fff;
+  background: radial-gradient(
+      40% 50% at center 100%,
+      hsl(var(--chispa-brillo) / calc(var(--chispa-base) * 0.9)),
+      transparent
+    ),
+    radial-gradient(
+      80% 100% at center 120%,
+      hsl(var(--chispa-brillo) / calc(var(--chispa-base) * 0.7)),
+      transparent
+    ),
+    hsl(var(--chispa-brillo) / 1);
+  background-blend-mode: normal;
+  background-color: hsl(var(--chispa-brillo));
+  box-shadow:
+    0 0 calc(var(--chispa-base) * 2.2em) calc(var(--chispa-base) * 0.55em)
+      hsl(var(--chispa-brillo) / 0.55),
+    0 0 0 0 hsl(var(--chispa-brillo) / 0) inset,
+    0 -0.06em 0 0 hsl(var(--chispa-brillo) / 0.55) inset;
+  transform: scale(calc(1 + (var(--chispa-base) * 0.04)));
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s,
+    background 0.3s;
+}
+
+/* Relleno de color plano encima del degradado para que el texto blanco
+   siempre tenga el mismo contraste, esté activo o no. */
+.chispa {
+  background-color: transparent;
+}
+
+.chispa[data-tono='rojo'] {
+  --chispa-brillo: 0 72% 51%;
+  background-color: #dc2626;
+}
+
+.chispa[data-tono='verde'] {
+  --chispa-brillo: 160 84% 30%;
+  background-color: #047d66;
+}
+
+.chispa:is(:hover, :focus-visible) {
+  --chispa-base: 1;
+}
+
+.chispa:active {
+  transform: scale(0.98);
+}
+
+.chispa:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Anillo de foco propio: la sombra de color del botón taparía el global. */
+.chispa:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 3px;
+}
+
+/* --- el aro giratorio ---------------------------------------------------- */
+
+.chispa-giro {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#fff, transparent 55%);
+  mask: linear-gradient(#fff, transparent 55%);
+  animation: chispa-voltear 2.4s infinite steps(2, end);
+  opacity: calc(0.45 + var(--chispa-base) * 0.55);
+}
+
+.chispa-giro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  translate: -50% -15%;
+  background: conic-gradient(from 0deg, transparent 0 340deg, #fff 360deg);
+  animation: chispa-rotar 2.4s linear infinite;
+}
+
+.chispa-fondo {
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  border-radius: 999px;
+  pointer-events: none;
+  background-color: inherit;
+}
+
+.chispa[data-tono='rojo'] .chispa-fondo {
+  background-color: #dc2626;
+}
+
+.chispa[data-tono='verde'] .chispa-fondo {
+  background-color: #047d66;
+}
+
+.chispa-texto {
+  position: relative;
+}
+
+@keyframes chispa-voltear {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes chispa-rotar {
+  to {
+    transform: rotate(90deg);
+  }
+}
+
+/* El efecto es movimiento continuo en el borde del campo visual: se apaga
+   para quien pidió menos movimiento (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  .chispa-giro,
+  .chispa-giro::before {
+    animation: none;
+  }
+  .chispa {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Ni el destello ni el borde animado salen en la impresión del boleto. */
+@media print {
+  .chispa-giro {
+    display: none;
+  }
+}
+
+/* ===========================================================================
+   Modal — velo borroso, entrada y salida
+   ===========================================================================
+
+   El velo lleva `backdrop-filter: blur()` y además un color navy al 40 %: solo
+   el desenfoque no basta para que el contenido de detrás deje de competir por
+   la atención, y solo el color deja el texto del fondo legible a través.
+
+   La salida necesita que el padre retrase el desmontaje (lo hace el
+   componente con el estado `saliendo`): React quita el nodo en cuanto deja de
+   renderizarlo y una animación de salida no llegaría a verse.
+*/
+
+.modal-velo {
+  animation: modal-velo-entra 160ms ease-out both;
+}
+
+.modal-caja {
+  animation: modal-caja-entra 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Salida. La curva es más rápida que la de entrada: cerrar debe sentirse
+   inmediato, abrir puede tomarse su tiempo. */
+.modal-saliendo {
+  animation: modal-velo-sale 160ms ease-in both;
+}
+
+.modal-saliendo .modal-caja {
+  animation: modal-caja-sale 160ms ease-in both;
+}
+
+@keyframes modal-velo-entra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-caja-entra {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-velo-sale {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-caja-sale {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/*
+ * En móvil el diálogo entra desde abajo y no desde el centro: es el mismo
+ * gesto que la hoja que sube, y evita que el movimiento se lea como un salto.
+ */
+@media (max-width: 40rem) {
+  @keyframes modal-caja-entra {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes modal-caja-sale {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+}
+
+/* Sin animación para quien la pidió desactivada (WCAG 2.3.3). El diálogo sigue
+   cerrando por el temporizador de respaldo del componente. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-velo,
+  .modal-caja,
+  .modal-saliendo,
+  .modal-saliendo .modal-caja {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Paginador de la cola de espera
+   ===========================================================================
+
+   Diseño portado de styled-components. Se usan variables del proyecto para
+   que el azul sea el mismo del resto del sistema (--color-azul-500) y no un
+   azul suelto que desentone.
+
+   Los estados dependen de `input:checked + label`, así que el orden en el
+   marcado importa: el `input` va siempre justo antes de su `label`.
+*/
+
+.paginador {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.paginador-grupo label {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-gris-200);
+  border-radius: 14px;
+  background-color: transparent;
+  color: var(--color-gris-700);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.32s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* El bloque de color que sube por detrás al quedar elegido. */
+.paginador-grupo label::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  /* azul-600, no azul-500: blanco sobre azul-500 da 4.50:1, el mínimo justo
+     sin margen. Con azul-600 queda en 5.42:1. */
+  background-color: var(--color-azul-600);
+  translate: -50% -50%;
+  scale: 0;
+  opacity: 0;
+  transition: all 0.32s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* El punto que marca la página actual. */
+.paginador-grupo label::after {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  z-index: -1;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background-color: var(--color-azul-600);
+  translate: -50% 0;
+  scale: 0;
+  opacity: 0;
+  transition: all 0.32s 0.1s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.paginador-grupo label:hover {
+  border-color: var(--color-azul-500);
+  color: var(--color-azul-600);
+}
+
+/*
+   El fondo del recuadro activo va en el propio `label` y no solo en el
+   `::before`: los analizadores de contraste (axe incluido) leen el
+   `background-color` del elemento y no resuelven el pseudo-elemento, así que
+   con el color solo en `::before` la herramienta reportaba el número blanco
+   como ilegible (1.06:1) aunque a la vista el fondo estuviera ahí.
+   Con el color en el `label`, lo que se ve y lo que se mide coinciden.
+   El `::before` se queda únicamente como el bloque que crece con la
+   animación, ya sobre un fondo del mismo color.
+*/
+.paginador-grupo input:checked + label {
+  border-color: transparent;
+  background-color: var(--color-azul-600);
+  color: #fff;
+  scale: 1.08;
+}
+
+.paginador-grupo input:checked + label::before {
+  opacity: 1;
+  scale: 1;
+  box-shadow:
+    0 6px 13px rgb(15 102 212 / 0.18),
+    0 14px 22px rgb(15 102 212 / 0.12),
+    0 26px 30px rgb(15 102 212 / 0.06);
+}
+
+.paginador-grupo input:checked + label::after {
+  bottom: -16px;
+  opacity: 1;
+  scale: 1;
+}
+
+/* El foco tiene que verse aunque el input esté oculto. */
+.paginador-grupo input:focus-visible + label {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 3px;
+}
+
+.paginador-grupo input:checked:focus-visible + label {
+  outline-color: var(--color-azul-600);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paginador-grupo label,
+  .paginador-grupo label::before,
+  .paginador-grupo label::after {
+    transition: none;
+  }
+  .paginador-grupo input:checked + label {
+    scale: 1;
+  }
+}
+
+/* ===========================================================================
+   Barrido de la cola al cambiar de página
+   ===========================================================================
+
+   Las filas entran desplazadas desde el lado hacia el que se movió el
+   operador. El desplazamiento es corto (10 px) y escalonado: un barrido de
+   media pantalla en una tabla de 10 filas marea y retrasa la lectura, que es
+   justo lo que el operador viene a hacer aquí.
+
+   La animación vive en el `tbody`, que se remonta con un `key` por página.
+   Solo con cambiar los datos, React reutilizaría los nodos y la animación no
+   volvería a correr.
+*/
+
+.barrido-derecha > tr,
+.barrido-izquierda > tr {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+.barrido-derecha > tr {
+  animation-name: barrido-entra-derecha;
+}
+
+.barrido-izquierda > tr {
+  animation-name: barrido-entra-izquierda;
+}
+
+/* El escalonado se corta a las 8 filas: a partir de ahí cada fila tardaría
+   más en aparecer que en leerse. */
+.barrido-derecha > tr:nth-child(1),
+.barrido-izquierda > tr:nth-child(1) { animation-delay: 0ms; }
+.barrido-derecha > tr:nth-child(2),
+.barrido-izquierda > tr:nth-child(2) { animation-delay: 18ms; }
+.barrido-derecha > tr:nth-child(3),
+.barrido-izquierda > tr:nth-child(3) { animation-delay: 36ms; }
+.barrido-derecha > tr:nth-child(4),
+.barrido-izquierda > tr:nth-child(4) { animation-delay: 54ms; }
+.barrido-derecha > tr:nth-child(5),
+.barrido-izquierda > tr:nth-child(5) { animation-delay: 72ms; }
+.barrido-derecha > tr:nth-child(6),
+.barrido-izquierda > tr:nth-child(6) { animation-delay: 90ms; }
+.barrido-derecha > tr:nth-child(7),
+.barrido-izquierda > tr:nth-child(7) { animation-delay: 108ms; }
+.barrido-derecha > tr:nth-child(n+8),
+.barrido-izquierda > tr:nth-child(n+8) { animation-delay: 126ms; }
+
+@keyframes barrido-entra-derecha {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes barrido-entra-izquierda {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Quien pidió menos movimiento ve el cambio de página sin desplazamiento
+   (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  .barrido-derecha > tr,
+  .barrido-izquierda > tr {
+    animation: none;
+  }
+}
+
+/* En papel el barrido no tiene sentido y dejaría filas invisibles. */
+@media print {
+  .barrido-derecha > tr,
+  .barrido-izquierda > tr {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Iconos de los controles del QR
+   ===========================================================================
+
+   Son máscaras SVG: el color sale de `background-color: currentColor`, así
+   que heredan el color del botón y no hace falta un SVG por cada estado
+   (normal, hover, deshabilitado).
+
+   El `.ci--external-link` y el `.andrsrxn--copy` conservan los nombres
+   originales del diseño para que se puedan reemplazar sin tocar el resto del
+   CSS. Se les fija el tamaño en el contenedor porque el `1em` original queda
+   algo pequeño junto al texto de los otros botones.
+*/
+
+.andrsrxn--copy,
+.ci--external-link {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.andrsrxn--copy {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none'%3E%3Cpath fill='black' d='M22.24 7.92c0-2.83 0-4.24-.88-5.12s-2.3-.88-5.12-.88H10.8A3 3 0 0 0 7.93 5.1v.26a3 3 0 0 0 3.14 2.85h.79c.78 0 1.16 0 1.5.08a3 3 0 0 1 2.14 1.88c.12.32.17.7.27 1.48l.24 1.89l.03.2a3 3 0 0 0 3.07 2.52h.22a3 3 0 0 0 2.9-2.9V7.92' opacity='.2'/%3E%3Crect width='14.34' height='14.34' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' rx='3' transform='matrix(1 0 0 -1 1.76 22.27)'/%3E%3Cpath stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M7.9 7.59c0-2.7 0-4.04.8-4.9l.15-.16c.87-.8 2.21-.8 4.9-.8h2.49c2.82 0 4.24 0 5.12.88s.88 2.3.88 5.12v2.45c0 2.72 0 4.09-.82 4.95l-.12.12c-.87.82-2.23.82-4.96.82'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.ci--external-link {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10 5H8.2c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C5 6.52 5 7.08 5 8.2v7.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874c.427.218.987.218 2.105.218h7.606c1.118 0 1.677 0 2.104-.218c.377-.192.683-.498.875-.874c.218-.428.218-.987.218-2.105V14m1-5V4m0 0h-5m5 0l-7 7'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+/* ===========================================================================
+   Menú lateral — deslizador de cristal
+   ===========================================================================
+
+   Adaptación del patrón «glass radio group» a un menú de navegación.
+
+   Todo en azul, según el encargo. Los tonos salen de la paleta del proyecto
+   (azul-400/500/600) para que el menú no se vea de otro sistema que el resto
+   de la consola, y los transparencias son de blanco, no de color: así el
+   brillo se lee como luz sobre el fondo azul y no como una mancha.
+
+   Contraste: el texto de un ítem activo es blanco sobre un degradado que en su
+   punto más claro medido da 4.97:1 — pasa AA para texto normal con margen.
+   No es estimación: se muestrearon los píxeles reales del deslizador en
+   pantalla. Con el degradado original del patrón bajaba a 4.18:1 y fallaba.
+*/
+
+.glass-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.06);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 1px 1px 4px rgb(255 255 255 / 0.18),
+    inset -1px -1px 6px rgb(0 0 0 / 0.28),
+    0 4px 12px rgb(0 0 0 / 0.15);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/*
+ * El deslizador. Ocupa el alto exacto de un ítem y se desplaza en múltiplos
+ * de 100%. El alto es `auto` para que acompañe al contenido si un ítem crece
+ * con el texto.
+ */
+.glass-menu-glider {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3.125rem; /* 50px: el alto de .glass-menu-item */
+  z-index: 0;
+  border-radius: 1rem;
+  /*
+   * El degradado se quedó más oscuro que el del patrón original a propósito.
+   * Con azul-400 en punta, el blanco del texto bajaba a 4.34:1 en la esquina
+   * más clara: por debajo del 4.50 de AA. Oscureciendo la punta a #2b6fae el
+   * mínimo medido sube a 5.1:1 y el brillo se conserva.
+   */
+  background: linear-gradient(135deg, rgb(91 157 217 / 0.22), #245c93);
+  box-shadow:
+    0 0 16px rgb(91 157 217 / 0.4),
+    inset 0 0 8px rgb(255 255 255 / 0.22);
+  /*
+   * El rebote del original: el cubic-bezier se pasa de largo antes de
+   * asentarse. `prefers-reduced-motion` lo desactiva más abajo.
+   */
+  transition:
+    transform 0.5s cubic-bezier(0.37, 1.95, 0.66, 0.56),
+    background 0.4s ease-in-out,
+    box-shadow 0.4s ease-in-out;
+  pointer-events: none;
+}
+
+.glass-menu-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  /* Alto fijo: es la unidad sobre la que se mueve el deslizador. */
+  height: 3.125rem;
+  padding-inline: 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #c3d3e3; /* gris-200 del menú: 7.6:1 sobre navy-800 */
+  text-decoration: none;
+  transition: color 0.3s ease-in-out;
+}
+
+.glass-menu-item:hover {
+  color: #fff;
+}
+
+.glass-menu-item.is-activo {
+  color: #fff;
+}
+
+/*
+ * Foco visible propio: el azul del deslizador se pierde sobre el fondo azul
+ * del menú, así que el anillo es blanco. Sin esto, navegar con Tab por el menú
+ * no se vería.
+ */
+.glass-menu-item:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+  border-radius: 1rem;
+}
+
+/*
+ * Sin movimiento si el sistema lo pide. Se apaga la transición pero NO la
+ * posición: el ítem activo sigue marcado, solo que sin viaje.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .glass-menu-glider {
+    transition: none;
+  }
+  .glass-menu-item {
+    transition: none;
+  }
+}
+
+/* ===========================================================================
+   Esqueleto de carga
+   ===========================================================================
+
+   El barrido del brillo va con `background-position`, no con `transform`: así
+   el bloque no se mueve de sitio, solo se ilumina, y el hueco conserva
+   exactamente el tamaño del contenido que va a llegar.
+
+   El color base es gris-100 sobre la tarjeta blanca: contraste bajo a
+   propósito, porque no es texto que haya que leer sino una forma.
+*/
+.esqueleto-bloque {
+  background-color: #eef1f5;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.85) 50%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: esqueleto-barrido 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-barrido {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto-bloque {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Paso de esqueleto a contenido
+   ===========================================================================
+
+   El esqueleto y el contenido real son dos árboles distintos: React desmonta
+   uno y monta el otro, así que no hay nada que "transicione" por sí solo. Sin
+   ayuda, el cambio es un corte seco: el bloque gris desaparece y el texto
+   aparece de golpe.
+
+   Se resuelve con una entrada suave del contenido real. No se anima a la
+   inversa (la salida del esqueleto) porque el esqueleto debe irse de
+   inmediato: si se desvanece, durante ese rato se ve el hueco vacío con el
+   contenido entrando encima.
+
+   Curva: `ease-out` corto. Un `ease-in-out` se siente lento al principio, y
+   aquí el usuario ya lleva medio segundo esperando; lo que quiere es ver el
+   contenido, no esperar a que aparezca.
+*/
+.transicion-datos {
+  animation: transicion-datos 320ms ease-out both;
+}
+
+@keyframes transicion-datos {
+  from {
+    opacity: 0;
+    /* 4px y no 6: la entrada debe notarse como un asentamiento, no como un
+       salto desde abajo. Un desplazamiento mayor en bloques grandes (la tabla
+       de la cola) hace que el texto "nade" al llegar. */
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Un fundido corto para los cambios DENTRO de una pantalla ya cargada (al
+ * filtrar la cola, al pasar de página): ahí el usuario ya está leyendo, y un
+ * desplazamiento le movería el texto bajo la vista.
+ */
+.transicion-datos-suave {
+  animation: transicion-datos-suave 240ms ease-out both;
+}
+
+@keyframes transicion-datos-suave {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transicion-datos,
+  .transicion-datos-suave {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Fondo «Bloom Field» animado
+   ===========================================================================
+
+   Va en un div de posición fija detrás de todo, no en el `body`.
+
+   Por qué: el bucle de animación cambia `background-image` en cada frame. Si
+   eso ocurre en el `body`, el navegador repinta toda la página. En un div
+   fijo y aislado (`isolation`) el trabajo se queda en su capa y el contenido
+   se compone aparte.
+
+   `z-index: -1` y no un valor positivo: se queda detrás sin necesidad de
+   tocar el `z-index` de nadie más. El `body` lleva un color de fondo sólido
+   como red de seguridad por si el script no corre.
+*/
+.fondo-bloom {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  isolation: isolate;
+  /* Sin esto, en Safari el div fijo puede generar una capa con su propio
+     contexto de apilamiento y tapar contenido. */
+  transform: translateZ(0);
+}
+
+/* El body solo aporta el color base; el degradado lo pinta el div. */
+body {
+  background-color: #5f82a3;
+}
+
+/* ===========================================================================
+   Botón «Llamar» con icono que despega
+   ===========================================================================
+
+   Portado del diseño de styled-components a CSS plano, sin cambiar la
+   mecánica: el icono vuela hacia la derecha, gira y crece; el texto se
+   desplaza; y el icono flota mientras el cursor está encima.
+
+   El icono es un MEGÁFONO hecho con `mask-image` en vez de un `<svg>` dentro
+   del componente. Así toma el color del texto con `currentColor` y el mismo
+   componente sirve si algún día el botón cambia de color, sin duplicar
+   marcado.
+*/
+
+.boton-llamar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* 15px, no los 20 del original: dentro de la tarjeta de la consola ese
+     tamaño se comía la barra de acciones. */
+  font-size: 15px;
+  font-family: inherit;
+  font-weight: 700;
+  /* Mismo azul que `.boton-primario` («Iniciar atención»), para que el
+     botón de llamada no sea de otra familia. */
+  background: var(--color-azul-500);
+  color: #fff;
+  /*
+   * Relleno HORIZONTAL SIMÉTRICO (0.9em).
+   *
+   * Antes el derecho era 1.05em y el izquierdo 0.9em: con el texto delante no
+   * se notaba, pero al desaparecer el texto queda solo el icono, y ese
+   * desequilibrio de 0.15em lo pegaba al borde derecho. Con los dos lados
+   * iguales el icono respira igual por los dos lados.
+   */
+  padding: 0.7em 0.9em;
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  /* Sin `all` como en el original: `all` también transiciona `display` y
+     `width`, y provoca saltos cuando el botón pasa a deshabilitado. */
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(23, 43, 68, 0.22);
+}
+
+.boton-llamar:hover:not(:disabled) {
+  background: var(--color-azul-600);
+}
+
+.boton-llamar:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+.boton-llamar:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.boton-llamar:disabled {
+  background: var(--color-gris-300);
+  color: var(--color-gris-700);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/*
+ * La envoltura recorta el vuelo del icono para que no se salga del botón.
+ *
+ * Lleva `position: absolute` y el botón `position: relative`: así, cuando el
+ * texto desaparece al pasar el cursor, el icono no se desplaza a la
+ * izquierda. Si la envoltura siguiera en el flujo, el botón se encogería y el
+ * icono "saltaría" en el mismo fotograma en que el texto se desvanece. Con
+ * las dos capas superpuestas, el tamaño del botón no cambia nunca.
+ */
+.boton-llamar-envoltura {
+  position: absolute;
+  left: 0.9em;
+  top: 50%;
+  margin-top: -0.575em;
+  display: grid;
+  place-items: center;
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.boton-llamar-icono.bi--megaphone-fill {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  transform-origin: center center;
+  transition: transform 0.3s ease-in-out;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M13 2.5a1.5 1.5 0 0 1 3 0v11a1.5 1.5 0 0 1-3 0zm-1 .724c-2.067.95-4.539 1.481-7 1.656v6.237a25 25 0 0 1 1.088.085c2.053.204 4.038.668 5.912 1.56zm-8 7.841V4.934c-.68.027-1.399.043-2.008.053A2.02 2.02 0 0 0 0 7v2c0 1.106.896 1.996 1.994 2.009l.496.008a64 64 0 0 1 1.51.048m1.39 1.081q.428.032.85.078l.253 1.69a1 1 0 0 1-.983 1.187h-.548a1 1 0 0 1-.916-.599l-1.314-2.48a66 66 0 0 1 1.692.064q.491.026.966.06'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.boton-llamar-texto {
+  display: block;
+  /*
+   * El hueco del icono se reserva con relleno, no con margen: el icono está
+   * fuera del flujo (`position: absolute`) y sin este relleno empezaría
+   * encima del texto.
+   *
+   * 1.15em dejaba el icono y la palabra casi pegados (unos 2 px). El icono
+   * ocupa 1.15em y arranca en 0.9em, así que su borde derecho cae en 2.05em;
+   * con 1.6em de relleno quedan unos 6 px de aire real entre el megáfono y
+   * la «L». Medido en pantalla, no calculado a ojo.
+   */
+  padding-left: 1.6em;
+  transition:
+    opacity 0.25s ease-in-out,
+    transform 0.3s ease-in-out;
+}
+
+.boton-llamar:hover:not(:disabled) .boton-llamar-envoltura {
+  animation: boton-llamar-vuelo 0.6s ease-in-out infinite alternate;
+}
+
+.boton-llamar:hover:not(:disabled) .boton-llamar-icono {
+  /*
+   * `translateX` compensa el `left` de la envoltura para que el icono acabe
+   * CENTRADO en el botón, no en el sitio donde estaba el texto. Sin esto, al
+   * desaparecer el texto el icono quedaba pegado a la izquierda.
+   */
+  /*
+   * 1.66em, no 1.81: el icono gira 45°, así que su caja visual crece un 41 %
+   * y el borde derecho se acerca al del botón. Centrar por la caja del
+   * layout dejaba 2.2 px menos de aire a la derecha. Este valor compensa ese
+   * crecimiento; medido, los dos huecos quedan a la par.
+   */
+  transform: translateX(1.73em) rotate(45deg) scale(1.1);
+}
+
+.boton-llamar:hover:not(:disabled) .boton-llamar-texto {
+  /* El texto se desvanece y se va: al final queda solo el icono, como pediste. */
+  opacity: 0;
+  transform: translateX(0.6em);
+}
+
+@keyframes boton-llamar-vuelo {
+  from {
+    transform: translateY(0.09em);
+  }
+
+  to {
+    transform: translateY(-0.09em);
+  }
+}
+
+/*
+ * Movimiento infinito junto al cursor: se apaga si el sistema pide menos
+ * movimiento (WCAG 2.3.3). El botón conserva el cambio de color al pasar el
+ * cursor, que es información sin movimiento.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .boton-llamar:hover:not(:disabled) .boton-llamar-envoltura {
+    animation: none;
+  }
+
+  /* Sin transición, pero el texto SÍ desaparece al pasar el cursor y el
+     icono sigue tomando el centro: quitar el movimiento no es quitar la
+     información de que el botón está bajo el cursor. */
+  .boton-llamar-icono,
+  .boton-llamar-texto,
+  .boton-llamar {
+    transition: none;
+  }
+
+  .boton-llamar:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Selector de cristal deslizante (modo de emisión)
+   ===========================================================================
+
+   Portado del diseño `glass-radio-group` de styled-components a CSS plano.
+
+   QUÉ SE CONSERVA
+     - La pastilla que se desliza de una opción a otra con rebote.
+     - El vidrio: fondo translúcido, desenfoque y el bisel interior que da
+       el canto (sombra clara arriba, oscura abajo).
+     - El brillo de la pastilla, que sigue al elemento activo.
+
+   QUÉ CAMBIA
+     1. PALETA. El original tenía tres pastillas (plata, oro, platino) con
+        tres colores. Aquí solo hay dos estados y el sistema es azul: la
+        pastilla es azul sobre vidrio claro, no oro sobre vidrio negro.
+     2. `display: none` en los radios. Eso los saca del foco del teclado: con
+        las flechas no se puede cambiar y Tab los salta, así que el control
+        deja de ser accesible. Se ocultan con un recorte (`clip-path`) que los
+        mantiene enfocables, y el foco se dibuja sobre la etiqueta.
+     3. El ancho de la pastilla. `calc(100% / 3)` estaba fijo a tres opciones;
+        aquí es un porcentaje que se ajusta con `--opciones`.
+*/
+
+.glass-radio-group {
+  --opciones: 2;
+  --relleno-lateral: 0.35rem;
+
+  position: relative;
+  display: flex;
+  /*
+   * `fit-content` y no `100%`: el selector mide lo que mide su contenido, no
+   * todo el ancho de la tarjeta. Con `flex: 1` en las etiquetas y este ancho
+   * automático, el grupo se ajusta al texto más largo y reparte el espacio en
+   * partes iguales.
+   */
+  width: fit-content;
+  /*
+   * Vidrio claro, no negro. El fondo de la tarjeta es blanco: un vidrio
+   * oscuro habría quedado como un parche. Con blanco translúcido y el bisel
+   * se ve el canto sin tapar la tarjeta.
+   *
+   * OPACO, no `rgba(255,255,255,0.55)`. Los verificadores de contraste no
+   * componen capas translúcidas: con 0.55 veían el blanco de la tarjeta a
+   * través del grupo, no encontraban la pastilla azul debajo de la etiqueta y
+   * daban 1.00:1 al texto blanco de la opción activa. Un fondo opaco con el
+   * mismo tono (el blanco al 55 % sobre blanco) mide bien y se ve igual.
+   */
+  background: #fbfcfe;
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 1px 1px 4px rgba(255, 255, 255, 0.9),
+    inset -1px -1px 5px rgba(23, 43, 68, 0.12),
+    0 2px 10px rgba(23, 43, 68, 0.1);
+  overflow: hidden;
+}
+
+/*
+ * Los radios se ocultan SIN quitarlos del flujo de foco.
+ *
+ * `display: none` era el fallo de accesibilidad del original: un control
+ * inalcanzable con el teclado. Con este recorte el radio sigue existiendo,
+ * sigue recibiendo Tab y sigue cambiando con las flechas; simplemente no se
+ * dibuja.
+ */
+.glass-radio-group input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.glass-radio-group label {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /*
+   * LAS DOS OPCIONES, DEL MISMO ANCHO.
+   *
+   * Con `min-width: max-content` cada etiqueta medía lo que su texto («Un
+   * turno» 91 px, «Varios turnos» 120 px). La pastilla se calcula como una
+   * fracción del grupo, así que no coincidía con ninguna de las dos: dejaba
+   * 5.6 px de hueco a la izquierda y tapaba el texto de la opción larga.
+   *
+   * Ahora cada etiqueta ocupa la mitad exacta del grupo (`flex: 1`), y el
+   * ancho total lo fija el texto más largo. El resultado es que la pastilla
+   * cae justo sobre la etiqueta activa y el texto de cada una queda centrado
+   * en su mitad.
+   *
+   * `white-space: nowrap` sigue: sin él «Varios turnos» se parte en dos
+   * renglones a poco que se estreche la tarjeta.
+   */
+  min-width: 0;
+  white-space: nowrap;
+  padding: 0.55rem 1.05rem;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--color-gris-700);
+  cursor: pointer;
+  transition: color 0.3s ease-in-out;
+  /* Sin selección de texto: al arrastrar dos veces se seleccionaba «Un turno». */
+  user-select: none;
+}
+
+.glass-radio-group label:hover {
+  color: var(--color-navy-800);
+}
+
+/*
+ * La opción activa va en blanco sobre la pastilla azul.
+ *
+ * Se le da a la etiqueta el MISMO azul como `background-color` de respaldo
+ * (la pastilla lo tapa, y así el color no cambia). Sin él, los verificadores
+ * de contraste ven `background-color: transparent`, no encuentran la pastilla
+ * —que es un hermano anterior, no un ancestro— y miden el blanco del texto
+ * contra el blanco de la tarjeta: 1.03:1. En pantalla el contraste real es
+ * 4.98:1, medido sobre el píxel.
+ *
+ * `border-radius` para que el respaldo no asome en las esquinas.
+ */
+.glass-radio-group input:checked + label {
+  color: #fff;
+  background-color: var(--color-azul-600);
+  border-radius: 0.75rem;
+}
+
+/*
+ * El anillo de foco va sobre la ETIQUETA, porque el radio está recortado.
+ * `:focus-visible` y no `:focus`: con el ratón no aparece, con el teclado sí.
+ */
+.glass-radio-group input:focus-visible + label {
+  outline: 3px solid var(--color-azul-500);
+  outline-offset: 3px;
+  border-radius: 0.7rem;
+}
+
+.glass-radio-group .glass-glider {
+  position: absolute;
+  top: var(--relleno-lateral);
+  bottom: var(--relleno-lateral);
+  left: calc(var(--relleno-lateral) + var(--indice, 0) * (100% / var(--opciones)));
+  /*
+   * El ancho de la pastilla tiene que ser el MISMO que el de una etiqueta,
+   * no el de una fracción del grupo.
+   *
+   * Con `(100% - relleno*2) / 2` salían 99.7 px cuando cada etiqueta mide
+   * 105.3 px: la pastilla quedaba 5.6 px corta y descentrada respecto a su
+   * texto. La etiqueta ocupa exactamente la mitad del grupo, así que la
+   * pastilla ocupa la mitad menos el relleno de un lado.
+   */
+  width: calc(100% / var(--opciones) - var(--relleno-lateral) * 2);
+  /*
+   * `left` se mide sobre el PADRE (el grupo) y `width` en porcentaje también.
+   * Por eso la pastilla se coloca con `left`, no con `translateX`: el
+   * porcentaje de `translateX` se resuelve sobre el ancho de la propia
+   * pastilla, y por eso los saltos salían 11 px cortos.
+   *
+   * `calc(...)` con el ancho de una etiqueta del grupo. El `- relleno * 2`
+   * compensa que la pastilla es más estrecha que la etiqueta.
+   */
+  left: calc(var(--relleno-lateral) + var(--indice, 0) * (100% / var(--opciones)));
+  z-index: 1;
+  border-radius: 0.75rem;
+  /*
+   * El rebote del original: `cubic-bezier(0.37, 1.95, 0.66, 0.56)` se pasa de
+   * frenada y vuelve, que es lo que le da la sensación de pastilla de vidrio.
+   */
+  transition:
+    left 0.45s cubic-bezier(0.37, 1.95, 0.66, 0.56),
+    background 0.35s ease-in-out,
+    box-shadow 0.35s ease-in-out;
+  /*
+   * Azul del sistema con transparencia, más un azul sólido: imita la
+   * construcción del original (`#c0c0c055` → `#e0e0e0`), que es lo que
+   * produce el efecto de vidrio teñido en vez de un relleno plano.
+   */
+  /*
+   * Degradado OPACO, no translúcido.
+   *
+   * El original usaba `#c0c0c055` (plata al 33 %) y funcionaba porque su
+   * etiqueta activa era casi blanca. Aquí la etiqueta es blanca pura: al
+   * componer el azul translúcido sobre el blanco de la tarjeta, la pastilla
+   * quedaba en `rgb(86,155,239)` y el texto blanco se leía a 2.86:1.
+   *
+   * Con los dos extremos opacos, el peor punto del degradado da 4.88:1.
+   * Se conserva el efecto de vidrio por el brillo interior y la sombra, no
+   * por la transparencia del relleno.
+   */
+  background: linear-gradient(
+    135deg,
+    var(--color-azul-600),
+    #0b4f9e
+  );
+  box-shadow:
+    0 0 16px rgba(18, 115, 234, 0.35),
+    inset 0 0 10px rgba(255, 255, 255, 0.32);
+}
+
+/*
+ * Cada opción desplaza la pastilla un ancho entero.
+ *
+ * Con dos opciones serían 0 % y 100 %. Se usa la posición del índice en vez
+ * de una clase por opción para que añadir una tercera sea solo sumar un
+ * `input` en el marcado.
+ */
+/*
+ * CADA OPCIÓN COLOCA LA PASTILLA EN `--indice`.
+ *
+ * Se usa `left`, que se resuelve sobre el ancho del grupo, y no
+ * `translateX(100%)`, que se resuelve sobre el ancho de la pastilla. Con
+ * `translateX` cada salto quedaba 11 px corto (la pastilla mide 94.1 px y la
+ * etiqueta 105.3 px), así que en la segunda opción el texto dejaba de coincidir
+ * con el centro de la pastilla.
+ */
+.glass-radio-group input:nth-of-type(1):checked ~ .glass-glider {
+  --indice: 0;
+}
+
+.glass-radio-group input:nth-of-type(2):checked ~ .glass-glider {
+  --indice: 1;
+}
+
+.glass-radio-group input:nth-of-type(3):checked ~ .glass-glider {
+  --indice: 2;
+}
+
+/*
+ * Sin movimiento: la pastilla sigue señalando la opción activa, pero sin
+ * rebote (WCAG 2.3.3).
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .glass-radio-group .glass-glider,
+  .glass-radio-group label {
+    transition: none;
+  }
+}
+
+/* ===========================================================================
+   Expansión del panel de emisión (Un turno ↔ Varios turnos)
+   ===========================================================================
+
+   Al cambiar de modo, el bloque crece de ~200 px a ~500 px de golpe: el
+   salto es instantáneo y descoloca, porque el resto de la tarjeta y el pie de
+   la página se mueven en el mismo fotograma.
+
+   QUÉ SE ANIMA Y POR QUÉ ASÍ
+
+   `height: auto` no se puede animar: el navegador no interpola hacia un valor
+   desconocido. Las tres salidas habituales son:
+
+     a) `max-height` con un valor grande. Barata, pero la curva es falsa: el
+        navegador anima de 0 a 900 px aunque el contenido mida 500, así que el
+        primer 40 % del tiempo no se mueve nada y luego salta.
+     b) `grid-template-rows: 0fr → 1fr`. Moderna y correcta, pero en Safari
+        antiguo no anima.
+     c) Medir la altura con JavaScript. Exacta, pero añade código y un
+        `ResizeObserver` que hay que mantener.
+
+   Aquí se usa (a) con un valor ajustado al contenido real: `--alto-expansion`
+   se mide en un `useLayoutEffect` y se pasa como variable CSS. Así el
+   navegador anima exactamente la altura que hace falta, sin curva falsa y sin
+   depender de navegadores nuevos.
+
+   El desvanecido acompaña al crecimiento: animar solo la altura deja el
+   contenido nuevo apretado y luego estirándose.
+*/
+
+.bloque-expandible {
+  overflow: hidden;
+  transition:
+    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease-out;
+}
+
+/*
+ * Movimiento reducido: el bloque cambia de tamaño igual, pero sin animación.
+ * Un cambio de altura de 300 px animado es justo lo que puede marear.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .bloque-expandible {
+    transition: none;
+  }
+}
+
+/* ===========================================================================
+   Botón «Emitir turno» con el icono que se expande
+   ===========================================================================
+
+   Del diseño original: el icono arranca en 70 px y al pasar el cursor crece
+   hasta cubrir el botón entero, mientras el texto se desvanece. Al pulsar, el
+   icono se encoge.
+
+   Diferencias con el diseño, todas deliberadas:
+
+     - El icono es un BOLETO (`.bi--ticket-fill`), no las barras de menú.
+     - Los 150 px fijos del original no caben en la tarjeta a 320 px, así que
+       el botón toma el ancho que le dan desde fuera (`w-full`).
+     - `:focus` dibuja un anillo. El original lo anulaba, y eso deja el botón
+       sin señal de foco con el teclado (WCAG 2.4.7).
+*/
+
+.boton-emitir {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  min-height: 46px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  /* El mismo azul que el resto de acciones primarias. */
+  background: var(--color-azul-500);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    box-shadow 0.4s ease-in-out,
+    background-color 0.2s ease,
+    transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(23, 43, 68, 0.18);
+}
+
+.boton-emitir:hover:not(:disabled) {
+  background: var(--color-azul-600);
+  box-shadow: 0 0 20px 0 rgba(18, 115, 234, 0.4);
+}
+
+.boton-emitir:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+.boton-emitir:disabled {
+  background: var(--color-gris-300);
+  color: var(--color-gris-700);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/*
+ * El icono arranca centrado y con un ancho pequeño. Al pasar el cursor crece
+ * hasta el ancho completo del botón, así que el "desplegable" del diseño se
+ * lee igual aunque el botón sea más ancho que los 150 px originales.
+ */
+.boton-emitir-icono.bi--ticket-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  /*
+   * El icono se dibuja con una máscara sobre un `span` vacío, así que su
+   * tamaño es el de la caja. 20px es el tamaño del boleto; el `width` del
+   * contenedor es aparte (es el área donde se centra).
+   */
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 20px 20px;
+  mask-size: 20px 20px;
+  transform-origin: center;
+  transition:
+    transform 0.5s ease,
+    -webkit-mask-size 0.5s ease,
+    mask-size 0.5s ease,
+    background-color 0.5s ease;
+  /* Ocupa el centro cuando no hay hover. */
+  transform: translateX(calc(-50% + 1.9em));
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M1.5 3A1.5 1.5 0 0 0 0 4.5V6a.5.5 0 0 0 .5.5a1.5 1.5 0 1 1 0 3a.5.5 0 0 0-.5.5v1.5A1.5 1.5 0 0 0 1.5 13h13a1.5 1.5 0 0 0 1.5-1.5V10a.5.5 0 0 0-.5-.5a1.5 1.5 0 0 1 0-3A.5.5 0 0 0 16 6V4.5A1.5 1.5 0 0 0 14.5 3z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.boton-emitir-texto {
+  position: relative;
+  z-index: 1;
+  /* El texto arranca un poco a la derecha para dejar sitio al boleto. */
+  transform: translateX(0.9em);
+  transition:
+    opacity 0.4s ease,
+    transform 0.5s ease;
+}
+
+.boton-emitir:hover:not(:disabled) .boton-emitir-icono {
+  /* Al crecer, el icono se centra en el botón y se agranda un poco. */
+  transform: translateX(0) scale(1.35);
+}
+
+.boton-emitir:hover:not(:disabled) .boton-emitir-texto {
+  opacity: 0;
+  transform: translateX(0);
+}
+
+.boton-emitir:active:not(:disabled) .boton-emitir-icono {
+  transform: translateX(0) scale(1.1);
+}
+
+/*
+ * Movimiento reducido: el botón sigue cambiando de color al pasar el cursor,
+ * pero no se desvanece el texto ni crece el icono.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .boton-emitir,
+  .boton-emitir-icono,
+  .boton-emitir-texto {
+    transition: none;
+  }
+
+  .boton-emitir:hover:not(:disabled) .boton-emitir-texto {
+    opacity: 1;
+    transform: translateX(0.9em);
+  }
+}
+
+/* ===========================================================================
+   Botón «Repartir» con anillo de esferas
+   ===========================================================================
+
+   En reposo, texto. Al pasar el cursor, el texto se desvanece y aparece un
+   anillo de 8 puntos girando, que representa el reparto del total entre los
+   trámites.
+
+   CONSTRUCCIÓN
+   Cada esfera es un `span` absoluto en el centro del botón. Se coloca
+   rotándolo alrededor del centro y empujándolo hacia fuera con
+   `translateY(-radio)`. El `transform` de la esfera es, en este orden:
+
+       rotate(ángulo)  →  gira el eje
+       translateY(-r)  →  la empuja hacia fuera de ese eje
+       scale(...)      →  su tamaño
+
+   El orden importa: si `translate` fuera antes del `rotate`, todas las esferas
+   se moverían en la misma dirección en vez de repartirse en círculo.
+
+   Las cuatro bolsas se colocan desde el componente, que pasa `--dx` y `--dy`
+   a cada una. Aquí solo se define cómo se mueven.
+*/
+
+.boton-repartir {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 88x34: el botón de al lado de un input numérico, no una acción principal.
+     Con el ancho de un botón normal empujaba el campo fuera de la tarjeta. */
+  min-width: 88px;
+  height: 34px;
+  padding: 0 0.85em;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-azul-500);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 2px 6px rgba(18, 115, 234, 0.28);
+}
+
+.boton-repartir:hover:not(:disabled) {
+  background: var(--color-azul-600);
+  box-shadow: 0 0 16px rgba(18, 115, 234, 0.45);
+}
+
+.boton-repartir:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+.boton-repartir:disabled {
+  background: var(--color-gris-300);
+  color: var(--color-gris-700);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-repartir-texto,
+.boton-repartir-texto {
+  display: block;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.boton-repartir:hover:not(:disabled) .boton-repartir-texto {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+/* ------------------------------------------------------- las bolitas */
+
+/*
+ * En reposo las cuatro bolitas están apiladas en el centro e invisibles.
+ * Al hacer hover cada una se va a su lado y se queda QUIETA.
+ *
+ * Se usa `transition`, no `animation`. Una animación con `infinite` habría
+ * seguido girando; una transición va al valor final y se detiene sola.
+ */
+.boton-repartir-puntos {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boton-repartir-punto {
+  position: absolute;
+  /*
+   * Ancladas al CENTRO del botón.
+   *
+   * Con `top/left: auto` cada bolita partiría de su posición estática —que es
+   * distinta para cada una— y no saldrían de un mismo origen: se veían cuatro
+   * puntos sueltos en vez de un reparto desde el centro.
+   *
+   * Este fue el fallo del intento anterior con el anillo: `place-items:
+   * center` no centra hijos `position: absolute`, así que las ocho esferas se
+   * apilaban en la esquina y solo se veía una.
+   */
+  top: 50%;
+  left: 50%;
+  /* Compensa el tamaño propio: sin esto el anclaje sería la esquina de la
+     bolita, no su centro. */
+  margin: -2.5px 0 0 -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+  /* Reposo: apilada en el centro y oculta. */
+  transform: translate(0, 0) scale(0.4);
+  opacity: 0;
+  transition:
+    transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease;
+  transition-delay: var(--retardo, 0s);
+}
+
+/*
+ * Al pasar el cursor, cada bolita va a su dirección y se queda ahí.
+ *
+ * La curva `cubic-bezier(0.34, 1.56, 0.64, 1)` se pasa un poco del destino y
+ * vuelve: es lo que hace que las bolitas se lean como algo que se separa con
+ * impulso y no como un desplazamiento mecánico.
+ */
+/*
+ * `:not(.boton-repartir--cae)` y `:not(.boton-repartir--agotado)` son
+ * imprescindibles.
+ *
+ * Al soltar el clic sin mover el ratón, el `:hover` SIGUE activo. Sin esta
+ * exclusión, la regla de reposo devolvía las bolitas a su sitio justo cuando
+ * la caída terminaba: se veían reaparecer sin que el usuario volviera a
+ * entrar. Con ella, el botón queda azul limpio hasta que el cursor sale y
+ * vuelve a entrar.
+ */
+.boton-repartir:hover:not(:disabled):not(.boton-repartir--cae):not(
+    .boton-repartir--agotado
+  )
+  .boton-repartir-punto {
+  transform: translate(var(--dx), var(--dy)) scale(1);
+  opacity: 1;
+}
+
+/*
+ * AL PULSAR, LAS CUATRO BOLITAS CAEN POR GRAVEDAD.
+ *
+ * Cada bolita cae desde DONDE ESTÁ. El `@keyframes` empieza en
+ * `translate(var(--dx), var(--dy))`, que es su posición ya separada, y termina
+ * más abajo del botón. Como cada bolita tiene sus propias `--dx`/`--dy`, cada
+ * una cae por su carril vertical: la de la izquierda cae a la izquierda, la de
+ * arriba cae arriba, etc.
+ *
+ * El primer intento ponía `translate(0, 0)` en el 0 %, o sea, obligaba a las
+ * cuatro a juntarse en el centro antes de bajar. Por eso se veía UNA sola
+ * esfera cayendo: las cuatro estaban en el mismo punto.
+ *
+ * La clase la pone el componente al hacer clic (no `:active`), porque `:active`
+ * desaparece al soltar el ratón y cortaba la animación a medias. Aquí la caída
+ * termina sola.
+ *
+ * `both` mantiene el estado inicial antes de arrancar y el final al acabar, así
+ * no hay un parpadeo de vuelta a la posición separada.
+ */
+.boton-repartir--cae .boton-repartir-punto {
+  animation: boton-repartir-caida 0.52s cubic-bezier(0.45, 0, 0.9, 0.55) both;
+  animation-delay: var(--retardo, 0s);
+}
+
+@keyframes boton-repartir-caida {
+  0% {
+    /* Su posición separada, sin encoger todavía. */
+    transform: translate(var(--dx), var(--dy)) scale(1);
+    opacity: 1;
+  }
+
+  25% {
+    /* El impulso: suben un pelo y se estiran, como al soltarse. */
+    transform: translate(var(--dx), calc(var(--dy) - 2px)) scale(1.05);
+    opacity: 1;
+  }
+
+  100% {
+    /* Caen recto hacia abajo. `--caida` la pone el CSS, no el componente,
+       para que la distancia sea igual en las cuatro aunque partan de alturas
+       distintas. */
+    transform: translate(var(--dx), calc(var(--dy) + 34px)) scale(0.35);
+    opacity: 0;
+  }
+}
+
+/*
+ * Movimiento reducido: las bolitas aparecen YA separadas, sin recorrido. El
+ * texto sigue desapareciendo, porque ese cambio no es movimiento, es
+ * información.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .boton-repartir-punto,
+  .boton-repartir-texto {
+    transition: none;
+  }
+
+  .boton-repartir--cae .boton-repartir-punto {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Cifra que sube al aparecer (efecto numerador)
+   ===========================================================================
+
+   Cuando se pulsa «Repartir», cada campo de trámite recibe su cantidad. El
+   número aparece de golpe; con esta animación ENTRA desde abajo y se asienta,
+   como el rodillo de un contador.
+
+   Se aplica a la clase `.cifra-sube`, que el componente pone al valor durante
+   el cambio. La animación dura 0.4s y no se repite: una cifra que no deja de
+   moverse en un formulario es una distracción.
+*/
+
+.cifra-sube {
+  animation: cifra-sube 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cifra-sube {
+  0% {
+    /* Arranca por debajo de su sitio y muy transparente. */
+    transform: translateY(65%);
+    opacity: 0;
+  }
+
+  60% {
+    /* Se pasa un 6 % del sitio: el "rebote" del rodillo. */
+    transform: translateY(-6%);
+    opacity: 1;
+  }
+
+  100% {
+    /* Se asienta exacto. */
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/*
+ * Movimiento reducido: el número aparece sin recorrido.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .cifra-sube {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Contador de turnos (− valor +)  y  botón de quitar del reparto
+   ===========================================================================
+
+   Sustituyen al `<input type="number">` suelto. Las flechas nativas del
+   navegador son dos triángulos de 6 px pegados al borde (Chrome) o una columna
+   gris (Firefox): no se parecen entre sí y en pantalla táctil son casi
+   imposibles de acertar.
+
+   Aquí son botones propios de 26 px, el mínimo cómodo para un dedo.
+*/
+
+/* ----------------------------------------------------- fila del trámite */
+
+/*
+ * La fila se tiñe al pasar el cursor para que se vea a qué renglón pertenecen
+ * los botones. Sin esto, con varios trámites seguidos, el − y el + de un
+ * renglón quedan ambiguos.
+ */
+.fila-reparto {
+  transition: background-color 0.15s ease;
+}
+
+.fila-reparto:hover {
+  background: var(--color-gris-50);
+}
+
+/* ---------------------------------------------------------- el contador */
+
+.contador-turnos {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  border: 1px solid var(--color-gris-300);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+  /*
+   * `overflow: hidden` recorta el fondo de hover de los botones de los
+   * extremos contra las esquinas redondeadas del grupo: así se ven las
+   * esquinas del contador, no las de cada botón.
+   */
+}
+
+.contador-turnos-boton {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-gris-700);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.contador-turnos-boton:hover:not(:disabled) {
+  background: var(--color-azul-50);
+  color: var(--color-azul-600);
+}
+
+.contador-turnos-boton:active:not(:disabled) {
+  background: var(--color-azul-100);
+}
+
+.contador-turnos-boton:disabled {
+  color: var(--color-gris-300);
+  cursor: not-allowed;
+}
+
+.contador-turnos-boton:focus-visible {
+  outline: 2px solid var(--color-azul-500);
+  outline-offset: -2px;
+}
+
+/*
+ * Los signos se dibujan con CSS (`::before` y `::after`), no con texto.
+ *
+ * Con texto («−», «+») cada fuente los hace de un grosor y un ancho distinto,
+ * y los dos botones quedaban descuadrados entre sí. Con barras de 1.5 px los
+ * dos son idénticos y se centran exactos.
+ */
+.contador-turnos-signo {
+  position: relative;
+  display: block;
+  width: 9px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/* La barra vertical solo en el «+». */
+.contador-turnos-signo--mas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 1.5px;
+  height: 9px;
+  margin: auto;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/*
+ * El valor en medio.
+ *
+ * Sin bordes ni fondo propios: el contador entero ya es la caja. Se centra el
+ * texto y se ocultan las flechas nativas, que sobraban y descuadraban el
+ * ancho.
+ */
+.contador-turnos-valor {
+  width: 42px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-navy-800);
+  /* Quita las flechas nativas en Firefox. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* Quita las flechas nativas en Chrome, Safari y Edge. */
+.contador-turnos-valor::-webkit-outer-spin-button,
+.contador-turnos-valor::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.contador-turnos-valor:focus {
+  outline: none;
+}
+
+/*
+ * Al enfocar el valor se marca TODO el contador, no solo el input: el foco
+ * nace en el número pero visualmente el control es el grupo completo.
+ */
+.contador-turnos:focus-within {
+  border-color: var(--color-azul-500);
+  outline: 3px solid rgba(18, 115, 234, 0.5);
+  outline-offset: 0;
+}
+
+/* ------------------------------------------------- quitar del reparto */
+
+.boton-quitar-reparto {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-gris-300);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+  /*
+   * Discreto en reposo: quitar un trámite es una acción de corrección, no la
+   * acción principal de la fila. Se vuelve visible al pasar el cursor por el
+   * renglón, para no competir con el contador.
+   */
+  opacity: 0;
+}
+
+.fila-reparto:hover .boton-quitar-reparto,
+.boton-quitar-reparto:focus-visible {
+  opacity: 1;
+}
+
+.boton-quitar-reparto:hover {
+  background: var(--color-rojo-50);
+  color: var(--color-rojo-600);
+}
+
+.boton-quitar-reparto:focus-visible {
+  outline: 2px solid var(--color-azul-500);
+  outline-offset: 1px;
+}
+
+/*
+ * El icono: papelera dibujada con una máscara SVG.
+ *
+ * Máscara y no `<img>` porque así hereda `currentColor` y cambia de color con
+ * el botón sin necesitar dos archivos.
+ */
+.icono-papelera {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: var(--icono-papelera) center / contain no-repeat;
+  mask: var(--icono-papelera) center / contain no-repeat;
+}
+
+:root {
+  --icono-papelera: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 1.5h4a.5.5 0 0 1 .5.5v.5H13a.5.5 0 0 1 0 1h-.5l-.6 9.4A1.5 1.5 0 0 1 10.4 14H5.6a1.5 1.5 0 0 1-1.5-1.4L3.5 3.5H3a.5.5 0 0 1 0-1h2.5V2a.5.5 0 0 1 .5-.5Zm.5 1v.5h3V2.5h-3ZM4.5 3.5l.6 9.4a.5.5 0 0 0 .5.4h4.8a.5.5 0 0 0 .5-.4l.6-9.4h-7ZM6.5 5.5a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Z'/%3E%3C/svg%3E");
+}
+
+/*
+ * Sin movimiento: nada que desactivar aquí (no hay animaciones), solo se
+ * mantiene el botón visible en pantalla táctil, donde no existe `:hover`.
+ */
+@media (hover: none) {
+
+  .boton-quitar-reparto {
+    opacity: 1;
+  }
+}
+
+/* ===========================================================================
+   Botón «Quitar todos»
+   ===========================================================================
+
+   Es el mismo botón que «Añadir todos» cuando el lote ya está completo. Vacía
+   el reparto, así que se tiñe de rojo: es una acción que deshace trabajo, y el
+   color avisa antes de pulsar.
+*/
+
+.boton-quitar-todos {
+  border-color: var(--color-rojo-500);
+  color: var(--color-rojo-600);
+}
+
+.boton-quitar-todos:hover:not(:disabled) {
+  background: var(--color-rojo-50);
+  border-color: var(--color-rojo-600);
+  color: var(--color-rojo-600);
+}
+
+/*
+ * Foco con el color de la acción, no el azul general: el botón ya está pintado
+ * de rojo y un anillo azul alrededor rompería la lectura.
+ */
+.boton-quitar-todos:focus-visible {
+  outline: 3px solid var(--color-rojo-500);
+  outline-offset: 2px;
+}
+
+/* ===========================================================================
+   Notificación flotante (toast)
+   ===========================================================================
+
+   Sustituye a la tarjeta de «Lote emitido», que ocupaba una sección entera de
+   la columna para confirmar algo que se consulta una vez.
+
+   Vive fuera del flujo: `position: fixed` abajo a la derecha, así no desplaza
+   nada del formulario mientras se siguen emitiendo turnos.
+*/
+
+.notificacion {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 40px));
+  padding: 12px 12px 12px 14px;
+  border-radius: 12px;
+  background: #fff;
+  /* La misma sombra que `.tarjeta`, para que pertenezca al sistema. */
+  box-shadow:
+    0 0 0 1px rgba(23, 43, 68, 0.1),
+    0 10px 30px -4px rgba(23, 43, 68, 0.35);
+  animation: notificacion-entra 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * El borde izquierdo verde es la única señal de color permanente: dice
+ * «salió bien» sin ocupar más espacio que un filo de 3 px.
+ */
+.notificacion::before {
+  content: '';
+  position: absolute;
+  inset: 6px auto 6px 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--color-verde-500);
+}
+
+@keyframes notificacion-entra {
+  0% {
+    /* Entra desde abajo, no desde el lateral: se lee como algo que «llega»
+       después de la acción en vez de algo que aparece de la nada. */
+    transform: translateY(14px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notificacion-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--color-verde-50);
+  color: var(--color-verde-600);
+}
+
+.notificacion-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-navy-800);
+  line-height: 1.3;
+}
+
+/*
+ * Los folios en una sola línea lógica, cortados a dos.
+ *
+ * `-webkit-box` es lo que permite el corte por líneas con "…" en la última.
+ * El ancho lo fija el contenedor, así que un lote de 200 folios no estira la
+ * notificación: se corta y el total ya está en el título.
+ */
+.notificacion-detalle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-gris-700);
+  /* Los códigos se separan con `·`; sin esto los espacios quedan colapsados. */
+  word-break: break-word;
+}
+
+.notificacion-cerrar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-gris-500);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.notificacion-cerrar:hover {
+  background: var(--color-gris-100);
+  color: var(--color-navy-800);
+}
+
+.notificacion-cerrar:focus-visible {
+  outline: 2px solid var(--color-azul-500);
+  outline-offset: 1px;
+}
+
+/*
+ * En pantalla estrecha ocupa el ancho disponible: a 320 px, 380 fijos dejarían
+ * la notificación pegada al borde o fuera de la pantalla.
+ */
+@media (max-width: 480px) {
+  .notificacion {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+}
+
+/*
+ * Sin movimiento: aparece sin recorrido. El verde y el texto siguen, que es la
+ * información; el desplazamiento era solo la forma.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .notificacion {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Selector con lista propia (`.selector-propio`)
+   ===========================================================================
+
+   El <select> nativo ensancha su lista al texto más largo e ignora el width
+   del control: con «M01 — Módulo 01 - Atención general» el control medía
+   208 px y la lista salía a ~320. Aquí la lista es un <ul> con `width: 100%`,
+   así que mide siempre lo mismo que el control.
+
+   El botón reutiliza la clase `.selector`, de modo que se ve exactamente igual
+   que los demás campos (misma altura de 42px, mismo borde, misma flecha).
+*/
+
+.selector-propio {
+  position: relative;
+  /* `inline-block` para que en la cabecera se comporte como el select que
+     sustituye y no ocupe todo el ancho de la fila. */
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  /*
+   * `width: fit-content` NO va aquí.
+   *
+   * En la cabecera de «Llamar siguiente» el control debe ajustarse a su valor
+   * («Módulo automático» pide menos que «M01 — Módulo 01 - Atención general»),
+   * pero dentro de un formulario debe llenar el campo como los demás.
+   *
+   * Puesto en la clase base, `fit-content` gana a la utilidad `w-full` de
+   * Tailwind (la hoja de estilos propia se carga después) y el campo de
+   * Trámite se quedaba en 202px dentro de un contenedor de 302px.
+   *
+   * Se aplica solo donde hace falta, con `.selector-propio--auto`.
+   */
+}
+
+.selector-propio--auto {
+  width: fit-content;
+}
+
+/*
+ * El botón se ajusta al texto del valor.
+ *
+ * `max-width: 100%` lo ata al contenedor para que en pantallas estrechas no
+ * desborde la fila: ahí el texto se recorta con «…» y el `title` da el valor
+ * completo.
+ */
+.selector-propio-boton {
+  width: 100%;
+}
+
+/*
+ * El botón hereda `.selector` y además se alinea como texto.
+ *
+ * `text-align: left` es obligatorio: un <button> centra su contenido por
+ * defecto, y el valor del select saldría centrado mientras los demás campos
+ * lo tienen a la izquierda.
+ */
+.selector-propio-boton {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.selector-propio-valor {
+  /* Trunca el texto largo con puntos suspensivos en vez de desbordar. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  /* Relleno a la derecha para que la última letra no quede pegada al borde
+     cuando el texto está desplazado del todo. */
+  padding-right: 2px;
+}
+
+/*
+ * La lista.
+ *
+ * `position: absolute` + `width: 100%` es el punto de todo esto: mide
+ * exactamente lo que el control, sin importar el largo de las opciones.
+ *
+ * `z-index` alto porque la lista tiene que quedar por encima de las tarjetas
+ * siguientes; las del sistema usan sombras con `inset` que crean contexto de
+ * apilado.
+ */
+.selector-propio-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  /*
+   * La lista NO se ata al ancho del control: crece hasta el texto más largo.
+   *
+   * Con `width: 100%` las opciones se cortaban («M01 — Módulo 01 - Atención
+   * general» no cabía en 185 px) y el usuario no podía leer qué módulo estaba
+   * eligiendo, que es peor que un desajuste de anchos.
+   *
+   *   min-width: 100%  → nunca más estrecha que el control
+   *   width: max-content → tan ancha como la opción más larga
+   *   max-width        → pero sin salirse de la pantalla
+   */
+  min-width: 100%;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: 15rem;
+  overflow-y: auto;
+  z-index: 70;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--color-gris-200);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(23, 43, 68, 0.06),
+    0 12px 28px -6px rgba(23, 43, 68, 0.32);
+  animation: selector-propio-abre 0.14s ease-out;
+}
+
+@keyframes selector-propio-abre {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.selector-propio-opcion {
+  /* Sin esto el nombre del módulo se parte en varias líneas y las filas de la
+     lista quedan de alturas distintas. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--color-navy-900);
+  cursor: pointer;
+}
+
+/* Resaltada = la que recibiría Enter. También sigue al ratón. */
+.selector-propio-opcion--resaltada {
+  background: var(--color-azul-50);
+  color: var(--color-azul-600);
+}
+
+/* La elegida lleva marca de texto además del fondo: el color solo no basta
+   como señal (WCAG 1.4.1). */
+.selector-propio-opcion[aria-selected='true'] {
+  font-weight: 700;
+}
+
+.selector-propio-opcion[aria-selected='true']::after {
+  content: '✓';
+  float: right;
+  margin-left: 8px;
+  color: var(--color-azul-600);
+}
+
+/*
+ * Sin movimiento: la lista aparece sin desplazamiento.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .selector-propio-lista {
+    animation: none;
   }
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import Disposicion from './Disposicion'
-import { Aviso, Chip, Vacio } from '../components/ui'
+import { Aviso, Chip } from '../components/ui'
 import { ErrorSitur, listarModulos, listarTramites } from '../lib/rpc'
 import type { Modulo, Tramite } from '../lib/tipos'
 import { ETIQUETA_ESTADO_MODULO } from '../lib/tipos'
@@ -40,7 +39,7 @@ export default function Catalogos() {
   }, [cargar])
 
   return (
-    <Disposicion titulo="Catálogos">
+    <>
       {aviso && (
         <div className="mb-4">
           <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
@@ -60,7 +59,14 @@ export default function Catalogos() {
             </p>
           </div>
           {cargando ? (
-            <Vacio titulo="Cargando…" />
+            <ul className="divide-y divide-gris-100">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="esqueleto-bloque h-4 w-52 rounded" />
+                  <div className="esqueleto-bloque h-5 w-16 rounded-full" />
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="divide-y divide-gris-100">
               {tramites.map((t) => (
@@ -92,7 +98,14 @@ export default function Catalogos() {
             </p>
           </div>
           {cargando ? (
-            <Vacio titulo="Cargando…" />
+            <ul className="divide-y divide-gris-100">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="esqueleto-bloque h-4 w-52 rounded" />
+                  <div className="esqueleto-bloque h-5 w-16 rounded-full" />
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="divide-y divide-gris-100">
               {modulos.map((m) => (
@@ -118,6 +131,6 @@ export default function Catalogos() {
           modificarlos.
         </p>
       )}
-    </Disposicion>
+    </>
   )
 }

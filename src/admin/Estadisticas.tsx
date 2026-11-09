@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import Disposicion from './Disposicion'
-import { Aviso, Vacio } from '../components/ui'
+import { Aviso, EsqueletoTabla, Vacio } from '../components/ui'
 import { ErrorSitur, listarEstadisticas } from '../lib/rpc'
 import type { FilaEstadistica } from '../lib/tipos'
 
@@ -41,7 +40,7 @@ export default function Estadisticas() {
   )
 
   return (
-    <Disposicion titulo="Estadísticas">
+    <>
       {aviso && (
         <div className="mb-4">
           <Aviso tono="peligro">{aviso}</Aviso>
@@ -62,7 +61,7 @@ export default function Estadisticas() {
           </h2>
         </div>
         {cargando ? (
-          <Vacio titulo="Cargando…" />
+          <EsqueletoTabla columnas={4} filas={6} />
         ) : filas.length === 0 ? (
           <Vacio titulo="Todavía no hay datos" detalle="Las cifras aparecen al cerrar la jornada." />
         ) : (
@@ -106,7 +105,7 @@ export default function Estadisticas() {
           </div>
         )}
       </section>
-    </Disposicion>
+    </>
   )
 }
 
@@ -116,17 +115,36 @@ function Tarjeta({ titulo, valor, tono = 'neutro' }: {
   tono?: 'neutro' | 'ok' | 'alerta' | 'peligro'
 }) {
   const colores = {
-    neutro: 'text-navy-800',
+    neutro: 'text-navy-900',
     ok: 'text-verde-600',
     alerta: 'text-ambar-600',
     peligro: 'text-rojo-600',
   }
+
+  /*
+   * Mismo estilo de tarjeta que las cifras de la consola (clases .cifra del
+   * index.css): marco de 9 px, radio de 35 px, sombra triple y el velo de
+   * grano. Se reutiliza la clase en vez de repetir el CSS, para que las dos
+   * pantallas no se separen con el tiempo.
+   *
+   * El velo aquí es siempre el gris: estas tarjetas no tienen una variante
+   * destacada en azul, y las cifras de color (verde, ámbar, rojo) van sobre
+   * blanco para conservar el contraste.
+   */
   return (
-    <div className="tarjeta p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
-        {titulo}
-      </p>
-      <p className={`mt-1 text-3xl font-black ${colores[tono]}`}>{valor}</p>
+    <div
+      className="cifra"
+      style={
+        { '--cifra-fondo': '#eef3f9', '--cifra-grano': '#a8b7c9' } as React.CSSProperties
+      }
+    >
+      <div className="cifra-velo" />
+      <div className="cifra-cuerpo bg-white">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gris-700">
+          {titulo}
+        </p>
+        <p className={`mt-1 text-3xl font-black ${colores[tono]}`}>{valor}</p>
+      </div>
     </div>
   )
 }

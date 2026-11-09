@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ETIQUETA_ESTADO, ETIQUETA_PRIORIDAD } from '../lib/tipos'
 import type { EstadoTurno, PrioridadTurno } from '../lib/tipos'
@@ -21,47 +21,13 @@ const ESTILO_ESTADO: Record<EstadoTurno, string> = {
 }
 
 /**
- * La marca del sistema.
- *
- * Antes era un monograma «SC» al lado del nombre «SITUR», que se contradecía:
- * dos siglas distintas para lo mismo, en el mismo trozo de pantalla. Ahora es
- * un símbolo —un boleto con su línea de perforación, que es literalmente lo
- * que el sistema emite— y el nombre va al lado, sin competir con él.
- *
- * Deliberadamente NO se inventa un escudo: la marca institucional del
- * municipio es del municipio, y este sitio es una herramienta interna. Cuando
- * el municipio entregue su escudo, este componente es el único sitio donde
- * hay que cambiarlo.
+ * Aquí vivía la marca del sistema (un monograma «SC» y después un símbolo de
+ * boleto). Se retiró: SITUR no es una marca, es una herramienta interna de la
+ * Dirección de Catastro, y un símbolo inventado en la cabecera no aportaba
+ * información: competía con el nombre del sistema sin decir nada. Cuando la
+ * dependencia entregue su escudo institucional, va en la cabecera como imagen,
+ * no como un icono dibujado aquí.
  */
-export function Marca({ tamano = 'md' }: { tamano?: 'md' | 'lg' }) {
-  const grande = tamano === 'lg'
-  return (
-    <div
-      className={`flex shrink-0 items-center justify-center rounded-2xl bg-azul-500 text-white ${
-        grande ? 'h-14 w-14' : 'h-9 w-9'
-      }`}
-      aria-hidden="true"
-    >
-      <svg
-        width={grande ? 30 : 21}
-        height={grande ? 30 : 21}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* El boleto: rectángulo con la muesca del resguardo. */}
-        <path d="M4 7.2A2.2 2.2 0 0 1 6.2 5H20v5.4a2.6 2.6 0 0 0 0 3.2V19H6.2A2.2 2.2 0 0 1 4 16.8z" />
-        {/* La línea de perforación. */}
-        <path d="M15.6 5.6v12.8" strokeDasharray="2 2.4" />
-        {/* El número del turno. */}
-        <path d="M7.4 10.2h5M7.4 13.4h3.4" />
-      </svg>
-    </div>
-  )
-}
 
 export function ChipEstado({ estado }: { estado: EstadoTurno }) {
   return (
@@ -151,6 +117,28 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
   const refDialog = useRef<HTMLDivElement>(null)
   const refPrevio = useRef<HTMLElement | null>(null)
 
+  /*
+   * Cierre animado.
+   *
+   * React desmonta el nodo en el mismo instante en que el padre deja de
+   * renderizarlo, así que una animación de salida en CSS nunca llegaría a
+   * verse. `saliendo` retrasa el desmontaje lo que dura la animación: primero
+   * se pinta la clase de salida y, cuando termina, se llama al `onCerrar`
+   * real del padre.
+   *
+   * `prefers-reduced-motion` se respeta sin lógica aquí: el CSS deja la
+   * animación en `none` y `animationend` no se dispara, así que el `setTimeout`
+   * de respaldo (ver abajo) cierra el diálogo igual de rápido.
+   */
+  const [saliendo, setSaliendo] = useState(false)
+
+  const cerrar = useCallback(() => {
+    setSaliendo(true)
+    // Respaldo: si `animationend` no llega (animación desactivada por
+    // accesibilidad, pestaña en segundo plano), se cierra igual.
+    window.setTimeout(() => onCerrar(), 180)
+  }, [onCerrar])
+
   useEffect(() => {
     refPrevio.current = document.activeElement as HTMLElement | null
     const dialogo = refDialog.current
@@ -165,7 +153,7 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
     function alPulsarTecla(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onCerrar()
+        cerrar()
         return
       }
       if (e.key !== 'Tab' || !dialogo) return
@@ -198,17 +186,17 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
       // El foco vuelve a donde estaba.
       refPrevio.current?.focus?.()
     }
-  }, [onCerrar])
+  }, [cerrar])
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-navy-900/50 p-0 sm:items-center sm:p-4"
-      onClick={onCerrar}
+      className={`modal-velo ${saliendo ? 'modal-saliendo' : ''} fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-navy-900/40 p-0 backdrop-blur-[3px] sm:items-center sm:p-4`}
+      onClick={cerrar}
       role="presentation"
     >
       <div
         ref={refDialog}
-        className={`w-full ${ancho} rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
+        className={`modal-caja w-full ${ancho} rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -218,7 +206,7 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
           <h2 className="text-base font-bold text-navy-800">{titulo}</h2>
           <button
             type="button"
-            onClick={onCerrar}
+            onClick={cerrar}
             className="rounded-lg p-1.5 text-gris-500 transition-colors hover:bg-gris-50 hover:text-gris-700"
             aria-label="Cerrar"
           >
@@ -234,18 +222,164 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
 }
 
 /** Campo de texto con etiqueta. */
-export function Campo({ etiqueta, children, ayuda }: {
+export function Campo({ etiqueta, children, ayuda, grupo = false }: {
   etiqueta: string
   children: ReactNode
   ayuda?: string
+  /**
+   * `grupo` cambia el `<label>` por un `<div>`.
+   *
+   * Hace falta cuando el control NO es un campo nativo: el `<label>` solo
+   * asocia correctamente con `<input>`, `<select>` y `<textarea>`. Metido
+   * dentro de un label, un botón (el `Selector` propio) hace que al pulsar la
+   * etiqueta se dispare el botón, y además es HTML inválido: un botón dentro
+   * de un label es contenido interactivo dentro de contenido interactivo.
+   *
+   * En ese caso el nombre accesible lo lleva el propio botón (`aria-label`),
+   * así que la etiqueta visible es solo texto.
+   */
+  grupo?: boolean
 }) {
+  const Etiqueta = grupo ? 'div' : 'label'
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gris-700">
+    <Etiqueta className="block">
+      {/*
+        Separación entre la etiqueta y su control: 8px.
+
+        Antes era 6px (`mb-1.5`) y, junto a la altura del select, la etiqueta
+        quedaba pegada a la caja. Con 8px el campo se lee como una unidad sin
+        que la etiqueta se despegue.
+
+        La ayuda sube de 4px a 6px por lo mismo: con 4px el texto de RN-017 se
+        confundía con el borde inferior del select.
+      */}
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gris-700">
         {etiqueta}
       </span>
       {children}
-      {ayuda && <span className="mt-1 block text-xs text-gris-500">{ayuda}</span>}
-    </label>
+      {ayuda && <span className="mt-1.5 block text-xs text-gris-500">{ayuda}</span>}
+    </Etiqueta>
   )
 }
+
+/**
+ * Esqueleto de carga.
+ *
+ * Por qué existe: las pantallas usaban `<Vacio titulo="Cargando…" />`, que es
+ * texto centrado en una caja vacía. Al cambiar de sección el contenido
+ * anterior desaparecía y durante un frame se veía un hueco en blanco antes de
+ * que llegaran los datos. El salto de altura se notaba más que la espera.
+ *
+ * Un esqueleto con la MISMA forma que el contenido final hace que el cambio
+ * sea limpio: el hueco ya tiene el tamaño correcto y los datos simplemente lo
+ * rellenan, sin salto.
+ *
+ * `aria-busy` + `aria-hidden` en el dibujo: el lector de pantalla anuncia
+ * «cargando» una vez y no lee una lista de cajas vacías.
+ */
+export function Esqueleto({
+  filas = 5,
+  alto = 'h-4',
+  className = '',
+}: {
+  /** Cuántas barras dibujar. */
+  filas?: number
+  /** Clase de alto de cada barra. */
+  alto?: string
+  className?: string
+}) {
+  return (
+    <div className={`space-y-3 ${className}`} aria-busy="true" aria-live="polite">
+      <span className="sr-only">Cargando…</span>
+      {Array.from({ length: filas }).map((_, i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          className={`esqueleto-bloque ${alto} rounded-md`}
+          /* Anchos distintos por fila: una columna de barras iguales parece
+             un error de maquetación, no un contenido que está por llegar. */
+          style={{ width: `${100 - (i % 3) * 8}%` }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Esqueleto de tabla: cabecera + filas.
+ *
+ * Se usa donde el contenido real es una tabla, para que el esqueleto tenga el
+ * mismo número de columnas y el mismo alto de fila.
+ */
+export function EsqueletoTabla({
+  columnas = 4,
+  filas = 6,
+}: {
+  columnas?: number
+  filas?: number
+}) {
+  return (
+    <div className="w-full" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Cargando…</span>
+      {/* Cabecera */}
+      <div aria-hidden="true" className="flex gap-4 border-b border-gris-100 bg-gris-50 px-6 py-3">
+        {Array.from({ length: columnas }).map((_, i) => (
+          <div
+            key={i}
+            className="esqueleto-bloque h-3 rounded"
+            style={{ width: `${100 / columnas}%`, opacity: 0.6 }}
+          />
+        ))}
+      </div>
+      {/* Filas */}
+      {Array.from({ length: filas }).map((_, f) => (
+        <div
+          key={f}
+          aria-hidden="true"
+          className="flex items-center gap-4 border-b border-gris-100 px-6 py-4"
+        >
+          {Array.from({ length: columnas }).map((_, c) => (
+            <div
+              key={c}
+              className="esqueleto-bloque h-4 rounded"
+              style={{ width: `${100 / columnas}%` }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Esqueleto de tarjetas: la rejilla de cifras de Estadísticas.
+ */
+export function EsqueletoTarjetas({ n = 4 }: { n?: number }) {
+  return (
+    <div
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span className="sr-only">Cargando…</span>
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} aria-hidden="true" className="tarjeta p-6">
+          <div className="esqueleto-bloque mb-3 h-3 w-2/3 rounded" />
+          <div className="esqueleto-bloque h-8 w-1/2 rounded" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Retardo mínimo del esqueleto, si algún día se usa.
+ *
+ * NO se aplica de forma global a propósito: en una pantalla que tarda 40 ms,
+ * forzar 150 ms hace la aplicación MÁS lenta de lo que era. Se queda aquí como
+ * utilidad documentada y sin usar, para no repetir la discusión.
+ *
+ * Si en el futuro se quisiera usar, el tope debe ser corto (≤200 ms) y solo
+ * donde la carga sea rápida y el destello frecuente.
+ */
+export const RETARDO_MINIMO_ESQUELETO_MS = 150

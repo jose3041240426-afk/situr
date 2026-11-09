@@ -228,6 +228,36 @@ export interface RespuestaGenerarTurno {
   tiempo_estimado_minutos: number | null
 }
 
+/** Un lote de la emisión masiva: cuántos turnos de un trámite. */
+export interface LoteTurnos {
+  tramite: string
+  cantidad: number
+}
+
+/** `generar_turnos_masivos(lotes)` */
+export interface RespuestaGenerarTurnosMasivos {
+  ok: true
+  total: number
+  turnos: Array<{
+    turno_id: string
+    codigo: string
+    folio: number
+    tramite: string
+    token_publico: string
+  }>
+}
+
+/** `programar_aviso_siguiente(minutos, tramite?)` */
+export interface RespuestaProgramarAviso {
+  ok: true
+  turno_id: string
+  codigo_turno: string
+  folio: number
+  clave_tramite: string
+  minutos: number
+  aviso_programado_en: string
+}
+
 /** `llamar_siguiente_turno(modulo_id?, tramite_id?)` */
 export interface RespuestaLlamarSiguiente {
   ok: true

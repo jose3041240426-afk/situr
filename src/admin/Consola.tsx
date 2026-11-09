@@ -1,28 +1,51 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Disposicion from './Disposicion'
+import BotonChispa from '../components/BotonChispa'
+import BotonLlamar from '../components/BotonLlamar'
+import BloqueExpandible from '../components/BloqueExpandible'
+import BotonEmitir from '../components/BotonEmitir'
+import BotonRepartir from '../components/BotonRepartir'
+import Selector from '../components/Selector'
+import NotificacionLote from '../components/NotificacionLote'
+import Paginador from '../components/Paginador'
+import BuscadorPapel from '../components/BuscadorPapel'
 import CodigoQR from '../components/CodigoQR'
-import { Aviso, Campo, Chip, ChipEstado, ChipPrioridad, Modal, Vacio } from '../components/ui'
+import {
+  Aviso,
+  Campo,
+  Chip,
+  ChipEstado,
+  ChipPrioridad,
+  EsqueletoTabla,
+  Modal,
+  Vacio,
+} from '../components/ui'
 import {
   ErrorSitur,
   abrirPeriodo,
   cancelarTurno,
   cerrarPeriodo,
+  formatearFecha,
   formatearFechaHora,
   formatearSoloHora,
   finalizarTurno,
   generarTurno,
+  generarTurnosMasivos,
+  programarAvisoSiguiente,
+  cancelarAvisoSiguiente,
+  opcionesAviso,
+  maximoEnAtencion,
   iniciarAtencion,
+  tokenDeTurno,
   listarCola,
   listarModulos,
-  listarPeriodos,
+  obtenerPeriodoAbierto,
   listarTramites,
   listarCifrasDelPeriodo,
   listarTurnosActuales,
   listarTurnosRetirados,
   llamarSiguiente,
-  llamarTurno,
   omitirTurno,
   proponerSiguienteTurno,
   repetirLlamada,
@@ -32,6 +55,7 @@ import type {
   FilaActual,
   FilaCola,
   FilaRetirado,
+  LoteTurnos,
   Modulo,
   PeriodoOperativo,
   PropuestaSiguiente,
@@ -56,17 +80,49 @@ export default function Consola() {
   const navegar = useNavigate()
 
   const [periodoAbierto, setPeriodoAbierto] = useState<PeriodoOperativo | null>(null)
+  /*
+   * Bandera propia del periodo, separada de `cargando`.
+   *
+   * El periodo ya no viaja en el bloque grande: llega antes. Si se atara a
+   * `cargando`, el chip seguiría en esqueleto esperando a las otras seis
+   * consultas y se perdería la mejora.
+   */
+  const [periodoListo, setPeriodoListo] = useState(false)
   const [cola, setCola] = useState<FilaCola[]>([])
   /** Turnos que el titular retiró oponiéndose (RF-033). */
   const [retirados, setRetirados] = useState<FilaRetirado[]>([])
   /** Las cifras del dia, para la fila de tarjetas (RF-022). */
   const [cifras, setCifras] = useState<CifrasPeriodo | null>(null)
   const [actuales, setActuales] = useState<FilaActual[]>([])
+  /**
+   * Tope de turnos abiertos a la vez (migración 010).
+   *
+   * Físicamente un operador tiene UNA ventanilla: un turno SERVING es alguien
+   * sentado delante y los CALLED son ciudadanos caminando hacia ella. Sin
+   * tope, llamar varias veces sin cerrar los anteriores hace crecer el panel
+   * «En atención ahora» hasta empujar «Llamar» fuera de la pantalla.
+   *
+   * Se lee de `configuracion` (3 por defecto): es una política de la
+   * dependencia, no una preferencia del operador.
+   */
+  const [maximoAtencion, setMaximoAtencion] = useState(3)
+
   /** El turno que esta en atencion ahora, si hay alguno. */
   const enAtencion =
     actuales.find((t) => t.estado === 'SERVING') ??
     actuales.find((t) => t.estado === 'CALLED') ??
     null
+
+  /*
+   * ¿Se alcanzó el tope de turnos abiertos? (migración 010)
+   *
+   * `actuales` son justo los CALLED + SERVING del operador, que es lo que
+   * cuenta el límite. Cuando se llega, «Llamar» se deshabilita y se explica
+   * por qué: dejar que el servidor rechace la llamada daría un error sin
+   * contexto («límite excedido») cuando el operador solo quería llamar al
+   * siguiente.
+   */
+  const topeAtencion = actuales.length >= maximoAtencion
 
   const [tramites, setTramites] = useState<Tramite[]>([])
   const [modulos, setModulos] = useState<Modulo[]>([])
@@ -86,11 +142,26 @@ export default function Consola() {
   const [prioridad, setPrioridad] = useState<'NORMAL' | 'PREFERENTE' | 'URGENTE'>('NORMAL')
   const [emitido, setEmitido] = useState<{ codigo: string; token: string } | null>(null)
 
+  // Emisión masiva (migración 009). Un renglón por trámite con su cantidad.
+  const [modoMasivo, setModoMasivo] = useState(false)
+  const [lotes, setLotes] = useState<LoteTurnos[]>([])
+  /** Qué se emitió en el último lote, para poder imprimir o dictar los folios. */
+  const [loteEmitido, setLoteEmitido] = useState<
+    { total: number; turnos: Array<{ codigo: string; tramite: string }> } | null
+  >(null)
+
+  // Aviso programado al siguiente (migración 009).
+  const [minutosAviso, setMinutosAviso] = useState<number[]>([])
+  const [avisoProgramado, setAvisoProgramado] = useState<
+    { codigo: string; minutos: number; turnoId: string } | null
+  >(null)
+
   // Llamada
   const [moduloFiltro, setModuloFiltro] = useState('')
   const [turnoLlamado, setTurnoLlamado] = useState<FilaActual | null>(null)
   /** La propuesta del sistema, con su razón (P5). */
   const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
+
   /**
    * La confirmacion de la llamada (RF-029).
    *
@@ -103,10 +174,117 @@ export default function Consola() {
   const [modalMotivo, setModalMotivo] = useState<
     { turno: FilaActual; accion: 'omitir' | 'cancelar' } | null
   >(null)
+  /*
+   * ¿Ya se sabe el estado del periodo?
+   *
+   * Mientras `cargando` es true, `periodoAbierto` vale `null` —que significa
+   * «no hay periodo abierto», no «todavía no lo sé»—. Sin esta bandera, al
+   * entrar se pintaba «Cerrado» y el botón verde «Abrir periodo de hoy», y un
+   * instante después saltaba a «Abierto» y «Cerrar periodo». El operador veía
+   * un cambio de estado que nunca ocurrió.
+   *
+   * La distinción importa: `null` es un DATO (no hay periodo), no un
+   * «cargando».
+   */
+  /*
+   * El esqueleto se mantiene hasta que TODO está listo: el periodo y las
+   * consultas de la consola.
+   *
+   * Antes solo miraba `periodoListo`. Como esa consulta es la más rápida,
+   * podía terminar antes que las demás y la barra pintaba su contenido real
+   * con la cola todavía cargando: la pantalla seguía «a medio hacer» justo el
+   * instante en que el operador estaba mirando. Esperando a las dos, el
+   * esqueleto cubre el total y desaparece de una vez.
+   */
+  const estadoPeriodoListo = periodoListo && !cargando
   /** Confirmación del cierre de periodo (Nielsen H5: acción destructiva). */
   const [confirmandoCierre, setConfirmandoCierre] = useState(false)
   /** Un turno en espera que el operador quiere cancelar (trámite equivocado). */
   const [cancelando, setCancelando] = useState<FilaCola | null>(null)
+
+  /*
+   * La cola se muestra por páginas de 10.
+   *
+   * Un día normal deja decenas de turnos en espera, y la tabla entera
+   * empujaba hacia abajo las confirmaciones y los avisos. 10 es el tramo que
+   * cabe en una pantalla de ventanilla sin desplazarse.
+   */
+  const POR_PAGINA = 10
+  const [paginaCola, setPaginaCola] = useState(1)
+
+  /*
+   * Turno cuyo QR se está mostrando, con su token ya resuelto. Se guarda el
+   * código para el encabezado y el token para pintar el código.
+   */
+  const [qrTurno, setQrTurno] = useState<{ codigo: string; token: string } | null>(null)
+
+  /** Confirma que el enlace se copió, durante unos segundos. */
+  const [copiadoQr, setCopiadoQr] = useState(false)
+
+  /*
+   * Filtro por trámite de la cola. Cadena vacía = todos.
+   *
+   * Existe porque el operador en ventanilla solo puede atender ciertos
+   * trámites (los de su módulo), y con 40 turnos mezclados tiene que buscar a
+   * ojo cuál es el suyo. Filtrando, la primera fila ya es un candidato real.
+   */
+  const [filtroTramite, setFiltroTramite] = useState('')
+
+  const urlQr = qrTurno ? `${window.location.origin}/turno/${qrTurno.token}` : ''
+
+  /*
+   * El tramo visible. Si la cola se acorta (se atendieron turnos) y la página
+   * actual se queda vacía, se retrocede a la última que existe: sin esto, el
+   * operador vería una tabla en blanco sin saber por qué.
+   */
+  /*
+   * La cola filtrada. Se filtra ANTES de paginar para que las páginas
+   * correspondan a lo que se está viendo, no al total.
+   */
+  const colaFiltrada = filtroTramite
+    ? cola.filter((f) => f.clave_tramite === filtroTramite)
+    : cola
+
+  /*
+   * Los trámites que de verdad tienen turnos esperando, con cuántos. Se
+   * calcula sobre la cola completa y no sobre lo filtrado: así el operador ve
+   * de un golpe dónde hay trabajo y cuánto.
+   */
+  const tramitesEnCola = useMemo(() => {
+    const mapa = new Map<string, { clave: string; denominacion: string; n: number }>()
+    for (const f of cola) {
+      const previo = mapa.get(f.clave_tramite)
+      if (previo) previo.n += 1
+      else
+        mapa.set(f.clave_tramite, {
+          clave: f.clave_tramite,
+          denominacion: f.denominacion_tramite,
+          n: 1,
+        })
+    }
+    return [...mapa.values()].sort((a, b) => b.n - a.n || a.clave.localeCompare(b.clave))
+  }, [cola])
+
+  const paginasCola = Math.max(1, Math.ceil(colaFiltrada.length / POR_PAGINA))
+  const paginaActual = Math.min(paginaCola, paginasCola)
+  const colaPagina = colaFiltrada.slice(
+    (paginaActual - 1) * POR_PAGINA,
+    paginaActual * POR_PAGINA,
+  )
+
+  /*
+   * Dirección del último cambio de página, para que el barrido de la tabla
+   * vaya hacia donde se movió el operador.
+   *
+   * Sin esto la animación siempre entraría por el mismo lado, y pasar de la
+   * página 3 a la 2 se sentiría como avanzar. Se guarda la página anterior en
+   * una ref y se compara al cambiar.
+   */
+  const paginaAnterior = useRef(paginaActual)
+  const direccion = paginaActual > paginaAnterior.current ? 'derecha' : 'izquierda'
+  useEffect(() => {
+    paginaAnterior.current = paginaActual
+  }, [paginaActual])
 
   const hoy = useMemo(() => {
     const d = new Date()
@@ -115,10 +293,37 @@ export default function Consola() {
     ).padStart(2, '0')}`
   }, [])
 
+  /*
+   * El periodo se carga en su PROPIA petición, aparte del bloque grande.
+   *
+   * Antes iba dentro del `Promise.all` con las otras seis consultas, así que
+   * el estado del periodo —y con él su botón— esperaba a la más lenta: medio
+   * segundo en local. Estando fuera, aparece en cuanto llega su consulta, que
+   * es la más ligera de todas.
+   */
   const cargar = useCallback(async () => {
     try {
-      const [ps, c, a, ts, ms, rt, cf] = await Promise.all([
-        listarPeriodos(),
+      /*
+       * El periodo se pide SUELTO, no dentro del `Promise.all`.
+       *
+       * Se lanza aquí pero se pinta con su propio `.then`, así que el chip y
+       * el botón aparecen en cuanto llega esa consulta —la más ligera— sin
+       * esperar a las otras seis. Una sola petición: antes se pedía dos veces
+       * (una por el efecto y otra por este bloque).
+       */
+      const promesaPeriodo = obtenerPeriodoAbierto()
+        .then((p) => {
+          setPeriodoAbierto(p)
+          setPeriodoListo(true)
+          return p
+        })
+        .catch(() => {
+          /* Si falla, el chip se queda en esqueleto: pintar «Cerrado» por un
+             error de red ofrecería abrir un periodo que ya está abierto. */
+          return null
+        })
+
+      const [c, a, ts, ms, rt, cf] = await Promise.all([
         listarCola(),
         listarTurnosActuales(),
         listarTramites(),
@@ -126,7 +331,6 @@ export default function Consola() {
         listarTurnosRetirados(),
         listarCifrasDelPeriodo(),
       ])
-      setPeriodoAbierto(ps.find((p) => p.estado === 'ABIERTO') ?? null)
       setCola(c)
       setActuales(a)
       setRetirados(rt)
@@ -136,9 +340,15 @@ export default function Consola() {
       setActualizado(new Date())
       if (!tramiteId && ts.length > 0) setTramiteId(ts[0].id)
 
-      // La propuesta: qué va a llamar el sistema y por qué (P5 + P11).
-      // Solo tiene sentido si hay un periodo abierto.
-      if (ps.some((p) => p.estado === 'ABIERTO')) {
+      /*
+       * La propuesta: qué va a llamar el sistema y por qué (P5 + P11).
+       * Solo tiene sentido si hay un periodo abierto.
+       *
+       * Se reutiliza la consulta del periodo en vez de lanzar otra: es la
+       * misma que dispara el efecto de arriba, y pedirla dos veces haría dos
+       * viajes a la base para el mismo dato.
+       */
+      if (await promesaPeriodo) {
         try {
           setPropuesta(await proponerSiguienteTurno())
         } catch {
@@ -146,6 +356,17 @@ export default function Consola() {
         }
       } else {
         setPropuesta(null)
+      }
+
+      /*
+       * El tope de turnos abiertos (migración 010). Si falla, se queda en 3:
+       * la consola nunca debe quedarse sin límite por un error de red, y 3 es
+       * el valor por defecto de la dependencia.
+       */
+      try {
+        setMaximoAtencion(await maximoEnAtencion())
+      } catch {
+        setMaximoAtencion(3)
       }
     } catch (e) {
       setAviso({
@@ -161,6 +382,14 @@ export default function Consola() {
   useEffect(() => {
     void cargar()
   }, [cargar])
+
+  // Opciones de aviso (5, 10, 15). Las decide la dependencia en `configuracion`,
+  // así que no se codifican aquí: si cambian en la base, la consola cambia sola.
+  useEffect(() => {
+    opcionesAviso()
+      .then((m) => setMinutosAviso(m))
+      .catch(() => setMinutosAviso([5, 10, 15]))
+  }, [])
 
   // Refresco periódico: la base es la autoridad y el panel refleja lo que
   // hay, sin depender de que llegue un evento.
@@ -215,7 +444,7 @@ export default function Consola() {
     if (!periodoAbierto) return
     const ok = await ejecutar(
       () => cerrarPeriodo(periodoAbierto.id),
-      `Periodo ${periodoAbierto.clave} cerrado. Los turnos en espera se omitieron.`,
+      `Periodo ${formatearFecha(periodoAbierto.clave)} cerrado. Los turnos en espera se omitieron.`,
     )
     if (ok) setTurnoLlamado(null)
   }
@@ -232,6 +461,85 @@ export default function Consola() {
       setAviso({
         tono: 'peligro',
         texto: e instanceof ErrorSitur ? e.message : 'No se pudo emitir el turno.',
+      })
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  /**
+   * Emite un lote de turnos (migración 009).
+   *
+   * Se envía solo lo que el operador llenó: los renglones con cantidad 0 no
+   * viajan. La base es atómica, así que un error aquí deja la cola intacta.
+   */
+  async function emitirMasivo() {
+    const pedido = lotes.filter((l) => l.cantidad > 0)
+    if (pedido.length === 0) return
+
+    setOcupado(true)
+    setAviso(null)
+    try {
+      const r = await generarTurnosMasivos(pedido)
+      setLoteEmitido({
+        total: r.total,
+        turnos: r.turnos.map((t) => ({ codigo: t.codigo, tramite: t.tramite })),
+      })
+      setLotes([])
+      await cargar()
+    } catch (e) {
+      setAviso({
+        tono: 'peligro',
+        texto: e instanceof ErrorSitur ? e.message : 'No se pudo emitir el lote.',
+      })
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  /**
+   * Programa el aviso push del siguiente turno (migración 009).
+   *
+   * El operador elige 5, 10 o 15 minutos y al ciudadano que está en esa
+   * posición le llega la notificación cuando se cumple el plazo.
+   */
+  async function programarAviso(minutos: number) {
+    setOcupado(true)
+    setAviso(null)
+    try {
+      const r = await programarAvisoSiguiente(minutos)
+      setAvisoProgramado({
+        codigo: r.codigo_turno,
+        minutos: r.minutos,
+        turnoId: r.turno_id,
+      })
+      setAviso({
+        tono: 'ok',
+        texto: `Aviso programado: al turno ${r.codigo_turno} le llegará la notificación en ${r.minutos} minutos.`,
+      })
+      await cargar()
+    } catch (e) {
+      setAviso({
+        tono: 'peligro',
+        texto: e instanceof ErrorSitur ? e.message : 'No se pudo programar el aviso.',
+      })
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  /** Deshace el aviso programado antes de que salga. */
+  async function cancelarAviso() {
+    if (!avisoProgramado) return
+    setOcupado(true)
+    try {
+      await cancelarAvisoSiguiente(avisoProgramado.turnoId)
+      setAvisoProgramado(null)
+      setAviso({ tono: 'ok', texto: 'Aviso cancelado.' })
+    } catch (e) {
+      setAviso({
+        tono: 'peligro',
+        texto: e instanceof ErrorSitur ? e.message : 'No se pudo cancelar el aviso.',
       })
     } finally {
       setOcupado(false)
@@ -289,41 +597,57 @@ export default function Consola() {
    * Es lo que evita tener que omitir al que "no toca": omitir quema el turno
    * de ese ciudadano. Aquí los demás siguen intactos.
    */
-  async function llamarEste(turnoId: string) {
+  /**
+   * Abre el QR de un turno de la cola.
+   *
+   * El token se pide en ese momento y no al cargar la cola: pedir un token
+   * por cada fila visible serían diez consultas para algo que casi nunca se
+   * usa. Aquí es una sola, y solo cuando el operador la pide.
+   */
+  async function abrirQr(f: FilaCola) {
     setOcupado(true)
     setAviso(null)
     try {
-      const r = await llamarTurno(turnoId)
-      setTurnoLlamado({
-        turno_id: r.turno_id,
-        codigo_turno: r.codigo_turno,
-        folio: r.folio,
-        estado: r.estado,
-        prioridad: r.prioridad,
-        creado_en: '',
-        llamado_en: r.llamado_en,
-        inicio_atencion: null,
-        numero_llamadas: r.numero_llamadas,
-        periodo_operativo_id: '',
-        tramite_id: '',
-        clave_tramite: r.clave_tramite,
-        denominacion_tramite: r.denominacion_tramite,
-        modulo_id: null,
-        codigo_modulo: r.codigo_modulo,
-        denominacion_modulo: r.denominacion_modulo,
-        trabajador_id: null,
-        nombre_trabajador: r.operador,
-        numero_empleado: null,
-      })
-      setAviso({ tono: 'ok', texto: `${r.codigo_turno} llamado a ${r.codigo_modulo}.` })
-      await cargar()
+      const token = await tokenDeTurno(f.turno_id)
+      setQrTurno({ codigo: f.codigo_turno, token })
     } catch (e) {
       setAviso({
         tono: 'peligro',
-        texto: e instanceof ErrorSitur ? e.message : 'No se pudo llamar a ese turno.',
+        texto: e instanceof ErrorSitur ? e.message : 'No se pudo obtener el código QR.',
       })
     } finally {
       setOcupado(false)
+    }
+  }
+
+  /**
+   * Copia el enlace del turno al portapapeles.
+   *
+   * `navigator.clipboard` solo existe en contextos seguros (HTTPS o
+   * localhost). En una ventanilla servida por HTTP plano no está, así que hay
+   * un respaldo con un `textarea` temporal: sin él, el botón fallaría en
+   * silencio justo en el entorno donde más se usa.
+   */
+  async function copiarQr() {
+    if (!urlQr) return
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(urlQr)
+      } else {
+        const area = document.createElement('textarea')
+        area.value = urlQr
+        area.setAttribute('readonly', '')
+        area.style.position = 'fixed'
+        area.style.top = '-1000px'
+        document.body.appendChild(area)
+        area.select()
+        document.execCommand('copy')
+        document.body.removeChild(area)
+      }
+      setCopiadoQr(true)
+      window.setTimeout(() => setCopiadoQr(false), 2500)
+    } catch {
+      setAviso({ tono: 'peligro', texto: 'No se pudo copiar el enlace.' })
     }
   }
 
@@ -331,16 +655,14 @@ export default function Consola() {
 
   if (!puedeOperar) {
     return (
-      <Disposicion titulo="Turnos">
-        <Aviso tono="alerta">
-          Su cuenta no tiene permiso para operar turnos. Consulte con el administrador.
-        </Aviso>
-      </Disposicion>
+      <Aviso tono="alerta">
+        Su cuenta no tiene permiso para operar turnos. Consulte con el administrador.
+      </Aviso>
     )
   }
 
   return (
-    <Disposicion titulo="Turnos">
+    <>
       {mfaPendiente && (
         <div className="mb-4">
           <Aviso tono="alerta">
@@ -356,15 +678,39 @@ export default function Consola() {
         </div>
       )}
 
-      {/* Barra de periodo operativo */}
-      <section className="tarjeta mb-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/*
+        Mientras no se sabe el estado del periodo se dibuja la barra entera
+        como esqueleto, con la misma forma que la real.
+        Sustituye a un texto «Comprobando periodo…» y a un chip gris suelto:
+        ambos seguían siendo un cambio visible en el sitio más mirado de la
+        pantalla. Un esqueleto con la forma final no cambia de tamaño ni de
+        composición al llegar los datos, así que no se percibe el salto.
+      */}
+      {!estadoPeriodoListo ? (
+        <section className="tarjeta mb-6 p-6" aria-busy="true" aria-live="polite">
+          <span className="sr-only">Comprobando el periodo operativo…</span>
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="min-w-48">
+              <div className="esqueleto-bloque mb-2 h-3 w-32 rounded" />
+              <div className="flex items-center gap-2">
+                <div className="esqueleto-bloque h-6 w-24 rounded" />
+                <div className="esqueleto-bloque h-5 w-16 rounded-full" />
+              </div>
+              <div className="esqueleto-bloque mt-2 h-3 w-28 rounded" />
+            </div>
+            {/* Mismo alto que el botón con chispa, para que nada se mueva. */}
+            <div className="esqueleto-bloque h-11 w-44 rounded-xl" />
+          </div>
+        </section>
+      ) : (
+      <section className="tarjeta transicion-datos mb-6 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
               Periodo operativo
             </p>
-            <p className="mt-0.5 flex items-center gap-2 text-lg font-bold text-navy-800">
-              {periodoAbierto ? periodoAbierto.clave : hoy}
+            <p className="mt-1 flex items-center gap-2 text-lg font-bold text-navy-800">
+              {formatearFecha(periodoAbierto ? periodoAbierto.clave : hoy)}
               {periodoAbierto ? (
                 <Chip tono="ok">Abierto</Chip>
               ) : (
@@ -372,32 +718,33 @@ export default function Consola() {
               )}
             </p>
             {periodoAbierto?.hora_inicio && (
-              <p className="text-xs text-gris-500">
+              <p className="mt-1 text-xs text-gris-500">
                 Abierto a las {formatearSoloHora(periodoAbierto.hora_inicio)}
               </p>
             )}
           </div>
+          {/*
+            El color sigue al estado, no al botón: con el periodo abierto la
+            acción es cerrar (rojo, destructiva); con el periodo cerrado la
+            acción es abrir (verde, habilita la jornada). Así el operador sabe
+            qué va a pasar antes de leer el texto.
+          */}
           {periodoAbierto ? (
-            <button
-              type="button"
+            <BotonChispa
+              tono="rojo"
               onClick={() => setConfirmandoCierre(true)}
               disabled={ocupado}
-              className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
             >
               Cerrar periodo
-            </button>
+            </BotonChispa>
           ) : (
-            <button
-              type="button"
-              onClick={() => void abrir()}
-              disabled={ocupado}
-              className="boton-primario"
-            >
+            <BotonChispa tono="verde" onClick={() => void abrir()} disabled={ocupado}>
               Abrir periodo de hoy
-            </button>
+            </BotonChispa>
           )}
         </div>
       </section>
+      )}
 
       {aviso && (
         /*
@@ -405,7 +752,7 @@ export default function Consola() {
          * página, así que un lector de pantalla no se enteraría de que la
          * operación se hizo (WCAG 4.1.3, nivel AA).
          */
-        <div role="status" aria-live="polite" className="mb-4">
+        <div role="status" aria-live="polite" className="mb-6">
           <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
         </div>
       )}
@@ -420,7 +767,26 @@ export default function Consola() {
 
         La primera tarjeta va en azul: es la que mira, la que cambia.
       */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {cargando ? (
+        /*
+         * Esqueleto de las tres tarjetas mientras llegan los datos.
+         *
+         * Sin esto se pintaban con «—» y «No hay turnos en espera»: mensajes
+         * que AFIRMAN algo falso. Un guion no significa «cargando», significa
+         * «no hay».
+         */
+        <div className="mb-6 grid gap-5 sm:grid-cols-3" aria-busy="true">
+          <span className="sr-only">Cargando el resumen del día…</span>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} aria-hidden="true" className="tarjeta p-6">
+              <div className="esqueleto-bloque mb-3 h-3 w-24 rounded" />
+              <div className="esqueleto-bloque mb-3 h-8 w-28 rounded" />
+              <div className="esqueleto-bloque h-3 w-2/3 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+      <div className="transicion-datos mb-6 grid gap-5 sm:grid-cols-3">
         <TarjetaCifra
           rotulo="Turno actual"
           valor={enAtencion?.codigo_turno ?? '—'}
@@ -453,65 +819,161 @@ export default function Consola() {
           icono="grafico"
         />
       </div>
+      )}
 
       {/* `min-w-0` en los hijos: sin eso, un hijo de la rejilla no baja del
           ancho de su contenido (un <select> con opciones largas) y la pagina
           desborda en horizontal a 320 px (WCAG 1.4.10). */}
-      <div className="grid gap-4 xl:grid-cols-[22rem_1fr]">
+      <div className="grid gap-5 xl:grid-cols-[22rem_1fr]">
         {/* ------------------------------------------------ emitir turno */}
-        <div className="min-w-0 space-y-4">
-          <section className="tarjeta p-4">
+        <div className="min-w-0 space-y-5">
+          <section className="tarjeta p-6">
             <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Emitir turno
             </h2>
 
-            {!periodoAbierto ? (
-              <p className="mt-3 rounded-lg bg-ambar-50 px-3 py-2.5 text-sm text-ambar-600">
+            {cargando ? (
+              /* Si aún no se sabe el estado del periodo, avisar de que «no hay
+                 periodo abierto» sería afirmar algo que quizá no es cierto. */
+              <div className="mt-4 space-y-3" aria-busy="true">
+                <span className="sr-only">Cargando la emisión de turnos…</span>
+                <div aria-hidden="true" className="esqueleto-bloque h-4 w-40 rounded" />
+                <div aria-hidden="true" className="esqueleto-bloque h-10 w-full rounded-lg" />
+                <div aria-hidden="true" className="esqueleto-bloque h-10 w-40 rounded-lg" />
+              </div>
+            ) : !periodoAbierto ? (
+              <p className="mt-4 rounded-xl bg-ambar-50 px-4 py-3 text-sm text-ambar-600">
                 No hay periodo abierto. Sin él, la base rechaza cualquier alta de turno
                 (RF-025).
               </p>
             ) : (
-              <div className="mt-3 space-y-3">
-                <Campo etiqueta="Trámite">
-                  <select
-                    className="selector"
-                    value={tramiteId}
-                    onChange={(e) => setTramiteId(e.target.value)}
-                  >
-                    {tramites.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.clave} — {t.denominacion}
-                      </option>
-                    ))}
-                  </select>
-                </Campo>
+              <div className="mt-5 space-y-5">{/* space-y-5: con 16px el campo
+                de Prioridad y el texto de RN-017 quedaban a la misma
+                distancia que su propia etiqueta, y no se distinguía a qué
+                campo pertenecía cada texto. */}
+                {/* Dos modos: un turno, o un lote. Se separan en vez de meter
+                    un campo «cantidad» en el formulario de siempre, porque
+                    emitir 100 turnos no es lo mismo que emitir uno y no debe
+                    parecerlo. */}
+                {/*
+                  Selector de cristal deslizante.
 
-                <Campo etiqueta="Prioridad" ayuda="RN-017: URGENTE sale antes que el resto.">
-                  <select
-                    className="selector"
-                    value={prioridad}
-                    onChange={(e) => setPrioridad(e.target.value as typeof prioridad)}
-                  >
-                    <option value="NORMAL">Normal</option>
-                    <option value="PREFERENTE">Preferente</option>
-                    <option value="URGENTE">Urgente</option>
-                  </select>
-                </Campo>
+                  Antes eran dos <button> con `aria-pressed`. Eso describía dos
+                  botones independientes, no una elección entre dos opciones.
+                  Aquí son RADIOS de verdad: el lector anuncia «opción 1 de 2»
+                  y las flechas del teclado cambian de modo solas. La pastilla
+                  que se desliza es solo la representación visual.
 
-                <button
-                  type="button"
-                  onClick={() => void emitir()}
-                  disabled={ocupado || !tramiteId}
-                  className="boton-primario w-full"
+                  `name` distinto de cualquier otro grupo de la página para que
+                  el teclado no los mezcle.
+                */}
+                <div
+                  className="glass-radio-group"
+                  role="radiogroup"
+                  aria-label="Modo de emisión"
                 >
-                  Emitir turno
-                </button>
+                  <input
+                    type="radio"
+                    name="modo-emision"
+                    id="modo-un-turno"
+                    checked={!modoMasivo}
+                    onChange={() => setModoMasivo(false)}
+                  />
+                  <label htmlFor="modo-un-turno">Un turno</label>
+
+                  <input
+                    type="radio"
+                    name="modo-emision"
+                    id="modo-varios-turnos"
+                    checked={modoMasivo}
+                    onChange={() => setModoMasivo(true)}
+                  />
+                  <label htmlFor="modo-varios-turnos">Varios turnos</label>
+
+                  <div className="glass-glider" aria-hidden="true" />
+                </div>
+
+                <BloqueExpandible clave={modoMasivo}>
+                {!modoMasivo ? (
+                  /*
+                   * `space-y-6` AQUÍ, no en el div de arriba.
+                   *
+                   * El div padre tiene `space-y-5`, pero su hijo directo es
+                   * `BloqueExpandible`, no los campos: el espacio se aplicaba
+                   * entre bloques, no entre los tres controles. Poniendo el
+                   * `space-y` en el fragmento, cada `Campo` y el botón pasan a
+                   * ser hijos con separación real.
+                   */
+                  <div className="space-y-6">
+                    {/*
+                      `Selector` y no `<select>`: la lista nativa se ensancha
+                      al texto más largo («REG — Registro catastral» no cabe en
+                      el ancho del campo) e ignora el `width` del control.
+
+                      `grupo`: el control no es un campo nativo, así que la
+                      etiqueta visible va en un `<div>`. Un botón dentro de un
+                      `<label>` es HTML inválido y además hace que al pulsar la
+                      etiqueta se abra el desplegable.
+                    */}
+                    <Campo etiqueta="Trámite" grupo>
+                      <Selector
+                        etiqueta="Trámite"
+                        className="w-full"
+                        valor={tramiteId}
+                        onCambiar={setTramiteId}
+                        opciones={tramites.map((t) => ({
+                          valor: t.id,
+                          etiqueta: `${t.clave} — ${t.denominacion}`,
+                        }))}
+                      />
+                    </Campo>
+
+                    <Campo
+                      etiqueta="Prioridad"
+                      ayuda="RN-017: URGENTE sale antes que el resto."
+                      grupo
+                    >
+                      <Selector
+                        etiqueta="Prioridad"
+                        className="w-full"
+                        valor={prioridad}
+                        onCambiar={(v) => setPrioridad(v as typeof prioridad)}
+                        opciones={[
+                          { valor: 'NORMAL', etiqueta: 'Normal' },
+                          { valor: 'PREFERENTE', etiqueta: 'Preferente' },
+                          { valor: 'URGENTE', etiqueta: 'Urgente' },
+                        ]}
+                      />
+                    </Campo>
+
+                    {/* El botón se separa más que un campo: es la acción final
+                        del formulario y conviene que no se lea como un
+                        tercer campo más. */}
+                    <div className="pt-1">
+                    <BotonEmitir
+                      onClick={() => void emitir()}
+                      disabled={ocupado || !tramiteId}
+                    >
+                      Emitir turno
+                    </BotonEmitir>
+                    </div>
+                  </div>
+                ) : (
+                  <EmisionMasiva
+                    tramites={tramites}
+                    lotes={lotes}
+                    onCambiar={setLotes}
+                    onEmitir={() => void emitirMasivo()}
+                    ocupado={ocupado}
+                  />
+                )}
+                </BloqueExpandible>
               </div>
             )}
           </section>
 
           {emitido && (
-            <section className="tarjeta p-4 impresion-boleto">
+            <section className="tarjeta p-6 impresion-boleto">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
@@ -550,7 +1012,7 @@ export default function Consola() {
                 lo muestre en público.
               </p>
 
-              <div className="no-imprimir mt-3 flex gap-2">
+              <div className="no-imprimir mt-4 flex gap-2">
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -570,12 +1032,30 @@ export default function Consola() {
             </section>
           )}
 
-          {/* Módulos */}
-          <section className="tarjeta p-4">
+          {/* Aviso programado al siguiente turno (migración 009). */}
+          <PanelAviso
+            minutos={minutosAviso}
+            programado={avisoProgramado}
+            onProgramar={(m) => void programarAviso(m)}
+            onCancelar={() => void cancelarAviso()}
+            ocupado={ocupado}
+            deshabilitado={!periodoAbierto || cola.length === 0}
+            cargando={cargando}
+          />
+
+          {/*
+           * Módulos.
+           *
+           * `mb-1` extra: es la última tarjeta de la columna izquierda y en
+           * pantallas anchas queda alineada con el pie de la columna derecha,
+           * así que necesita un poco más de aire abajo para no quedar pegada
+           * al borde de la rejilla.
+           */}
+          <section className="tarjeta mb-1 p-6">
             <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
               Módulos
             </h2>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-4 flex flex-wrap gap-2">
               {modulos.map((m) => (
                 <Chip key={m.id} tono={m.estado === 'ACTIVO' ? 'ok' : 'neutro'}>
                   {m.codigo}
@@ -593,175 +1073,91 @@ export default function Consola() {
         </div>
 
         {/* ------------------------------------------------ atención */}
-        <div className="min-w-0 space-y-4">
-          <section className="tarjeta p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-                Llamar siguiente
-              </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {/*
-                  Este selector no va dentro de un <label>: es un control
-                  suelto en la cabecera, y sin nombre accesible un lector de
-                  pantalla anuncia «combo box» a secas (WCAG 4.1.2, critico).
-                  El `max-w` y el `min-w-0` son para que a 320 px no imponga
-                  su ancho intrínseco (el de la opción más larga) y desborde
-                  la fila (WCAG 1.4.10).
-                */}
-                <select
-                  aria-label="Módulo al que llamar"
-                  className="selector w-full min-w-0 max-w-[13rem] py-2 text-sm sm:w-auto"
-                  value={moduloFiltro}
-                  onChange={(e) => setModuloFiltro(e.target.value)}
-                >
-                  <option value="">Módulo automático</option>
-                  {modulos
-                    .filter((m) => m.estado === 'ACTIVO')
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.codigo} — {m.denominacion}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setConfirmandoLlamada(true)}
-                  disabled={ocupado || !periodoAbierto}
-                  className="boton-primario px-6 py-3 text-base"
-                >
-                  Llamar
-                </button>
-              </div>
-            </div>
+        <div className="min-w-0 space-y-5">
+          {/*
+            «En atención ahora» va PRIMERO.
 
-            {/*
-              LA PROPUESTA (P5 + P11).
-              Antes de apretar, el operador ve a quién va a llamar el sistema
-              y POR QUÉ. Sin esto, el "Llamar" era un reflejo: la tabla de la
-              cola muestra la posición por trámite (RN-014, lo que ve el
-              ciudadano) y no el orden real de llamada (RN-017), así que había
-              tres turnos con "posición 1" y ninguno era previsualizable.
-            */}
-            {propuesta?.hay_turnos && !turnoLlamado && (
-              <div className="mt-4 rounded-xl border-2 border-gris-200 bg-gris-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
-                  El sistema va a llamar a
-                </p>
-                <div className="mt-1 flex flex-wrap items-center gap-3">
-                  <span className="text-3xl font-black text-navy-800">
-                    {propuesta.codigo_turno}
-                  </span>
-                  <span className="text-sm text-gris-700">
-                    {propuesta.denominacion_tramite}
-                  </span>
-                  {propuesta.prioridad && <ChipPrioridad prioridad={propuesta.prioridad} />}
-                </div>
-                {propuesta.razon && (
-                  <p className="mt-2 text-sm text-gris-700">{propuesta.razon}</p>
-                )}
-                <p className="mt-1 text-xs text-gris-500">
-                  Posición {propuesta.posicion_global} de {propuesta.en_espera} en la cola
-                  · {propuesta.minutos_esperando} min esperando
-                </p>
-              </div>
-            )}
+            Antes estaba debajo de «Llamar siguiente», y el orden contaba la
+            historia al revés: arriba la acción de llamar y abajo el estado
+            actual. Pero un operador trabaja al revés —mira qué está atendiendo
+            y después decide a quién llama— y además la acción ocupaba el sitio
+            de más peso visual, que es el del estado.
 
-            {!propuesta?.hay_turnos && !turnoLlamado && (
-              <p className="mt-3 text-sm text-gris-500">
-                {propuesta?.mensaje ?? 'No hay turnos en espera.'}
-              </p>
-            )}
-
-            {turnoLlamado && (
-              <div className="mt-4 rounded-xl border-2 border-gris-200 bg-gris-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-3xl font-black text-navy-800">
-                      {turnoLlamado.codigo_turno}
-                    </p>
-                    <p className="text-sm text-gris-700">
-                      {turnoLlamado.denominacion_tramite} · {turnoLlamado.codigo_modulo}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void conTurno(
-                          () => repetirLlamada(turnoLlamado.turno_id),
-                          'Llamada repetida.',
-                        )
-                      }
-                      disabled={ocupado}
-                      className="boton-secundario"
-                    >
-                      Repetir
-                    </button>
-                    {/*
-                      OMITIR y CANCELAR no son sinonimos, y el ciudadano ve
-                      mensajes distintos segun cual se elija:
-                        · OMITIR   -> "Su turno no fue atendido. Acuda a
-                          ventanilla para reposicion." (no se presento)
-                        · CANCELAR -> "Su turno fue cancelado." (se cancela
-                          la solicitud)
-                      Con los dos botones igual de rotulados, el operador
-                      elegia al azar (Nielsen H2 y H6). Ahora cada uno dice lo
-                      que hace y el dialogo explica el efecto.
-                    */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setModalMotivo({ turno: turnoLlamado, accion: 'omitir' })
-                      }
-                      disabled={ocupado}
-                      className="boton-secundario"
-                      title="El ciudadano no se presento. Podra reponerse en ventanilla."
-                    >
-                      Omitir
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setModalMotivo({ turno: turnoLlamado, accion: 'cancelar' })
-                      }
-                      disabled={ocupado}
-                      className="boton-peligro"
-                      title="Se cancela la solicitud del ciudadano. No se puede reponer."
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void conTurno(
-                          () => iniciarAtencion(turnoLlamado.turno_id),
-                          'Atención iniciada.',
-                        )
-                      }
-                      disabled={ocupado}
-                      className="boton-primario"
-                    >
-                      Iniciar atención
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
+            Este panel es ahora el ÚNICO lugar donde se gestiona un turno ya
+            llamado: aquí viven Repetir, Omitir, Cancelar, Iniciar atención y
+            Finalizar.
+          */}
           {/* En atención ahora */}
           <section className="tarjeta overflow-hidden">
-            <div className="border-b border-gris-100 px-4 py-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-                En atención ahora
-              </h2>
+            <div className="border-b border-gris-100 px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+                  En atención ahora
+                </h2>
+                {/*
+                  El contador hace visible el límite antes de chocar con él:
+                  «2 de 3» explica por sí solo por qué el próximo es el
+                  último que se puede llamar.
+                */}
+                {!cargando && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      topeAtencion
+                        ? 'bg-ambar-50 text-ambar-600'
+                        : 'bg-gris-100 text-gris-700'
+                    }`}
+                  >
+                    {actuales.length} de {maximoAtencion}
+                  </span>
+                )}
+              </div>
             </div>
-            {actuales.length === 0 ? (
+            {cargando ? (
+              /* Mientras carga no se puede afirmar «no hay turnos»: eso es un
+                 dato, no un estado de espera. */
+              <div className="space-y-3 px-6 py-4" aria-busy="true">
+                <span className="sr-only">Cargando turnos en curso…</span>
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} aria-hidden="true" className="flex items-center gap-4">
+                    <div className="esqueleto-bloque h-5 w-28 rounded" />
+                    <div className="esqueleto-bloque h-4 w-40 rounded" />
+                    <div className="esqueleto-bloque ml-auto h-8 w-28 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            ) : actuales.length === 0 ? (
               <Vacio titulo="No hay turnos en curso" detalle="Los turnos llamados y en atención aparecen aquí." />
             ) : (
-              <ul className="divide-y divide-gris-100">
+              <>
+                {/*
+                  Al llegar al tope se dice QUÉ hacer, no solo que está lleno.
+                  El límite existe para que nadie acumule ciudadanos llamados
+                  sin atenderlos, así que la salida siempre es cerrar uno.
+                */}
+                {topeAtencion && (
+                  <div className="flex items-start gap-2 border-b border-ambar-500/30 bg-ambar-50 px-6 py-3">
+                    <span className="mt-0.5 shrink-0 text-ambar-600" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M12 8v5M12 16.5v.5" />
+                        <circle cx="12" cy="12" r="9" />
+                      </svg>
+                    </span>
+                    <p className="text-xs leading-snug text-navy-800">
+                      Ya tiene <strong>{actuales.length}</strong> turnos abiertos, el
+                      máximo permitido. Finalice, omita o cancele uno para poder llamar
+                      al siguiente.
+                    </p>
+                  </div>
+                )}
+                {/*
+                  `max-h` + `overflow-y-auto` como red de seguridad: si por
+                  datos viejos o un límite recién subido aparecen más turnos
+                  que el tope, el panel se desplaza en vez de crecer sin fin y
+                  empujar «Llamar» fuera de la pantalla.
+                */}
+                <ul className="transicion-datos max-h-[26rem] divide-y divide-gris-100 overflow-y-auto">
                 {actuales.map((t) => (
-                  <li key={t.turno_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <li key={t.turno_id} className="flex flex-wrap items-center gap-4 px-6 py-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-base font-bold text-navy-800">
@@ -829,9 +1225,10 @@ export default function Consola() {
                               )
                             }
                             disabled={ocupado}
-                            className="boton-primario px-3 py-1.5 text-xs"
+                            className="boton-primario whitespace-nowrap px-3 py-1.5 text-xs"
+                            title="El ciudadano ya está en la ventanilla. Empieza a contar el tiempo de atención."
                           >
-                            Atender
+                            Iniciar atención
                           </button>
                         </>
                       )}
@@ -854,68 +1251,159 @@ export default function Consola() {
                   </li>
                 ))}
               </ul>
+              </>
             )}
           </section>
-        </div>
-      </div>
+          <section className="tarjeta p-6">
+            <div className="flex flex-wrap items-center justify-between gap-5">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+                Llamar siguiente
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {/*
+                  Este selector no va dentro de un <label>: es un control
+                  suelto en la cabecera, y sin nombre accesible un lector de
+                  pantalla anuncia «combo box» a secas (WCAG 4.1.2, critico).
+                  El `max-w` y el `min-w-0` son para que a 320 px no imponga
+                  su ancho intrínseco (el de la opción más larga) y desborde
+                  la fila (WCAG 1.4.10).
+                */}
+                {/*
+                  Mismo `.selector` que el campo Trámite de «Emitir turno»,
+                  sin utilidades que lo sobrescriban.
 
+                  Antes llevaba `py-2 text-sm`, que pisaban el `py-2.5` y la
+                  altura de 42px del componente: este control medía 2px menos
+                  que los demás y el texto salía más pequeño. Se veía de otra
+                  familia que el resto del formulario.
 
-      {/*
-        LOS RETIRADOS (RF-033).
+                  `max-w-[13rem]` se mantiene porque a 320 px la opción más
+                  larga impondría su ancho intrínseco y desbordaría la fila
+                  (WCAG 1.4.10).
+                */}
+                <Selector
+                  etiqueta="Módulo al que llamar"
+                  /*
+                   * `min-w` y no `max-w`: el control tiene el ancho de la
+                   * opción más larga («M01 — Módulo 01 - Atención general»).
+                   * Antes se limitaba a 13rem y el texto se cortaba; el ancho
+                   * ya no es un problema porque la lista lo sigue, así que se
+                   * deja crecer.
+                   *
+                   * `w-full` a pantalla completa y `sm:w-auto` desde tablet:
+                   * a 320 px el ancho intrínseco desbordaría la fila
+                   * (WCAG 1.4.10).
+                   */
+                  className="selector-propio--auto w-full sm:w-auto"
+                  valor={moduloFiltro}
+                  onCambiar={setModuloFiltro}
+                  opciones={[
+                    { valor: '', etiqueta: 'Módulo automático' },
+                    ...modulos
+                      .filter((m) => m.estado === 'ACTIVO')
+                      .map((m) => ({ valor: m.id, etiqueta: `${m.codigo} — ${m.denominacion}` })),
+                  ]}
+                />
+                <BotonLlamar
+                  onClick={() => setConfirmandoLlamada(true)}
+                  disabled={ocupado || !periodoAbierto || topeAtencion}
+                  /*
+                   * El `title` explica el bloqueo en el propio botón: un botón
+                   * apagado sin motivo es el fallo que se quiere evitar.
+                   */
+                  title={
+                    topeAtencion
+                      ? `Tiene ${actuales.length} turnos sin cerrar (máximo ${maximoAtencion}). Finalice o cancele uno antes de llamar a otro.`
+                      : undefined
+                  }
+                >
+                  Llamar
+                </BotonLlamar>
+              </div>
+            </div>
 
-        Cuando el titular se opone al tratamiento, el turno se cancela: el
-        derecho a oponerse exige cesar, no esperar. Por eso **no está en la
-        cola de espera** (esa solo trae los que esperan) y, sin esta tarjeta,
-        el turno desaparecía de la pantalla sin dejar rastro: el operador no
-        sabía si el ciudadano se había retirado o si el sistema lo había
-        perdido.
+            {/*
+              LA PROPUESTA (P5 + P11).
+              Antes de apretar, el operador ve a quién va a llamar el sistema
+              y POR QUÉ. Sin esto, el "Llamar" era un reflejo: la tabla de la
+              cola muestra la posición por trámite (RN-014, lo que ve el
+              ciudadano) y no el orden real de llamada (RN-017), así que había
+              tres turnos con "posición 1" y ninguno era previsualizable.
+            */}
+            {/*
+              SIN `!turnoLlamado`.
 
-        Aquí está el rastro, con lo que el titular escribió. No se puede
-        llamar a estos turnos: están cancelados.
-      */}
-      {retirados.length > 0 && (
-        <section className="tarjeta mb-4 overflow-hidden">
-          <div className="border-b border-gris-100 px-4 py-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-              Retirados por el titular
-            </h2>
-            <p className="mt-0.5 text-xs text-gris-500">
-              {retirados.length}{' '}
-              {retirados.length === 1 ? 'ciudadano se opuso' : 'ciudadanos se opusieron'}{' '}
-              a que se atendiera su turno. No se llamarán.
-            </p>
-          </div>
-          <ul className="divide-y divide-gris-100">
-            {retirados.map((r) => (
-              <li key={r.turno_id} className="px-4 py-3">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-bold text-navy-800">{r.codigo_turno}</span>
-                  <span className="text-sm text-gris-700">
-                    {r.denominacion_tramite}
-                  </span>
-                  {r.codigo_modulo && (
-                    <span className="text-xs text-gris-500">
-                      módulo {r.codigo_modulo}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 rounded bg-ambar-50 px-2 py-1.5 text-sm text-ambar-600">
-                  «{r.consideracion}»
+              Antes la previsualización se ocultaba en cuanto había un turno
+              llamado, así que con la lista «En atención ahora» llena el
+              operador veía la cola pero no a QUIÉN iba a llamar. La condición
+              sobraba: la tarjeta de acuse («Llamando a C-183») es otra cosa y
+              vive más abajo, no choca con esta.
+            */}
+            {propuesta?.hay_turnos && (
+              <div className="mt-5 rounded-2xl border-2 border-gris-200 bg-gris-50 p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
+                  El sistema va a llamar a
                 </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <span className="text-3xl font-black text-navy-800">
+                    {propuesta.codigo_turno}
+                  </span>
+                  <span className="text-sm text-gris-700">
+                    {propuesta.denominacion_tramite}
+                  </span>
+                  {propuesta.prioridad && <ChipPrioridad prioridad={propuesta.prioridad} />}
+                </div>
+                {propuesta.razon && (
+                  <p className="mt-3 text-sm text-gris-700">{propuesta.razon}</p>
+                )}
+                <p className="mt-2 text-xs text-gris-500">
+                  Posición {propuesta.posicion_global} de {propuesta.en_espera} en la cola
+                  · {propuesta.minutos_esperando} min esperando
+                </p>
+              </div>
+            )}
 
-      {/* Cola de espera */}
-      <section className="tarjeta overflow-hidden">
-        <div className="flex items-center justify-between border-b border-gris-100 px-4 py-3">
+            {cargando && (
+              <div className="mt-3 space-y-2" aria-busy="true">
+                <span className="sr-only">Buscando el siguiente turno…</span>
+                <div aria-hidden="true" className="esqueleto-bloque h-4 w-64 rounded" />
+                <div aria-hidden="true" className="esqueleto-bloque h-4 w-40 rounded" />
+              </div>
+            )}
+
+            {!cargando && !propuesta?.hay_turnos && (
+              <p className="mt-3 text-sm text-gris-500">
+                {propuesta?.mensaje ?? 'No hay turnos en espera.'}
+              </p>
+            )}
+
+            {/*
+              ============================ COLA DE ESPERA ============
+
+              La cola vive DENTRO de este panel, no en una tarjeta aparte.
+
+              «Llamar» y la lista de turnos en espera son la MISMA acción con
+              distinto alcance: el siguiente de la cola, o uno concreto. Al
+              estar en dos bloques separados parecían cosas distintas, y por
+              eso se podía pulsar «Llamar a este» en la cola sin pasar por la
+              validación que sí aplica «Llamar». Ahora hay un solo lugar con
+              un solo camino.
+            */}
+            <div className="mt-5 border-t border-gris-200 pt-4">
+              <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
             Cola de espera
           </h2>
           <span className="text-xs text-gris-500">
-            {cola.length} {cola.length === 1 ? 'turno' : 'turnos'} ·{' '}
+            {cargando ? (
+              <span className="esqueleto-bloque inline-block h-3 w-20 rounded align-middle" aria-hidden="true" />
+            ) : (
+              <>
+                {colaFiltrada.length}
+                {filtroTramite ? ` de ${cola.length}` : ''}{' '}
+                {cola.length === 1 ? 'turno' : 'turnos'}
+              </>
+            )}{' '}·{' '}
             <strong className="text-gris-700">Nº de llamada</strong> y{' '}
             posición por trámite (RN-014)
             {actualizado && (
@@ -934,15 +1422,126 @@ export default function Consola() {
             )}
           </span>
         </div>
+        {/*
+          FILTRO POR TRÁMITE.
+
+          Un operador solo puede atender ciertos trámites (los de su módulo), y
+          con 40 turnos mezclados tenía que buscar a ojo cuál era el suyo. Con
+          el filtro, la primera fila de la tabla ya es un candidato real.
+
+          Los botones llevan el número de turnos de cada trámite para que se
+          vea de un golpe dónde hay trabajo, sin tener que filtrar para
+          averiguarlo.
+
+          `aria-pressed` y no un `role="tab"`: no hay paneles que se
+          intercambien, es el mismo listado filtrado. Un lector de pantalla
+          anuncia «Módulo, botón, activado» y funciona.
+        */}
+        {/*
+          BUSCADOR DE PAPEL.
+
+          Va encima de la tabla porque resuelve una duda que la tabla NO puede:
+          la lista solo muestra turnos en espera, así que un papel ya tomado no
+          aparece en ninguna parte. Aquí el operador teclea el código impreso
+          y sabe si todavía vale.
+
+          Se busca por CÓDIGO y no por folio: el folio se reinicia por trámite,
+          así que «folio 1» existe varias veces el mismo día.
+
+          Va FUERA del condicional de los filtros: sirve igual cuando solo hay
+          un trámite en la cola, que es justo cuando más se usa.
+        */}
+        <details className="mt-3 rounded-xl border border-gris-200 bg-gris-50/60">
+          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-gris-700">
+            ¿Este papel ya tiene dueño?
+          </summary>
+          <div className="border-t border-gris-200 p-3">
+            <BuscadorPapel />
+          </div>
+        </details>
+
+        {cola.length > 0 && tramitesEnCola.length > 1 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-gris-100 bg-gris-50/60 px-0 py-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gris-500">
+              Trámite
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setFiltroTramite('')
+                setPaginaCola(1)
+              }}
+              aria-pressed={filtroTramite === ''}
+              className={`etiqueta cursor-pointer transition-colors ${
+                filtroTramite === ''
+                  ? 'bg-navy-800 text-white'
+                  : 'bg-white text-gris-700 ring-1 ring-gris-200 hover:ring-gris-500'
+              }`}
+            >
+              Todos
+              {/*
+                El número iba con `opacity-70`, que sobre el navy-800 del chip
+                activo o el blanco del inactivo caía a 4.14:1 (mínimo 4.5).
+                En vez de translucidez, un tono explícito por estado: el texto
+                hereda el color del chip y se aclara solo cuando el chip es
+                oscuro.
+              */}
+              <span
+                className={`tabular-nums ${
+                  filtroTramite === ''
+                    ? 'text-white/85'
+                    : 'text-gris-500'
+                }`}
+              >
+                {cola.length}
+              </span>
+            </button>
+            {tramitesEnCola.map((t) => {
+              const activo = filtroTramite === t.clave
+              return (
+                <button
+                  key={t.clave}
+                  type="button"
+                  onClick={() => {
+                    // Al cambiar de filtro se vuelve a la primera página: si
+                    // se quedara en la 3 y el filtro deja 4 turnos, la tabla
+                    // saldría vacía.
+                    setFiltroTramite(activo ? '' : t.clave)
+                    setPaginaCola(1)
+                  }}
+                  aria-pressed={activo}
+                  title={t.denominacion}
+                  className={`etiqueta cursor-pointer transition-colors ${
+                    activo
+                      ? 'bg-navy-800 text-white'
+                      : 'bg-white text-gris-700 ring-1 ring-gris-200 hover:ring-gris-500'
+                  }`}
+                >
+                  {t.clave}
+                  <span
+                    className={`tabular-nums ${
+                      activo ? 'text-white/85' : 'text-gris-500'
+                    }`}
+                  >
+                    {t.n}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {cargando ? (
-          <Vacio titulo="Cargando…" />
+          /* Mismo esqueleto que la tabla real: 6 columnas, 10 filas. Al llegar
+             los datos no hay salto de altura. */
+          <EsqueletoTabla columnas={6} filas={10} />
         ) : cola.length === 0 ? (
           <Vacio
             titulo="No hay nadie en espera"
             detalle="Los turnos emitidos y no atendidos se ordenan aquí por prioridad y fecha."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="transicion-datos overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gris-50 text-left text-xs text-gris-700">
                 <tr>
@@ -967,8 +1566,19 @@ export default function Consola() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gris-100">
-                {cola.map((f) => (
+              {/*
+                `key` por página: React reutiliza las filas si solo cambian los
+                datos, y entonces la animación de barrido no se volvería a
+                disparar. Al cambiar la clave, el `tbody` se remonta y la
+                animación CSS corre de nuevo en cada cambio de página.
+              */}
+              <tbody
+                key={`pagina-${paginaActual}`}
+                className={`divide-y divide-gris-100 ${
+                  direccion === 'derecha' ? 'barrido-derecha' : 'barrido-izquierda'
+                }`}
+              >
+                {colaPagina.map((f) => (
                   <tr key={f.turno_id} className="hover:bg-gris-50">
                     <td className="px-3 py-2.5">
                       {/*
@@ -1019,14 +1629,27 @@ export default function Consola() {
                         siguen en la cola.
                       */}
                       <div className="flex justify-end gap-1.5">
+                        {/*
+                          QR DEL TURNO (RF-006).
+
+                          El lote no puede traer QR: de una emisión masiva
+                          salen cientos de folios y no hay nadie delante para
+                          escanearlos. El código se pide aquí, cuando el
+                          ciudadano ya está en la ventanilla.
+
+                          Va primero porque es justo lo que se hace al
+                          entregar el turno al ciudadano.
+                        */}
                         <button
                           type="button"
-                          onClick={() => void llamarEste(f.turno_id)}
-                          disabled={ocupado || !periodoAbierto}
+                          onClick={() => void abrirQr(f)}
+                          disabled={ocupado}
                           className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
+                          title="Mostrar el código QR de este turno para entregarlo"
                         >
-                          Llamar a este
+                          QR
                         </button>
+
                         {/*
                           Un turno emitido por error (trámite equivocado)
                           no se podía cancelar: había que llamarlo y
@@ -1051,7 +1674,116 @@ export default function Consola() {
             </table>
           </div>
         )}
-      </section>
+
+        {/*
+          El paginador va dentro de la tarjeta, al pie de la tabla, para que se
+          lea como parte de ella y no como una sección aparte.
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gris-100 px-0 py-4">
+          <p className="text-xs text-gris-500" role="status" aria-live="polite">
+            {colaFiltrada.length === 0
+              ? 'Sin turnos en espera'
+              : `Mostrando ${(paginaActual - 1) * POR_PAGINA + 1}–${Math.min(
+                  paginaActual * POR_PAGINA,
+                  colaFiltrada.length,
+                )} de ${colaFiltrada.length}`}
+          </p>
+          <Paginador
+            total={colaFiltrada.length}
+            pagina={paginaActual}
+            porPagina={POR_PAGINA}
+            onCambiar={setPaginaCola}
+          />
+              </div>
+            </div>
+
+            {/*
+              CONFIRMACIÓN DE LA LLAMADA.
+
+              Solo confirma: «llamaste a este». Los botones para gestionarlo
+              (Repetir, Omitir, Cancelar, Iniciar atención) se han quitado de
+              aquí porque ya están en «En atención ahora», justo arriba.
+
+              Antes estaban en LOS DOS sitios, así que un turno recién llamado
+              mostraba cuatro botones idénticos duplicados en la misma
+              pantalla. Se conservaba la copia de arriba porque al recargar la
+              página el turno seguía en `CALLED` pero este panel ya no existía:
+              el panel persistente es el que garantiza que las acciones
+              siempre estén disponibles. El de aquí es solo un acuse.
+            */}
+            {turnoLlamado && (
+              <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-azul-200 bg-azul-50 p-4">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-azul-500 text-white">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </span>
+                <p className="min-w-0 flex-1 text-sm text-navy-800">
+                  Llamando a{' '}
+                  <strong className="font-black">{turnoLlamado.codigo_turno}</strong>
+                  {' · '}
+                  {turnoLlamado.denominacion_tramite}
+                  {turnoLlamado.codigo_modulo ? ` · ${turnoLlamado.codigo_modulo}` : ''}
+                </p>
+                <p className="text-xs text-gris-700">
+                  Gestiónelo en «En atención ahora», arriba.
+                </p>
+              </div>
+            )}
+
+          </section>
+        </div>
+      </div>
+
+
+      {/*
+        LOS RETIRADOS (RF-033).
+
+        Cuando el titular se opone al tratamiento, el turno se cancela: el
+        derecho a oponerse exige cesar, no esperar. Por eso **no está en la
+        cola de espera** (esa solo trae los que esperan) y, sin esta tarjeta,
+        el turno desaparecía de la pantalla sin dejar rastro: el operador no
+        sabía si el ciudadano se había retirado o si el sistema lo había
+        perdido.
+
+        Aquí está el rastro, con lo que el titular escribió. No se puede
+        llamar a estos turnos: están cancelados.
+      */}
+      {retirados.length > 0 && (
+        <section className="tarjeta mb-6 overflow-hidden">
+          <div className="border-b border-gris-100 px-6 py-4">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+              Retirados por el titular
+            </h2>
+            <p className="mt-0.5 text-xs text-gris-500">
+              {retirados.length}{' '}
+              {retirados.length === 1 ? 'ciudadano se opuso' : 'ciudadanos se opusieron'}{' '}
+              a que se atendiera su turno. No se llamarán.
+            </p>
+          </div>
+          <ul className="divide-y divide-gris-100">
+            {retirados.map((r) => (
+              <li key={r.turno_id} className="px-6 py-4">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-bold text-navy-800">{r.codigo_turno}</span>
+                  <span className="text-sm text-gris-700">
+                    {r.denominacion_tramite}
+                  </span>
+                  {r.codigo_modulo && (
+                    <span className="text-xs text-gris-500">
+                      módulo {r.codigo_modulo}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 rounded bg-ambar-50 px-2 py-1.5 text-sm text-ambar-600">
+                  «{r.consideracion}»
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
 
       {/*
         LA CONFIRMACIÓN DE LA LLAMADA (RF-029).
@@ -1141,11 +1873,118 @@ export default function Consola() {
         entera de la jornada. Ahora pide confirmación y dice exactamente
         cuántos turnos se van a perder.
       */}
+      {/*
+        QR DEL TURNO (RF-006).
+
+        Se muestra en un diálogo y no en la fila de la tabla: el código
+        necesita tamaño para escanearse desde un teléfono, y la tabla ya va
+        apretada. Aquí se puede imprimir o dejar en pantalla para que el
+        ciudadano lo escanee.
+      */}
+      {qrTurno && (
+        <Modal titulo={`Código QR · ${qrTurno.codigo}`} onCerrar={() => setQrTurno(null)}>
+          {/*
+            `impresion-boleto`: al imprimir, el CSS deja visible SOLO esta
+            tarjeta y oculta el resto de la página. Es el mismo mecanismo del
+            boleto recién emitido, para que el papel salga igual en los dos
+            casos.
+          */}
+          <div className="impresion-boleto space-y-4 text-center">
+            <p className="text-sm text-gris-700">
+              Entregue este código al ciudadano. Al escanearlo verá su turno y su
+              posición en la fila.
+            </p>
+
+            {/*
+              El QR con «abrir enlace» anclado en su esquina superior derecha.
+
+              Va aquí y no en la fila de botones porque su significado es
+              «abrir ESTO»: pegado al código, la relación se entiende sin
+              leer nada. Es la salida de emergencia (QR borroso, impresora
+              caída, ciudadano sin cámara), por eso se queda discreto y con
+              nombre accesible propio.
+            */}
+            <div className="relative mx-auto w-fit rounded-xl bg-gris-50 p-4 no-imprimir">
+              <CodigoQR valor={urlQr} tamano={240} />
+              <a
+                href={urlQr}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute right-2 top-2 rounded-lg bg-white/90 p-1 text-gris-700 shadow-sm transition-colors hover:bg-white hover:text-azul-600"
+                aria-label="Abrir el enlace del turno en otra pestaña. Solo si el QR no sirvió."
+                title="Solo si el QR no sirvió. Abre el turno en otra pestaña."
+              >
+                <span className="ci--external-link" aria-hidden="true" />
+              </a>
+            </div>
+
+            {/* El QR que se imprime, sin el botón encima. */}
+            <div className="hidden print:flex justify-center rounded-xl bg-gris-50 p-4">
+              <CodigoQR valor={urlQr} tamano={240} />
+            </div>
+
+            <p className="font-mono text-2xl font-black tracking-tight text-navy-800">
+              {qrTurno.codigo}
+            </p>
+
+            {/*
+              COPIAR, pegado al enlace que copia. El botón va encima del texto
+              y no en la fila inferior: antes había que adivinar qué copiaba.
+              Ahora está donde está lo que copia.
+            */}
+            <div className="mx-auto w-full max-w-md">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gris-500">
+                  Enlace del turno
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void copiarQr()}
+                  className="rounded-lg p-1.5 text-gris-700 transition-colors hover:bg-gris-50 hover:text-azul-600"
+                  aria-label="Copiar el enlace del turno"
+                  title="Copiar el enlace del turno"
+                >
+                  <span className="andrsrxn--copy" aria-hidden="true" />
+                </button>
+              </div>
+              <p className="break-all rounded-lg bg-gris-50 px-3 py-2 font-mono text-xs text-azul-600 no-imprimir">
+                {urlQr}
+              </p>
+            </div>
+            <p className="text-xs text-gris-500">
+              No contiene datos personales: solo el número aleatorio del turno.
+            </p>
+
+            <div className="no-imprimir flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setQrTurno(null)} className="boton-secundario">
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="boton-primario whitespace-nowrap"
+              >
+                Imprimir QR
+              </button>
+            </div>
+
+            {/*
+              `role="status"`: el aviso de copiado aparece sin recargar, y un
+              lector de pantalla no se enteraría de que la acción se hizo
+              (WCAG 4.1.3).
+            */}
+            <p role="status" aria-live="polite" className="sr-only">
+              {copiadoQr ? 'Enlace copiado al portapapeles' : ''}
+            </p>
+          </div>
+        </Modal>
+      )}
+
       {confirmandoCierre && periodoAbierto && (
         <Modal titulo="Cerrar el periodo" onCerrar={() => setConfirmandoCierre(false)}>
           <div className="space-y-4">
             <p className="text-sm text-gris-700">
-              Al cerrar el periodo <strong>{periodoAbierto.clave}</strong>:
+              Al cerrar el periodo <strong>{formatearFecha(periodoAbierto.clave)}</strong>:
             </p>
             <ul className="space-y-2 rounded-lg bg-ambar-50 p-3 text-sm text-ambar-600">
               <li>
@@ -1308,7 +2147,21 @@ export default function Consola() {
           </form>
         </Modal>
       )}
-    </Disposicion>
+
+      {/*
+        El lote emitido se confirma con una notificación flotante, no con una
+        tarjeta. Antes ocupaba un `<section className="tarjeta">` entero con su
+        título, el total y una fila de folios, y quedaba ahí el resto de la
+        jornada. Era demasiado peso para un dato que se consulta una vez.
+      */}
+      {loteEmitido && (
+        <NotificacionLote
+          total={loteEmitido.total}
+          codigos={loteEmitido.turnos.map((t) => t.codigo)}
+          onCerrar={() => setLoteEmitido(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -1350,37 +2203,423 @@ function TarjetaCifra({
     ),
   }
   return (
+    /*
+      Tarjeta de cifra con el estilo de tarjeta «de cristal mate».
+
+      `--cifra-fondo` y `--cifra-grano` son las dos variables que el overlay
+      necesita; se declaran aquí y no en el CSS para que la tarjeta destacada
+      (azul) tenga su propio grano en vez del gris.
+    */
     <div
-      className={`rounded-xl border p-4 shadow-sm ${
+      className="cifra"
+      style={
         destacado
-          ? 'border-azul-600 bg-azul-600 text-white'
-          : 'border-gris-200 bg-white text-navy-800'
-      }`}
+          ? ({ '--cifra-fondo': '#0f66d4', '--cifra-grano': '#0a4a9e' } as React.CSSProperties)
+          : ({ '--cifra-fondo': '#eef3f9', '--cifra-grano': '#a8b7c9' } as React.CSSProperties)
+      }
     >
-      <p
-        className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
-          destacado ? 'text-azul-100' : 'text-gris-500'
+      <div className="cifra-velo" />
+      <div
+        className={`cifra-cuerpo ${
+          destacado ? 'bg-azul-600 text-white' : 'bg-white text-navy-900'
         }`}
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+        <p
+          className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
+            destacado ? 'text-azul-100' : 'text-gris-700'
+          }`}
         >
-          {trazos[icono]}
-        </svg>
-        {rotulo}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {trazos[icono]}
+          </svg>
+          {rotulo}
+        </p>
+        <p className="mt-1.5 text-3xl font-black leading-none tracking-tight">{valor}</p>
+        <p className={`mt-1.5 text-xs ${destacado ? 'text-azul-100' : 'text-gris-700'}`}>
+          {pie}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Emisión masiva de turnos (migración 009).
+ *
+ * Dos formas de llenar el lote, que es lo que se pidió:
+ *   - Repartir un total entre varios trámites (100 = 25 + 25 + 50).
+ *   - Poner cuántos de cada trámite por separado.
+ *
+ * En ambos casos lo que viaja a la base es la misma lista de lotes, y la base
+ * emite todo en una sola transacción: o salen todos, o no sale ninguno.
+ */
+function EmisionMasiva({
+  tramites,
+  lotes,
+  onCambiar,
+  onEmitir,
+  ocupado,
+}: {
+  tramites: Tramite[]
+  lotes: LoteTurnos[]
+  onCambiar: (l: LoteTurnos[]) => void
+  onEmitir: () => void
+  ocupado: boolean
+}) {
+  /** Cómo se reparte: por cantidades sueltas o repartiendo un total. */
+  const [total, setTotal] = useState('100')
+
+  /*
+   * Contador que se incrementa en cada reparto.
+   *
+   * Un `<input type="number">` no puede animar su contenido: el texto lo
+   * dibuja el navegador, no el DOM, así que no hay nodo al que aplicarle una
+   * animación. La solución es cambiar la `key` del input cuando se reparte:
+   * React lo desmonta y lo monta de nuevo, y el navegador vuelve a pintar el
+   * campo desde cero con la clase de animación puesta.
+   *
+   * Es más barato que construir un contador de cifras con spans, y para un
+   * campo de formulario el remontaje no pierde nada: el valor llega por
+   * `value`.
+   */
+  const [repartos, setRepartos] = useState(0)
+
+  const filas = lotes.length > 0 ? lotes : tramites.slice(0, 2).map((t) => ({ tramite: t.clave, cantidad: 0 }))
+  const suma = filas.reduce((n, l) => n + (Number(l.cantidad) || 0), 0)
+
+  function cambiarCantidad(clave: string, cantidad: number) {
+    const base = filas.map((l) => (l.tramite === clave ? { ...l, cantidad } : l))
+    onCambiar(base)
+  }
+
+  /** Reparte el total a partes iguales y deja el sobrante en el primero. */
+  function repartir(totalTexto: string) {
+    const n = Math.max(0, Math.floor(Number(totalTexto) || 0))
+    if (filas.length === 0) return
+    const porCabeza = Math.floor(n / filas.length)
+    const sobrante = n - porCabeza * filas.length
+    onCambiar(
+      filas.map((l, i) => ({ ...l, cantidad: porCabeza + (i === 0 ? sobrante : 0) })),
+    )
+    // Dispara la animación de las cifras al llegar al campo.
+    setRepartos((n) => n + 1)
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Se elimina la segunda fila de pestañas. Antes había dos controles
+          casi idénticos apilados («Un turno/Varios turnos» y «Por trámite/
+          Repartir total») y no se distinguía cuál cambiaba qué. Ahora el
+          reparto del total es un campo opcional DENTRO del mismo formulario,
+          con su propia etiqueta, así que no compiten dos filas iguales. */}
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <Campo etiqueta="Repartir un total (opcional)">
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                min={1}
+                className="campo flex-1"
+                placeholder="ej. 100"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+              />
+              <BotonRepartir
+                onClick={() => repartir(total)}
+                disabled={!total || Number(total) <= 0}
+                className="shrink-0"
+              >
+                Repartir
+              </BotonRepartir>
+            </div>
+          </Campo>
+        </div>
+      </div>
+      <p className="text-[11px] leading-snug text-gris-700">
+        Escriba cuántos quiere de cada trámite, o un total y pulse «Repartir»
+        para dividirlo en partes iguales.
       </p>
-      <p className="mt-1.5 text-3xl font-black leading-none tracking-tight">{valor}</p>
-      <p className={`mt-1.5 text-xs ${destacado ? 'text-azul-100' : 'text-gris-500'}`}>
-        {pie}
+
+      <div className="space-y-1.5">
+        {filas.map((l) => {
+          const t = tramites.find((x) => x.clave === l.tramite)
+          return (
+            <div
+              key={l.tramite}
+              className="fila-reparto group flex items-center gap-2 rounded-lg px-2 py-1.5"
+            >
+              <label className="min-w-0 flex-1 truncate text-xs text-gris-700">
+                <span className="font-semibold">{l.tramite}</span>
+                {t ? ` — ${t.denominacion}` : ''}
+              </label>
+
+              {/*
+                Contador − / + con el número en medio.
+
+                Antes era un `<input type="number">` suelto, con las flechas
+                nativas del navegador: en Chrome son dos triángulos de 6 px
+                pegados al borde y en Firefox una columna gris distinta. No
+                quedaban igual en ningún navegador y en pantalla táctil eran
+                casi imposibles de acertar.
+
+                Ahora son botones de 26 px (el mínimo cómodo para un dedo),
+                con el valor como input de ancho fijo en medio.
+              */}
+              <div className="contador-turnos shrink-0">
+                <button
+                  type="button"
+                  onClick={() => cambiarCantidad(l.tramite, Math.max(0, l.cantidad - 1))}
+                  disabled={l.cantidad <= 0}
+                  aria-label={`Restar uno a ${l.tramite}`}
+                  className="contador-turnos-boton"
+                >
+                  <span className="contador-turnos-signo" aria-hidden="true" />
+                </button>
+                <input
+                  /*
+                   * La `key` incluye el número de repartos: al pulsar
+                   * «Repartir» cambia, React vuelve a montar el campo y la
+                   * clase `cifra-sube` arranca la animación de entrada.
+                   *
+                   * Sin `repartos` en la clave, el input solo se actualizaría
+                   * de valor y no habría animación: el número aparecería de
+                   * golpe.
+                   */
+                  key={`${l.tramite}-${repartos}`}
+                  type="number"
+                  min={0}
+                  aria-label={`Cantidad para ${l.tramite}`}
+                  className={`contador-turnos-valor ${
+                    repartos > 0 && l.cantidad > 0 ? 'cifra-sube' : ''
+                  }`}
+                  value={l.cantidad}
+                  onChange={(e) => cambiarCantidad(l.tramite, Number(e.target.value) || 0)}
+                />
+                <button
+                  type="button"
+                  onClick={() => cambiarCantidad(l.tramite, l.cantidad + 1)}
+                  aria-label={`Sumar uno a ${l.tramite}`}
+                  className="contador-turnos-boton"
+                >
+                  <span className="contador-turnos-signo contador-turnos-signo--mas" aria-hidden="true" />
+                </button>
+              </div>
+
+              {/*
+                Quitar del reparto. No borra el trámite del catálogo: solo lo
+                saca de este lote. Por eso el icono es una papelera y no una
+                «X», que sugeriría cerrar algo.
+              */}
+              <button
+                type="button"
+                onClick={() => onCambiar(filas.filter((x) => x.tramite !== l.tramite))}
+                aria-label={`Sacar ${l.tramite} del reparto`}
+                className="boton-quitar-reparto shrink-0"
+              >
+                <span className="icono-papelera" aria-hidden="true" />
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/*
+        Añadir trámites al lote: uno a uno, o todos de golpe.
+
+        El botón alterna entre «Añadir todos» y «Quitar todos» según si el lote
+        ya está completo:
+
+          faltan trámites → «Añadir todos»  (mete los que faltan)
+          están todos     → «Quitar todos»  (vacía el lote)
+
+        Antes, al añadir todos el botón desaparecía y no había forma de
+        deshacerlo sin sacar los trámites uno por uno con la papelera. Alternar
+        deja el regreso a un clic.
+
+        El selector de trámite suelto solo se muestra mientras falte alguno: si
+        ya están todos dentro, su lista estaría vacía.
+      */}
+      <div className="flex flex-col items-center gap-1.5">
+        {tramites.length > filas.length && (
+          <Selector
+            etiqueta="Añadir otro trámite al reparto"
+            className="w-full"
+            /*
+             * El valor siempre es `''`: este control es una ACCIÓN, no una
+             * selección. Al elegir un trámite se añade a la lista y el campo
+             * vuelve a su texto inicial, para poder añadir otro seguido.
+             *
+             * Por eso `onCambiar` añade y no guarda nada.
+             */
+            valor=""
+            onCambiar={(clave) => {
+              if (clave) onCambiar([...filas, { tramite: clave, cantidad: 0 }])
+            }}
+            opciones={[
+              { valor: '', etiqueta: 'Añadir otro trámite…' },
+              ...tramites
+                .filter((t) => !filas.some((l) => l.tramite === t.clave))
+                .map((t) => ({ valor: t.clave, etiqueta: `${t.clave} — ${t.denominacion}` })),
+            ]}
+          />
+        )}
+        {tramites.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              tramites.length > filas.length
+                ? /* Añadir: se conservan las cantidades ya escritas y los
+                     trámites nuevos entran en cero. */
+                  onCambiar(
+                    tramites.map((t) => {
+                      const ya = filas.find((l) => l.tramite === t.clave)
+                      return { tramite: t.clave, cantidad: ya ? ya.cantidad : 0 }
+                    }),
+                  )
+                : /* Quitar: se vacía el lote entero. */
+                  onCambiar([])
+            }
+            /*
+             * `self-center` lo centra en la columna: el botón es más estrecho
+             * que el selector de arriba y, alineado a la izquierda, quedaba
+             * colgando de una esquina.
+             */
+            className={`boton-secundario self-center text-xs ${
+              tramites.length > filas.length ? '' : 'boton-quitar-todos'
+            }`}
+          >
+            {tramites.length > filas.length ? 'Añadir todos' : 'Quitar todos'}
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-gris-200 pt-2.5">
+        <span className="text-xs text-gris-700">Total a emitir</span>
+        <span className="text-lg font-black text-navy-800">{suma}</span>
+      </div>
+
+      {/*
+        Mismo componente que el botón de un turno: el efecto del boleto (el
+        icono se estira y el texto se desvanece al pasar el cursor) es ya la
+        señal visual de «esto emite turnos», así que también aplica al lote.
+        Antes era un `boton-primario` plano y los dos botones de emisión se
+        veían distintos sin motivo.
+      */}
+      <BotonEmitir
+        onClick={onEmitir}
+        disabled={ocupado || suma <= 0}
+        className="w-full"
+      >
+        {suma > 0 ? `Emitir ${suma} turnos` : 'Emitir lote'}
+      </BotonEmitir>
+      <p className="text-[11px] leading-snug text-gris-500">
+        Si un trámite del lote falla, no se emite ninguno: el lote es completo o no
+        existe.
       </p>
     </div>
+  )
+}
+
+/**
+ * Aviso programado al siguiente turno (migración 009).
+ *
+ * El operador ve las opciones que la dependencia habilitó en `configuracion`
+ * (5, 10 y 15 minutos por defecto) y elige una. Al cumplirse el plazo, al
+ * ciudadano que está en esa posición de la cola le llega la notificación.
+ */
+export function PanelAviso({
+  minutos,
+  programado,
+  onProgramar,
+  onCancelar,
+  ocupado,
+  deshabilitado,
+  cargando,
+}: {
+  minutos: number[]
+  programado: { codigo: string; minutos: number } | null
+  onProgramar: (m: number) => void
+  onCancelar: () => void
+  ocupado: boolean
+  deshabilitado: boolean
+  /** Mientras carga no se puede afirmar que no hay turnos a los que avisar. */
+  cargando: boolean
+}) {
+  return (
+    <section className="tarjeta p-6">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+        Avisar al siguiente
+      </h2>
+      {cargando ? (
+        <div className="mt-3 space-y-3" aria-busy="true">
+          <span className="sr-only">Cargando el aviso al siguiente turno…</span>
+          <div aria-hidden="true" className="esqueleto-bloque h-3 w-full rounded" />
+          <div aria-hidden="true" className="esqueleto-bloque h-3 w-4/5 rounded" />
+          <div aria-hidden="true" className="mt-4 grid grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="esqueleto-bloque h-9 rounded-lg" />
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
+      <p className="mt-1 text-xs leading-snug text-gris-500">
+        Elige con cuánta anticipación quiere que le llegue el aviso al turno que
+        sigue en la cola.
+      </p>
+
+      {programado && (
+        <div className="mt-3 flex items-center justify-between rounded-lg bg-verde-50 px-3 py-2">
+          <span className="text-xs text-navy-800">
+            <span className="font-bold">{programado.codigo}</span> avisado en{' '}
+            <span className="font-bold">{programado.minutos} min</span>
+          </span>
+          <button
+            type="button"
+            onClick={onCancelar}
+            disabled={ocupado}
+            className="text-xs font-semibold text-navy-800 underline"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {minutos.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onProgramar(m)}
+            disabled={ocupado || deshabilitado}
+            className="boton-secundario text-sm"
+          >
+            {/* El nombre accesible lo da el texto del botón. Un aria-label
+                distinto («Avisar en 5 minutos») rompe WCAG 2.5.3: el nombre
+                debe CONTENER el texto visible, o quien dicta «5 min» por voz
+                no activa nada. El contexto lo pone el título del panel. */}
+            {m} min
+          </button>
+        ))}
+      </div>
+
+      {deshabilitado && (
+        <p className="mt-2 text-[11px] leading-snug text-gris-500">
+          No hay turnos en espera a los que avisar.
+        </p>
+      )}
+      </>
+      )}
+    </section>
   )
 }

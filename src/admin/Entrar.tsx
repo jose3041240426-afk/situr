@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { Aviso, Campo, Marca } from '../components/ui'
+import { Aviso, Campo } from '../components/ui'
 
 /**
  * SITUR — Acceso del operador.
@@ -59,9 +59,6 @@ export default function Entrar() {
     <main className="flex min-h-screen items-center justify-center bg-navy-800 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3">
-            <Marca tamano="lg" />
-          </div>
           <h1 className="text-2xl font-black text-white">SITUR</h1>
           <p className="mt-1 text-sm text-gris-200">
             Sistema de Gestión y Seguimiento de Turnos
@@ -193,7 +190,7 @@ function InscripcionMFA() {
                     )}
                   </div>
                   {secreto && (
-                    <p className="break-all rounded-lg bg-gris-50 px-3 py-2 font-mono text-xs text-azul-500">
+                    <p className="break-all rounded-lg bg-gris-50 px-3 py-2 font-mono text-xs text-azul-600">
                       {secreto}
                     </p>
                   )}

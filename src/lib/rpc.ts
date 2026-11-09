@@ -11,7 +11,10 @@ import type {
   PeriodoOperativo,
   PrioridadTurno,
   PropuestaSiguiente,
+  LoteTurnos,
   RespuestaGenerarTurno,
+  RespuestaGenerarTurnosMasivos,
+  RespuestaProgramarAviso,
   RespuestaLlamarSiguiente,
   RespuestaOperacionTurno,
   RespuestaPeriodo,
@@ -138,6 +141,47 @@ export async function generarTurno(
     p_tramite_id: tramiteId,
     p_prioridad: prioridad ?? null,
   })
+}
+
+/**
+ * Emite un lote de turnos en una sola transacción (migración 009).
+ *
+ * Ejemplo: 25 del trámite A y 25 del trámite B en una sola llamada. Es
+ * atómica: si un trámite del lote no es válido, no se emite ninguno.
+ */
+export async function generarTurnosMasivos(
+  lotes: LoteTurnos[],
+): Promise<RespuestaGenerarTurnosMasivos> {
+  return rpc<RespuestaGenerarTurnosMasivos>('generar_turnos_masivos', {
+    p_lotes: lotes,
+  })
+}
+
+/**
+ * Programa el aviso push del siguiente turno de la cola (migración 009).
+ *
+ * Los minutos permitidos los decide la dependencia en `configuracion`; la
+ * consola los pide con `opcionesAviso()` para no ofrecer un valor que la
+ * base vaya a rechazar.
+ */
+export async function programarAvisoSiguiente(
+  minutos: number,
+  tramiteId?: string | null,
+): Promise<RespuestaProgramarAviso> {
+  return rpc<RespuestaProgramarAviso>('programar_aviso_siguiente', {
+    p_minutos: minutos,
+    p_tramite_id: tramiteId ?? null,
+  })
+}
+
+/** Deshace un aviso programado que todavía no ha salido. */
+export async function cancelarAvisoSiguiente(turnoId: string): Promise<boolean> {
+  return rpc<boolean>('cancelar_aviso_siguiente', { p_turno_id: turnoId })
+}
+
+/** Los minutos que la consola puede ofrecer (5, 10, 15 por defecto). */
+export async function opcionesAviso(): Promise<number[]> {
+  return rpc<number[]>('opciones_aviso_minutos', {})
 }
 
 /**
@@ -275,6 +319,67 @@ export async function listarCola(): Promise<FilaCola[]> {
 }
 
 /**
+ * El token público de un turno, para pintar su código QR desde la cola.
+ *
+ * El QR no se genera al emitir un lote: de un lote salen cientos de folios y
+ * el ciudadano no está delante para escanear ninguno. Aquí el operador ya
+ * tiene a la persona en la ventanilla, así que el QR se pide para ESE turno y
+ * se imprime o se dicta en ese momento.
+ *
+ * El token no revela nada del ciudadano: es un número aleatorio que solo
+ * sirve para abrir `/turno/{token}` (RF-017).
+ */
+/**
+ * Resultado de consultar un papel en recepción.
+ *
+ * Se busca por `codigo` y no por `folio` porque el folio NO es único: cada
+ * trámite lleva su propio contador (`uq_turnos_periodo_tramite_folio`), así que
+ * «folio 1» existe tres veces el mismo día.
+ */
+export type ConsultaTurno = {
+  turno_id: string
+  codigo_turno: string
+  folio: number
+  estado: string
+  tiene_dueno: boolean
+  nombre_trabajador: string | null
+  codigo_modulo: string | null
+  clave_tramite: string
+  denominacion_tramite: string
+  creado_en: string
+  llamado_en: string | null
+}
+
+/**
+ * ¿Este papel todavía vale o alguien ya lo tomó?
+ *
+ * Devuelve `null` cuando el código no existe, para que la interfaz pueda decir
+ * «no encontrado» sin tratarlo como error.
+ */
+export async function consultarTurnoPorCodigo(codigo: string): Promise<ConsultaTurno | null> {
+  const limpio = codigo.trim()
+  if (!limpio) return null
+
+  const { data, error } = await supabase.rpc('consultar_turno_por_codigo', { p_codigo: limpio })
+  if (error) throw traducirError(error)
+
+  /* La función es `RETURNS TABLE`, así que PostgREST devuelve un arreglo con
+     cero o una fila, nunca un objeto suelto. */
+  const filas = (data ?? []) as ConsultaTurno[]
+  return filas[0] ?? null
+}
+
+export async function tokenDeTurno(turnoId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('token_publico')
+    .eq('id', turnoId)
+    .single()
+  if (error) throw traducirError(error)
+  return (data as { token_publico: string }).token_publico
+}
+
+/**
  * Los turnos en curso, para la consola del operador.
  *
  * El operador tiene sesión, así que la RLS le deja leer la vista. Esta
@@ -394,6 +499,34 @@ export async function listarPeriodos(): Promise<PeriodoOperativo[]> {
 }
 
 /**
+ * El periodo abierto, o `null` si no hay ninguno. Se llama así, y no
+ * `periodoAbierto`, para no chocar con la variable de estado de la consola.
+ *
+ * Dos diferencias con `listarPeriodos()`, y las dos importan:
+ *
+ *   1. Filtra en la base. `listarPeriodos()` trae TODOS los periodos
+ *      históricos y el cliente elegía el abierto con `.find()`. Con años de
+ *      operación eso es una lista creciente para usar un solo elemento.
+ *
+ *   2. Es una consulta propia, no va dentro del `Promise.all` de la consola.
+ *      Así el estado del periodo (y su botón) no espera a las otras seis
+ *      consultas: aparece en cuanto llega esta.
+ *
+ * `maybeSingle()` y no `single()`: «no hay periodo abierto» es un estado
+ * normal —al empezar el día—, no un error. Con `single()` PostgREST
+ * devolvería un 406 y habría que tratar el caso como excepción.
+ */
+export async function obtenerPeriodoAbierto(): Promise<PeriodoOperativo | null> {
+  const { data, error } = await supabase
+    .from('periodos_operativos')
+    .select('*')
+    .eq('estado', 'ABIERTO')
+    .maybeSingle()
+  if (error) throw traducirError(error)
+  return (data as PeriodoOperativo | null) ?? null
+}
+
+/**
  * Usuarios. La vista de `usuarios` no existe: se lee la tabla con el join a
  * `apellidos` y `roles`, que es lo que hace la política `p_usuarios_admin`
  * (administradores) y `p_usuarios_propio` (el propio usuario).
@@ -453,15 +586,60 @@ export async function asignarModuloUsuario(
 // UTILIDADES DE PRESENTACIÓN
 // ===========================================================================
 
-/** Formatea una marca de tiempo en `America/Mazatlan` (RG-001). */
-export function formatearFechaHora(iso: string | null | undefined): string {
+/**
+ * Formatea una fecha como `dd/mm/aaaa`, que es el orden que se usa en México.
+ *
+ * `dateStyle: 'medium'` de `es-MX` produce «8 nov 2026», con el mes en medio.
+ * Aquí se pide explícitamente día/mes/año en dos dígitos.
+ *
+ * Acepta tanto una marca ISO completa (`2026-11-08T15:04:05Z`) como la clave
+ * de un periodo, que ya viene como `2026-11-08`.
+ */
+export function formatearFecha(iso: string | null | undefined): string {
   if (!iso) return '—'
+
+  // Una clave `aaaa-mm-dd` se interpreta como fecha local. `new Date('2026-11-08')`
+  // la trataría como UTC y en México se vería el día anterior.
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (soloFecha) {
+    const [, a, m, d] = soloFecha
+    return `${d}/${m}/${a}`
+  }
+
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
   return new Intl.DateTimeFormat('es-MX', {
     timeZone: 'America/Mazatlan',
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(d)
+}
+
+/** Formatea una marca de tiempo como `dd/mm/aaaa hh:mm` (RG-001). */
+export function formatearFechaHora(iso: string | null | undefined): string {
+  if (!iso) return '—'
+
+  /*
+   * Una clave `aaaa-mm-dd` viene sin hora. Interpretarla con `new Date(iso)`
+   * la trata como medianoche UTC, que en Mazatlán (UTC-7) cae el día anterior
+   * a las 5 de la tarde. Añadirle `T00:00:00` tampoco sirve: eso usa la zona
+   * del RUNTIME (el servidor, no el usuario) y da otro día distinto.
+   *
+   * La única forma segura es fijar la zona objetivo a mano: se fija el
+   * mediodía de Mazatlán, que está lejos de cualquier cambio de día y de
+   * cualquier horario de verano.
+   */
+  const soloFecha = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  const d = new Date(soloFecha ? `${iso}T12:00:00-07:00` : iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('es-MX', {
+    timeZone: 'America/Mazatlan',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(d)
 }
 
@@ -527,3 +705,16 @@ export async function manifestarConsideraciones(
 }
 
 
+
+/**
+ * Cuántos turnos CALLED+SERVING puede tener abiertos un operador (migración
+ * 010).
+ *
+ * El valor vive en `configuracion` para que la dependencia lo ajuste sin
+ * recompilar, igual que MAXIMO_TURNOS_LOTE. La consola lo usa para deshabilitar
+ * «Llamar» con un motivo visible en lugar de dejar que el servidor rechace la
+ * llamada sin explicación.
+ */
+export async function maximoEnAtencion(): Promise<number> {
+  return rpc<number>('maximo_en_atencion', {})
+}

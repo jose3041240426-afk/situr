@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import Disposicion from './Disposicion'
-import { Aviso, Campo, Chip, Modal, Vacio } from '../components/ui'
+import { Aviso, Campo, Chip, EsqueletoTabla, Modal, Vacio } from '../components/ui'
+import Selector from '../components/Selector'
 import { ErrorSitur, asignarModuloUsuario, listarModulos, listarUsuarios } from '../lib/rpc'
 import type { Modulo, Usuario } from '../lib/tipos'
 import { useAuth } from '../lib/auth'
@@ -23,6 +23,16 @@ export default function GestionUsuarios() {
   const [cargando, setCargando] = useState(true)
   const [aviso, setAviso] = useState<{ tono: 'ok' | 'peligro'; texto: string } | null>(null)
   const [editando, setEditando] = useState<Usuario | null>(null)
+
+  /*
+   * Módulo elegido en el diálogo.
+   *
+   * Antes se leía con `document.getElementById('modio-usuario')` al confirmar.
+   * Eso ataba la lógica al DOM y además dependía de un id escrito a mano con
+   * una errata («modio»). Con estado, el valor fluye por React y el botón
+   * puede usar directamente lo que hay seleccionado.
+   */
+  const [moduloElegido, setModuloElegido] = useState('')
 
   const cargar = useCallback(async () => {
     try {
@@ -63,7 +73,7 @@ export default function GestionUsuarios() {
   }
 
   return (
-    <Disposicion titulo="Usuarios">
+    <>
       {aviso && (
         <div className="mb-4">
           <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
@@ -82,7 +92,7 @@ export default function GestionUsuarios() {
           </div>
 
           {cargando ? (
-            <Vacio titulo="Cargando…" />
+            <EsqueletoTabla columnas={4} filas={5} />
           ) : usuarios.length === 0 ? (
             <Vacio
               titulo="Sin usuarios registrados"
@@ -104,7 +114,7 @@ export default function GestionUsuarios() {
                 <tbody className="divide-y divide-gris-100">
                   {usuarios.map((u) => (
                     <tr key={u.id} className="hover:bg-gris-50">
-                      <td className="px-4 py-2.5 font-mono text-xs text-azul-500">
+                      <td className="px-4 py-2.5 font-mono text-xs text-azul-600">
                         {u.numero_empleado}
                       </td>
                       <td className="px-4 py-2.5">
@@ -134,7 +144,23 @@ export default function GestionUsuarios() {
                       <td className="px-4 py-2.5">
                         <button
                           type="button"
-                          onClick={() => setEditando(u)}
+                          onClick={() => {
+                            setEditando(u)
+                            /*
+                             * Se precarga el módulo actual al abrir el diálogo.
+                             * Antes lo hacía `defaultValue` del `<select>`, que
+                             * solo actúa al montar; con estado hay que
+                             * inicializarlo aquí o el campo saldría vacío.
+                             *
+                             * `Usuario` trae `modulo_codigo` (no el id), así que
+                             * se busca su id en la lista ya cargada. Si el
+                             * módulo no está en la lista se deja vacío en vez de
+                             * inventar un valor.
+                             */
+                            setModuloElegido(
+                              modulos.find((m) => m.codigo === u.modulo_codigo)?.id ?? '',
+                            )
+                          }}
                           className="boton-secundario px-3 py-1.5 text-xs"
                         >
                           Asignar módulo
@@ -160,20 +186,22 @@ export default function GestionUsuarios() {
               pulsa «llamar siguiente» (RG-004). Si el módulo está pausado, la base
               elige otro activo.
             </p>
-            <Campo etiqueta="Módulo">
-              <select
-                id="modio-usuario"
-                className="selector"
-                defaultValue={editando.modulo_codigo ?? ''}
-              >
-                <option value="">Sin módulo (elige el primero activo)</option>
-                {modulos.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.codigo} — {m.denominacion}
-                    {m.estado !== 'ACTIVO' ? ` (${m.estado})` : ''}
-                  </option>
-                ))}
-              </select>
+            <Campo etiqueta="Módulo" grupo>
+              <Selector
+                etiqueta="Módulo"
+                className="w-full"
+                valor={moduloElegido}
+                onCambiar={setModuloElegido}
+                opciones={[
+                  { valor: '', etiqueta: 'Sin módulo (elige el primero activo)' },
+                  ...modulos.map((m) => ({
+                    valor: m.id,
+                    etiqueta: `${m.codigo} — ${m.denominacion}${
+                      m.estado !== 'ACTIVO' ? ` (${m.estado})` : ''
+                    }`,
+                  })),
+                ]}
+              />
             </Campo>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEditando(null)} className="boton-secundario">
@@ -182,8 +210,7 @@ export default function GestionUsuarios() {
               <button
                 type="button"
                 onClick={() => {
-                  const valor = (document.getElementById('modio-usuario') as HTMLSelectElement).value
-                  void asignar(editando, valor || null)
+                  void asignar(editando, moduloElegido || null)
                 }}
                 className="boton-primario"
               >
@@ -193,6 +220,6 @@ export default function GestionUsuarios() {
           </div>
         </Modal>
       )}
-    </Disposicion>
+    </>
   )
 }
