@@ -222,7 +222,7 @@ export default function TurnoCiudadano() {
   useEffect(() => {
     if (!turno) return
     if (turno.estado === 'CALLED') {
-      setAvisoEnPantalla('Su turno fue llamado. Acuda a ' + (turno.codigo_modulo ?? 'su módulo') + '.')
+      setAvisoEnPantalla('Su turno fue llamado. Acuda a ' + (turno.modulo ?? 'su módulo') + '.')
     } else if (turno.estado === 'SKIPPED' || turno.estado === 'CANCELLED' || turno.estado === 'COMPLETED') {
       setAvisoEnPantalla(null)
     }
