@@ -1,16 +1,32 @@
 # SITUR — Sistema Web de Gestión y Seguimiento de Turnos
 
-**Dirección de Catastro · Durango**
+**Dirección de Catastro · Durango** · Proyecto de estadía
+
+![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/despliegue-Vercel-000000?logo=vercel&logoColor=white)
+![Accesibilidad](https://img.shields.io/badge/accesibilidad-0%20hallazgos%20en%207%20pantallas-2ea44f)
+![Tutorial](https://img.shields.io/badge/tutorial-32%20pasos%20con%20capturas-1f6feb)
 
 Aplicación del **DRS v1.9** (documento de requisitos). React 19 + TypeScript
-sobre Vercel, con Supabase (PostgreSQL) como autoridad de los turnos.
+sobre Vercel, con Supabase (PostgreSQL) como autoridad de los turnos: la base
+decide, el navegador solo pide.
 
 > **Qué es este repositorio**: **la aplicación**. El DRS, las migraciones en
 > SQL plano, la suite de 151 aserciones y el tutorial con capturas viven en
 > el proyecto completo, en las carpetas hermanas `migracion/`, `tutorial/` y
 > en la raíz. Lo que sí está aquí es todo lo que hace falta para
-> **desplegar**: el código, las migraciones en el formato de la CLI de
+> **desplegar**: el código, las **20 migraciones** en el formato de la CLI de
 > Supabase (`supabase/migrations/`), la semilla y los scripts de instalación.
+
+| | |
+|---|---|
+| ![Consola del operador](docs/capturas/consola.png) | ![Portal del ciudadano](docs/capturas/portal.png) |
+| **Consola del operador**: emitir, llamar, atender y cerrar la jornada | **Portal del ciudadano**: su turno con el QR, sin cuenta y sin datos |
+| ![El papel ya tiene dueño](docs/capturas/papel.png) | ![Pantalla de la sala](docs/capturas/pantalla.png) |
+| **El papel entregado** se marca en la cola y la fila se ilumina | **Pantalla de la sala** (opcional): las últimas llamadas |
 
 ---
 
@@ -32,6 +48,28 @@ Ciudadano llega a la ventanilla
                   └─ el operador llama  →  el teléfono se repinta solo
                        └─ atiende y finaliza  →  todo queda en la auditoría
 ```
+
+### Lo que hace hoy
+
+- **Emisión por lote.** Doce turnos de una vez, repartidos por trámite, en una
+  sola transacción: o salen todos o no sale ninguno.
+- **El papel impreso ya tiene dueño.** De un lote salen papeles iguales; cuando
+  el operador entrega uno, lo marca desde la cola y la fila se ilumina. Se
+  distingue lo que está en el montón de lo que ya está en la mano de alguien.
+- **Aviso programado y preferencia del ciudadano.** El portal pregunta **después**
+  de mostrar el turno, en dos pasos, y el ciudadano elige si quiere el aviso
+  «rápido» (5 min) o «con tiempo» (15 min). La preferencia sobrevive a la
+  recarga y se puede cambiar.
+- **Límites en la ventanilla.** Un operador no acumula más turnos llamados y en
+  atención de los que permite la configuración, y la consola lo avisa antes de
+  chocar con el tope.
+- **Historial paginado** por fecha y código, con el recorrido completo de cada
+  turno y el motivo de cada transición.
+- **Derecho de oposición (RF-033).** El titular puede retirarse con su token y
+  una consideración; el turno se cancela y la consola avisa con una
+  notificación breve.
+- **Push de verdad (RF-028)** con la pestaña cerrada, y **pantalla de la sala
+  opcional** que sondea la base cada 5 s.
 
 ---
 
@@ -405,10 +443,11 @@ supabase link --project-ref <ref>
 supabase db push          # aplica supabase/migrations/ en orden
 ```
 
-En el proyecto completo hay además una carpeta `migracion/` con las mismas
-migraciones en SQL plano, la **suite de 151 aserciones** y el volcado
-restaurable. No está en este repositorio porque aquí está únicamente la
-aplicación.
+En el proyecto completo hay además una carpeta `migracion/` con las **mismas
+20 migraciones** en SQL plano (`001`–`020`), la **suite de 151 aserciones** y
+el volcado restaurable. No está en este repositorio porque aquí está
+únicamente la aplicación. `migracion/sincronizar-supabase.sh --verificar`
+comprueba que las dos copias no se han separado.
 
 En Supabase no hace falta el `00_stubs.sql` del proyecto completo: el
 esquema `auth`, `auth.uid()` y los roles `anon`/`authenticated`/`service_role`
@@ -735,12 +774,14 @@ app/
 │   ├── suscripcion.ts       Alta/baja de suscripciones push
 │   ├── turno.ts             La consulta pública del turno
 │   └── ultimas-llamadas.ts  La pantalla pública (RF-020)
+├── docs/capturas/            Capturas del README (las saca el tutorial)
 ├── middleware.ts             Límite de tasa (IP + token / IP + cuenta)
 ├── public/
 │   ├── sw.js                 Service Worker: guarda el token y muestra el aviso
 │   └── manifest.webmanifest
 ├── src/
 │   ├── admin/                Consola: Entrar, Consola, Usuarios, Catálogos, Historial, Estadísticas
+│   │                         (+ Esqueletos por pantalla y la disposición del panel)
 │   ├── ciudadano/            Portal del ciudadano y pantalla pública
 │   ├── components/           Piezas visuales (Chip, Modal, QR…)
 │   └── lib/
@@ -764,7 +805,7 @@ app/
 
 ```bash
 npm run typecheck             # TypeScript en modo estricto
-npm run alto-impacto          # accesibilidad y comportamiento, 8 pantallas
+npm run alto-impacto          # accesibilidad y comportamiento, 7 pantallas
 npm run colores               # toda clase de color usada existe en el CSS
 ```
 
@@ -779,11 +820,16 @@ el desbordamiento horizontal a 320/768/1024/1440 px, el contraste calculado
 tras la cascada completa, y que la pantalla pública **muestre** las llamadas
 y que el aviso push **lleve al turno** del ciudadano.
 
-El tutorial con capturas se regenera con:
+El tutorial con capturas (**32 pasos**, PDF de 19 páginas) se regenera con:
 
 ```bash
 pruebas/tutorial.sh           # base limpia + recorrido + TUTORIAL.pdf
 ```
+
+El recorrido se hace contra el **build de producción** servido con
+`vite preview`, no contra el servidor de desarrollo, y cada paso comprueba el
+texto que debe verse antes de fotografiar: si la interfaz cambia, el tutorial
+falla en ese paso en vez de sacar una captura que ya no cuenta lo que dice.
 
 ### Arnés local (opcional)
 
