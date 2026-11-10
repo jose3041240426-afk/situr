@@ -11,3 +11,11 @@ dist
 
 # Secretos de la instalación
 secretos.env
+
+# Backups locales de la sesión (contienen secretos y ruido)
+.env.local.bak-*
+*.bak-*
+*.bak-pre-*
+*.bak2
+*.antes-fix-*
+*.bak

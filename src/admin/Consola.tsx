@@ -33,7 +33,6 @@ import {
   generarTurno,
   generarTurnosMasivos,
   programarAvisoSiguiente,
-  cancelarAvisoSiguiente,
   opcionesAviso,
   maximoEnAtencion,
   iniciarAtencion,
@@ -151,13 +150,7 @@ export default function Consola() {
   >(null)
 
   // Aviso programado al siguiente (migración 009).
-  const [minutosAviso, setMinutosAviso] = useState<number[]>([])
-  const [avisoProgramado, setAvisoProgramado] = useState<{
-    codigos: string[]
-    minutos: number
-    turnos: Array<{ codigo: string; turnoId: string }>
-  } | null>(null)
-
+const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   // Llamada
   const [moduloFiltro, setModuloFiltro] = useState('')
   const [turnoLlamado, setTurnoLlamado] = useState<FilaActual | null>(null)
@@ -176,6 +169,8 @@ export default function Consola() {
   const [modalMotivo, setModalMotivo] = useState<
     { turno: FilaActual; accion: 'omitir' | 'cancelar' } | null
   >(null)
+  /** Turno en atención al que el operador quiere avisar (P13). */
+  const [avisando, setAvisando] = useState<FilaActual | null>(null)
   /*
    * ¿Ya se sabe el estado del periodo?
    *
@@ -499,82 +494,7 @@ export default function Consola() {
     }
   }
 
-  /**
-   * Programa el aviso push de los próximos turnos (migración 014).
-   *
-   * El operador elige 5, 10 o 15 minutos y la base avisa a tantos turnos
-   * como lugares de atención tenga ocupados ahora (CALLED + SERVING, mínimo
-   * uno): con tres abiertos, a los tres siguientes; no solo al primero. Al
-   * cumplirse el plazo les llega la notificación a todos.
-   */
-  async function programarAviso(minutos: number) {
-    setOcupado(true)
-    setAviso(null)
-    try {
-      const r = await programarAvisoSiguiente(minutos)
-      const turnos = r.turnos.map((t) => ({ codigo: t.codigo, turnoId: t.turno_id }))
-      const lista =
-        turnos.length === 1
-          ? turnos[0].codigo
-          : `${turnos
-              .slice(0, -1)
-              .map((t) => t.codigo)
-              .join(', ')} y ${turnos[turnos.length - 1].codigo}`
-
-      setAvisoProgramado({
-        codigos: turnos.map((t) => t.codigo),
-        minutos: r.minutos,
-        turnos,
-      })
-      setAviso({
-        tono: 'ok',
-        texto:
-          turnos.length === 1
-            ? `Aviso programado: al turno ${lista} le llegará la notificación en ${r.minutos} minutos.`
-            : `Aviso programado: a los turnos ${lista} les llegará la notificación en ${r.minutos} minutos.`,
-      })
-      await cargar()
-    } catch (e) {
-      setAviso({
-        tono: 'peligro',
-        texto: e instanceof ErrorSitur ? e.message : 'No se pudo programar el aviso.',
-      })
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  /** Deshace los avisos programados antes de que salgan. */
-  async function cancelarAviso() {
-    if (!avisoProgramado) return
-    setOcupado(true)
-    try {
-      const resultados = await Promise.all(
-        avisoProgramado.turnos.map((t) =>
-          cancelarAvisoSiguiente(t.turnoId).catch(() => false),
-        ),
-      )
-      setAvisoProgramado(null)
-      setAviso({
-        tono: 'ok',
-        texto:
-          resultados.every(Boolean)
-            ? resultados.length === 1
-              ? 'Aviso cancelado.'
-              : 'Avisos cancelados.'
-            : 'Se cancelaron los que seguían pendientes; alguno ya había salido.',
-      })
-    } catch (e) {
-      setAviso({
-        tono: 'peligro',
-        texto: e instanceof ErrorSitur ? e.message : 'No se pudo cancelar el aviso.',
-      })
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  async function llamar() {
+async function llamar() {
     setOcupado(true)
     setAviso(null)
     try {
@@ -1067,47 +987,9 @@ export default function Consola() {
                   Ver
                 </a>
               </div>
-            </section>
+</section>
           )}
 
-          {/* Aviso programado al siguiente turno (migración 009). */}
-          <PanelAviso
-            minutos={minutosAviso}
-            programado={avisoProgramado}
-            onProgramar={(m) => void programarAviso(m)}
-            onCancelar={() => void cancelarAviso()}
-            ocupado={ocupado}
-            deshabilitado={!periodoAbierto || cola.length === 0}
-            cargando={cargando}
-          />
-
-          {/*
-           * Módulos.
-           *
-           * `mb-1` extra: es la última tarjeta de la columna izquierda y en
-           * pantallas anchas queda alineada con el pie de la columna derecha,
-           * así que necesita un poco más de aire abajo para no quedar pegada
-           * al borde de la rejilla.
-           */}
-          <section className="tarjeta mb-1 p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-              Módulos
-            </h2>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {modulos.map((m) => (
-                <Chip key={m.id} tono={m.estado === 'ACTIVO' ? 'ok' : 'neutro'}>
-                  {m.codigo}
-                  {m.estado !== 'ACTIVO' ? ` · ${m.estado === 'PAUSADO' ? 'Pausado' : 'Fuera'}` : ''}
-                </Chip>
-              ))}
-            </div>
-            {operador?.modulo && (
-              <p className="mt-2 text-xs text-gris-500">
-                Su módulo: <strong>{operador.modulo}</strong>. Si está activo, «llamar
-                siguiente» enruta ahí (RG-004).
-              </p>
-            )}
-          </section>
         </div>
 
         {/* ------------------------------------------------ atención */}
@@ -1208,7 +1090,6 @@ export default function Consola() {
                         {t.denominacion_tramite}
                         {t.codigo_modulo ? ` · ${t.codigo_modulo}` : ''}
                         {t.nombre_trabajador ? ` · ${t.nombre_trabajador}` : ''}
-                        {t.llamado_en ? ` · llamado ${formatearSoloHora(t.llamado_en)}` : ''}
                       </p>
                     </div>
                     {/*
@@ -1222,37 +1103,46 @@ export default function Consola() {
                     <div className="flex flex-wrap justify-end gap-1.5">
                       {t.estado === 'CALLED' && (
                         <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void conTurno(
-                                () => repetirLlamada(t.turno_id),
-                                'Llamada repetida.',
-                              )
-                            }
-                            disabled={ocupado}
-                            className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
-                            title="Volver a llamar a este ciudadano"
-                          >
-                            Repetir
-                          </button>
+<button
+                          type="button"
+                          onClick={() =>
+                            void conTurno(
+                              () => repetirLlamada(t.turno_id),
+                              'Llamada repetida.',
+                            )
+                          }
+                          disabled={ocupado}
+                          className="boton-secundario px-2.5 py-1.5"
+                          title="Volver a llamar a este ciudadano"
+                          aria-label={`Repetir la llamada al turno ${t.codigo_turno}`}
+                        >
+                          <span
+                            className="coolicons--repeat-fill text-base"
+                            aria-hidden="true"
+                          />
+                        </button>
                           <button
                             type="button"
                             onClick={() => setModalMotivo({ turno: t, accion: 'omitir' })}
                             disabled={ocupado}
-                            className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
+                            className="boton-omision px-2.5 py-1.5"
                             title="El ciudadano no se presentó. Podrá reponerse en ventanilla."
+                            aria-label={`Omitir el turno ${t.codigo_turno}`}
                           >
-                            Omitir
+                            <span
+                              className="bi--skip-forward-circle-fill text-base"
+                              aria-hidden="true"
+                            />
                           </button>
                           <button
                             type="button"
                             onClick={() => setModalMotivo({ turno: t, accion: 'cancelar' })}
                             disabled={ocupado}
-                            className="boton-peligro px-3 py-1.5 text-xs"
+                            className="boton-peligro px-2.5 py-1.5"
                             title="Se cancela la solicitud del ciudadano. No se puede reponer."
+                            aria-label={`Cancelar el turno ${t.codigo_turno}`}
                           >
-                            Cancelar
+                            <span className="ix--cancelled text-base" aria-hidden="true" />
                           </button>
                           <button
                             type="button"
@@ -1269,21 +1159,36 @@ export default function Consola() {
                             Iniciar atención
                           </button>
                         </>
-                      )}
-                      {t.estado === 'SERVING' && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void conTurno(
-                              () => finalizarTurno(t.turno_id),
-                              'Turno finalizado.',
-                            )
-                          }
-                          disabled={ocupado}
-                          className="boton-ok px-3 py-1.5 text-xs"
-                        >
-                          Finalizar
-                        </button>
+)}
+                       {t.estado === 'SERVING' && (
+                         <>
+                           <button
+                            type="button"
+                            onClick={() => setAvisando(t)}
+                            disabled={ocupado}
+                            className="boton-reloj"
+                            title="Preparar al siguiente turno de la cola"
+                            aria-label="Preparar al siguiente turno de la cola"
+                          >
+                            <span
+                              className="andrsrxn--clock text-lg"
+                              aria-hidden="true"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void conTurno(
+                                () => finalizarTurno(t.turno_id),
+                                'Turno finalizado.',
+                              )
+                            }
+                            disabled={ocupado}
+                            className="boton-finalizar px-3 py-1.5 text-xs"
+                          >
+                            Finalizar
+                          </button>
+                        </>
                       )}
                     </div>
                   </li>
@@ -2192,13 +2097,76 @@ export default function Consola() {
         título, el total y una fila de folios, y quedaba ahí el resto de la
         jornada. Era demasiado peso para un dato que se consulta una vez.
       */}
-      {loteEmitido && (
+{loteEmitido && (
         <NotificacionLote
           total={loteEmitido.total}
           codigos={loteEmitido.turnos.map((t) => t.codigo)}
           onCerrar={() => setLoteEmitido(null)}
         />
       )}
+
+      {avisando && (
+  <Modal
+    titulo="Preparar al siguiente turno"
+    onCerrar={() => setAvisando(null)}
+  >
+    <div className="aviso-modal">
+      <div className="aviso-campana" aria-hidden="true" />
+
+      <p className="text-sm text-gris-700">
+        <strong className="font-semibold text-navy-800">{avisando.codigo_turno}</strong>{' '}
+        está en atención. Elige con cuánta anticipación quieres avisar a los
+        próximos de la cola para que se preparen: recibirán un push que dice
+        que su turno está por llegar.
+      </p>
+
+      {propuesta?.hay_turnos && (
+        <div className="rounded-xl border border-gris-200 bg-gris-50 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gris-500">
+            El siguiente
+          </p>
+          <p className="mt-0.5 text-sm font-bold text-navy-800">
+            {propuesta.codigo_turno}
+            {propuesta.denominacion_tramite
+              ? ` · ${propuesta.denominacion_tramite}`
+              : ''}
+          </p>
+          {propuesta.razon && (
+            <p className="mt-0.5 text-[11px] leading-snug text-gris-700">
+              {propuesta.razon}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="aviso-modal-opciones mt-1 flex flex-wrap justify-center gap-2">
+        {minutosAviso.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={async () => {
+              const ok = await ejecutar(
+                () => programarAvisoSiguiente(m, null),
+                `Aviso programado: los próximos turnos de la cola recibirán la notificación en ${m} minutos.`,
+              )
+              if (ok) setAvisando(null)
+            }}
+            disabled={ocupado}
+            className="boton-secundario boton-aviso-minutos px-4 py-2 text-sm"
+          >
+            {m} min
+          </button>
+        ))}
+      </div>
+
+      <p className="mt-2 text-[11px] leading-snug text-gris-500">
+        Se avisará a tantos turnos como lugares de atención ocupados haya
+        ahora, con un mínimo de uno. El aviso no reserva la ventanilla: solo
+        dice «su turno está por llegar», que es cierto para todos.
+      </p>
+    </div>
+  </Modal>
+)}
     </>
   )
 }
@@ -2565,110 +2533,5 @@ function EmisionMasiva({
         existe.
       </p>
     </div>
-  )
-}
-
-/**
- * Aviso programado a los próximos turnos (migraciones 009 y 014).
- *
- * El operador ve las opciones que la dependencia habilitó en `configuracion`
- * (5, 10 y 15 minutos por defecto) y elige una. Al cumplirse el plazo les
- * llega la notificación a tantos turnos de la cola como lugares de atención
- * haya ocupados en ese momento (mínimo uno), no solo al primero.
- */
-export function PanelAviso({
-  minutos,
-  programado,
-  onProgramar,
-  onCancelar,
-  ocupado,
-  deshabilitado,
-  cargando,
-}: {
-  minutos: number[]
-  programado: { codigos: string[]; minutos: number } | null
-  onProgramar: (m: number) => void
-  onCancelar: () => void
-  ocupado: boolean
-  deshabilitado: boolean
-  /** Mientras carga no se puede afirmar que no hay turnos a los que avisar. */
-  cargando: boolean
-}) {
-  return (
-    <section className="tarjeta p-6">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-        Avisar a los próximos
-      </h2>
-      {cargando ? (
-        <div className="mt-3 space-y-3" aria-busy="true">
-          <span className="sr-only">Cargando el aviso a los próximos turnos…</span>
-          <div aria-hidden="true" className="esqueleto-bloque h-3 w-full rounded" />
-          <div aria-hidden="true" className="esqueleto-bloque h-3 w-4/5 rounded" />
-          <div aria-hidden="true" className="mt-4 grid grid-cols-3 gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="esqueleto-bloque h-9 rounded-lg" />
-            ))}
-          </div>
-        </div>
-      ) : (
-      <>
-      <p className="mt-1 text-xs leading-snug text-gris-500">
-        Elige con cuánta anticipación quieres que les llegue el aviso a los
-        próximos turnos: se avisa a uno por cada lugar de atención ocupado
-        ahora (mínimo uno).
-      </p>
-
-      {programado && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-verde-50 px-3 py-2">
-          <span className="text-xs text-navy-800">
-            {programado.codigos.length === 1 ? (
-              <>
-                <span className="font-bold">{programado.codigos[0]}</span> avisado en{' '}
-              </>
-            ) : (
-              <>
-                <span className="font-bold">{programado.codigos.length}</span> avisados (
-                {programado.codigos.join(', ')}) en{' '}
-              </>
-            )}
-            <span className="font-bold">{programado.minutos} min</span>
-          </span>
-          <button
-            type="button"
-            onClick={onCancelar}
-            disabled={ocupado}
-            className="text-xs font-semibold text-navy-800 underline"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
-
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {minutos.map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => onProgramar(m)}
-            disabled={ocupado || deshabilitado}
-            className="boton-secundario text-sm"
-          >
-            {/* El nombre accesible lo da el texto del botón. Un aria-label
-                distinto («Avisar en 5 minutos») rompe WCAG 2.5.3: el nombre
-                debe CONTENER el texto visible, o quien dicta «5 min» por voz
-                no activa nada. El contexto lo pone el título del panel. */}
-            {m} min
-          </button>
-        ))}
-      </div>
-
-      {deshabilitado && (
-        <p className="mt-2 text-[11px] leading-snug text-gris-500">
-          No hay turnos en espera a los que avisar.
-        </p>
-      )}
-      </>
-      )}
-    </section>
   )
 }

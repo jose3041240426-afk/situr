@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
-import { consultarTurnoPublico, ErrorSitur, manifestarConsideraciones } from '../lib/rpc'
+import {
+  actualizarPreferenciaAviso,
+  consultarTurnoPublico,
+  ErrorSitur,
+  manifestarConsideraciones,
+} from '../lib/rpc'
+import { Modal } from '../components/ui'
 import { CODIGO_TOKEN_EXPIRADO, CODIGO_TOKEN_INVALIDO } from '../lib/tipos'
 import type { TurnoPublico } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
@@ -9,7 +15,6 @@ import {
   pedirPermiso,
   pushSoportado,
   registrarServiceWorker,
-  cancelarAvisos,
   suscribirAvisos,
   recordarTokenEnElServiceWorker,
 } from '../lib/push'
@@ -31,15 +36,34 @@ export default function TurnoCiudadano() {
   const [turno, setTurno] = useState<TurnoPublico | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<{ titulo: string; detalle: string } | null>(null)
-  const [preguntando, setPreguntando] = useState(false)
-  const [suscrito, setSuscrito] = useState(false)
-  const [rechazado, setRechazado] = useState(false)
-  const [cancelando, setCancelando] = useState(false)
   /** RF-033: el titular manifiesta su consideracion y se opone. */
   const [oponiendo, setOponiendo] = useState(false)
   const [consideracion, setConsideracion] = useState('')
   const [errorConsideracion, setErrorConsideracion] = useState<string | null>(null)
   const [vivo, setVivo] = useState(false)
+  /** Cambiando la preferencia del aviso (P14). */
+  const [cambiandoPref, setCambiandoPref] = useState<number | null | undefined>(undefined)
+  /** 0 = cerrado, 1 = "¿quieres aviso?", 2 = "precisión o rapidez". */
+  const [pasoModalAviso, setPasoModalAviso] = useState<0 | 1 | 2>(0)
+  /** El ciudadano ya cerró el modal alguna vez (eligió o dijo No). */
+  const [yaDecidio, setYaDecidio] = useState(false)
+  /** Activando la suscripción push (paso 1 → paso 2). */
+  const [activando, setActivando] = useState(false)
+  /** Error visible del paso 1 (suscripción). */
+  const [errorSuscripcion, setErrorSuscripcion] = useState<string | null>(null)
+  /** Error visible del paso 2 (guardar preferencia). */
+  const [errorPref, setErrorPref] = useState<string | null>(null)
+  /**
+   * El ciudadano YA interactuó con el modal (eligió o cerró).
+   *
+   * Es un `useRef` y no un estado a propósito: no queremos re-renders por
+   * esto. Solo sirve para que el `useEffect` que abre el modal no lo
+   * vuelva a abrir aunque:
+   *   - la BD tarde en reflejar la preferencia,
+   *   - el `cargar()` de cada 10 s traiga datos viejos un instante,
+   *   - Realtime dispare un evento a media transición.
+   */
+  const interactuoRef = useRef(false)
 
   const cargar = useCallback(async () => {
     try {
@@ -126,6 +150,37 @@ export default function TurnoCiudadano() {
     }
   }, [token, cargar])
 
+  // Abrir el modal de aviso al cargar el turno, si aún no se ha decidido.
+  //
+  // El guard `pasoModalAviso !== 0` y la dep `pasoModalAviso` son lo que
+  // evita el bug de «el modal se reinicia solo»:
+  //
+  //   · `turno` cambia cada 10 s (sondeo) y con cada evento Realtime.
+  //   · Cada cambio re-ejecutaba el efecto, que programaba
+  //     `setPasoModalAviso(1)` a +800 ms.
+  //   · Si el ciudadano ya estaba en el paso 2 leyendo las opciones, el
+  //     timer lo devolvía al paso 1 a media lectura.
+  //
+  // Con el guard, el efecto solo puede disparar la apertura cuando el modal
+  // está cerrado (paso 0). Si ya está abierto, no toca nada.
+  useEffect(() => {
+    // Blindaje local: si el ciudadano ya interactuó, no volver a abrir.
+    if (interactuoRef.current) return
+    if (pasoModalAviso !== 0) return
+    if (!turno) return
+    if (turno.estado !== 'WAITING') return
+    if (turno.preferencia_aviso_minutos !== null) return
+    if (localStorage.getItem(`situr_pref_vista_${token}`)) return
+    // Pequeño retraso para que el ciudadano vea primero su turno.
+    const t = window.setTimeout(() => {
+      // Se vuelve a chequear dentro del timer: si el ciudadano interactuó
+      // durante los 800 ms (por ejemplo, cerró el modal), no abrir.
+      if (interactuoRef.current) return
+      setPasoModalAviso(1)
+    }, 800)
+    return () => window.clearTimeout(t)
+  }, [turno, token, pasoModalAviso])
+
   // El Service Worker se registra desde el principio (no requiere permiso),
   // para que la suscripción sea instantánea cuando el ciudadano acepte.
   useEffect(() => {
@@ -145,21 +200,6 @@ export default function TurnoCiudadano() {
   }, [token])
 
   /** DRS §5.2, paso 3: el permiso se pide DESPUÉS de mostrar el turno. */
-  async function preguntar() {
-    setPreguntando(true)
-    try {
-      const ok = await pedirPermiso()
-      if (!ok) {
-        setRechazado(true)
-        return
-      }
-      const exito = await suscribirAvisos(token)
-      setSuscrito(exito)
-      if (!exito) setRechazado(true)
-    } finally {
-      setPreguntando(false)
-    }
-  }
 
   /**
    * RF-033: el titular se opone al tratamiento. Se hace con su token, que
@@ -182,17 +222,87 @@ export default function TurnoCiudadano() {
     }
   }
 
-  /** Retirar el consentimiento (P12). Un permiso que no se puede quitar
-   *  no es consentimiento. */
-  async function dejarDeAvisar() {
-    setCancelando(true)
+  /** Cerrar el modal sin elegir (se guarda en localStorage para no repetir). */
+  function cerrarModalAviso() {
+    interactuoRef.current = true
+    localStorage.setItem(`situr_pref_vista_${token}`, '1')
+    setYaDecidio(true)
+    setPasoModalAviso(0)
+  }
+
+  /**
+   * Paso 1: activar la suscripción push y pasar al paso 2.
+   */
+  async function activarAviso() {
+    setErrorSuscripcion(null)
+    if (!pushSoportado()) {
+      setErrorSuscripcion(
+        'Este navegador no admite notificaciones. Puede intentarlo desde otro dispositivo.',
+      )
+      return
+    }
+    setActivando(true)
     try {
-      await cancelarAvisos(token)
-      setSuscrito(false)
+      const permiso = await pedirPermiso()
+      if (!permiso) {
+        setErrorSuscripcion(
+          'Necesitamos permiso de notificaciones. Actívelo en la configuración del navegador y vuelva a intentarlo.',
+        )
+        return
+      }
+      const ok = await suscribirAvisos(token)
+      if (!ok) {
+        setErrorSuscripcion(
+          'No se pudo activar el aviso. Intente de nuevo en unos segundos.',
+        )
+        return
+      }
+      setPasoModalAviso(2)
     } finally {
-      setCancelando(false)
+      setActivando(false)
     }
   }
+
+  /** Reabrir el modal para que el ciudadano que dijo No pueda cambiar de opinión. */
+  function reabrirModalAviso() {
+    setErrorSuscripcion(null)
+    setErrorPref(null)
+    setPasoModalAviso(1)
+  }
+
+  /** Elegir una preferencia desde el modal (paso 2). */
+  async function elegirPreferencia(minutos: number) {
+    setCambiandoPref(minutos)
+    try {
+      await actualizarPreferenciaAviso(token, minutos)
+      // Marcar el ref ANTES de cerrar el modal: si el `cargar()` de cada
+      // 10 s corre en paralelo y trae datos viejos, el `useEffect` no
+      // reabrirá el modal.
+      interactuoRef.current = true
+      localStorage.setItem(`situr_pref_vista_${token}`, '1')
+      // Actualizar el turno en memoria sin volver a llamar a `cargar()`:
+      // así el estado `turno` refleja la nueva preferencia de inmediato,
+      // sin depender del endpoint.
+      setTurno((prev) =>
+        prev ? { ...prev, preferencia_aviso_minutos: minutos } : prev,
+      )
+      setYaDecidio(true)
+      setPasoModalAviso(0)
+    } catch {
+      // Si la BD rechaza el cambio, el modal se queda abierto para
+      // reintentar. No marcamos `interactuoRef` ni `localStorage`.
+    } finally {
+      setCambiandoPref(undefined)
+    }
+  }
+
+  /**
+   * Cambiar la preferencia del aviso (P14).
+   * Solo mientras el turno está en WAITING.
+   */
+
+  /** Retirar el consentimiento (P12). Un permiso que no se puede quitar
+   *  no es consentimiento. */
 
   // -------------------------------------------------------------- pantalla
 
@@ -236,32 +346,15 @@ export default function TurnoCiudadano() {
         en un móvil es luz gastada y texto ilegible; la ficha de abajo va
         en blanco, que es donde está la información que importa.
       */}
-      <header className="bg-navy-800 px-4 py-3 text-white">
+      <header className="bg-navy-800 px-3 py-2.5 text-white sm:px-4 sm:py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 7.2A2.2 2.2 0 0 1 6.2 5H20v5.4a2.6 2.6 0 0 0 0 3.2V19H6.2A2.2 2.2 0 0 1 4 16.8z" />
-                <path d="M15.6 5.6v12.8" strokeDasharray="2 2.4" />
-                <path d="M7.4 10.2h5M7.4 13.4h3.4" />
-              </svg>
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-bold leading-tight">SITUR</p>
-              <p className="truncate text-[11px] text-white/60">
-                Dirección de Catastro · Durango
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold leading-tight">
+              Sistema de toma de turnos
+            </p>
+            <p className="truncate text-[11px] text-white/60">
+              Dirección de Catastro · Durango
+            </p>
           </div>
           <p className="hidden text-right text-xs text-white/70 sm:block">
             <span className="block font-semibold text-white">
@@ -281,13 +374,13 @@ export default function TurnoCiudadano() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl p-4 pb-10">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <main className="mx-auto max-w-5xl p-3 pb-8 sm:p-4 sm:pb-10">
+        <div className="grid min-w-0 gap-4 md:mx-auto md:max-w-2xl lg:mx-0 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_300px]">
         {/*
           La columna de la ficha: la ficha del turno, los avisos y los dos
           desplegables (oponerse y aviso de privacidad).
         */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
         {/* La ficha */}
         <div className="tarjeta overflow-hidden">
           {/*
@@ -339,14 +432,18 @@ export default function TurnoCiudadano() {
             </p>
             {/* El código, en su caja: es lo que el ciudadano viene a ver. */}
             <div className={`mx-auto mt-2 max-w-xs rounded-xl px-6 py-4 ${estilo.fondo}`}>
-              <h1 className={`text-5xl font-black leading-none tracking-tight ${estilo.texto}`}>
+              <h1 className={`break-words text-4xl font-black leading-none tracking-tight sm:text-5xl ${estilo.texto}`}>
                 {turno.codigo_turno}
               </h1>
-              <p className={`mt-1.5 text-sm font-semibold ${estilo.texto}`}>
+              <p className={`mt-1.5 break-words text-sm font-semibold ${estilo.texto}`}>
                 {turno.denominacion_tramite}
               </p>
             </div>
-            <p className={`mt-3 text-sm font-semibold ${estilo.texto}`}>{turno.mensaje}</p>
+            <p className="mx-auto mt-2 max-w-[17rem] text-[10px] leading-relaxed text-gris-500 sm:max-w-xs">
+              No comparta este código con nadie. Es su credencial para
+              consultar el turno.
+            </p>
+            <p className={`mt-3 break-words text-sm font-semibold ${estilo.texto}`}>{turno.mensaje}</p>
           </div>
 
           <dl className="space-y-1 border-t border-gris-100 px-5 py-4">
@@ -373,18 +470,13 @@ export default function TurnoCiudadano() {
             {turno.modulo && (
               <Dato etiqueta="Módulo" valor={turno.modulo} icono="modulo" />
             )}
-            {turno.tiempo_estimado_minutos != null && (
+            {turno.token_primer_acceso === null && (
               <Dato
-                etiqueta="Tiempo estimado"
-                valor={`${turno.tiempo_estimado_minutos} min`}
-                icono="reloj"
+                etiqueta="Consulta"
+                valor="Primera vez que abre este enlace"
+                icono="info"
               />
             )}
-            <Dato
-              etiqueta="Emitido"
-              valor={formatearHora(turno.creado_en)}
-              icono="calendario"
-            />
             {turno.llamado_en && (
               <Dato
                 etiqueta="Llamado"
@@ -395,68 +487,149 @@ export default function TurnoCiudadano() {
           </dl>
         </div>
 
-        {/* Avisos push (RF-028) */}
-        {turno.estado === 'WAITING' || turno.estado === 'CALLED' ? (
-          <div className="mt-4">
-            {suscrito ? (
-              <div className="rounded-xl border border-verde-500/30 bg-verde-50 px-4 py-3 text-sm text-verde-600">
-                <p className="font-bold">Le avisaremos cuando se acerque su turno</p>
-                <p className="mt-0.5 text-xs">
-                  Recibirá el aviso aunque cierre esta pestaña.
+        {/* Preferencia de aviso (P14): modal en dos pasos */}
+        {pasoModalAviso === 1 && (
+          <Modal
+            titulo="¿Le avisamos cuando se acerque su turno?"
+            onCerrar={cerrarModalAviso}
+            ancho="max-w-md"
+          >
+            <div className="space-y-4 text-center">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-azul-50 text-azul-500">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                </svg>
+              </span>
+              <p className="text-sm text-gris-700">
+                Le enviaremos una notificación al móvil cuando su turno esté
+                próximo, aunque tenga esta pestaña cerrada. No guardamos su
+                nombre ni su teléfono.
+              </p>
+              {errorSuscripcion && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-rojo-500/30 bg-rojo-50 px-3 py-2 text-xs font-semibold text-rojo-600"
+                >
+                  {errorSuscripcion}
                 </p>
-                {/*
-                  EL CONSENTIMIENTO SE PUEDE RETIRAR (P12). Un permiso que no
-                  se puede quitar no es consentimiento: la RPC
-                  `eliminar_suscripcion_push` ya existía, pero no había forma
-                  de llegar a ella desde aquí.
-                */}
+              )}
+              <div className="flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => void dejarDeAvisar()}
-                  disabled={cancelando}
-                  className="mt-2 text-xs font-semibold text-verde-600 underline underline-offset-2 hover:text-verde-500"
+                  onClick={() => void activarAviso()}
+                  disabled={activando}
+                  className="boton-primario w-full py-3 disabled:opacity-60"
                 >
-                  {cancelando ? 'Cancelando…' : 'Dejar de avisarme'}
+                  {activando ? 'Activando…' : 'Sí, avísame'}
                 </button>
-              </div>
-            ) : rechazado ? (
-              <div className="rounded-xl border border-gris-200 bg-white px-4 py-3 text-sm text-gris-700">
-                <p className="font-semibold text-gris-700">
-                  Sin problema: su turno se actualiza solo en esta pantalla
-                </p>
-                <p className="mt-0.5 text-xs">
-                  Si cambió de opinión, puede recargar la página y volver a intentarlo.
-                </p>
-              </div>
-            ) : pushSoportado() ? (
-              <div className="tarjeta p-4">
-                <p className="text-sm font-bold text-navy-800">
-                  ¿Quiere que le avisemos cuando se acerque su turno?
-                </p>
-                <p className="mt-1 text-xs text-gris-700">
-                  Le llega al navegador aunque tenga esta pestaña cerrada. Para
-                  mandárselo, su navegador guarda una dirección de aviso que
-                  pertenece a su proveedor de correo (en la mayoría de los
-                  casos, Google). No guardamos su nombre, su correo ni su
-                  teléfono, y puede cancelar cuando quiera.
-                </p>
                 <button
                   type="button"
-                  onClick={() => void preguntar()}
-                  disabled={preguntando}
-                  className="boton-primario mt-3 w-full"
+                  onClick={cerrarModalAviso}
+                  className="boton-secundario w-full py-3"
                 >
-                  {preguntando ? 'Activando…' : 'Sí, avisarme'}
+                  No, gracias
                 </button>
               </div>
-            ) : (
-              <div className="rounded-xl border border-gris-200 bg-white px-4 py-3 text-sm text-gris-700">
-                Este navegador no admite avisos. Deje la página abierta: se
-                actualiza sola.
-              </div>
-            )}
+            </div>
+          </Modal>
+        )}
+
+        {pasoModalAviso === 2 && (
+          <Modal
+            titulo="¿Cómo prefiere el aviso?"
+            onCerrar={cerrarModalAviso}
+            ancho="max-w-md"
+          >
+            <div className="space-y-3">
+              <p className="text-sm text-gris-700">
+                Elija cómo quiere que le avisemos. Podrá cambiarlo después.
+              </p>
+              {errorPref && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-rojo-500/30 bg-rojo-50 px-3 py-2 text-xs font-semibold text-rojo-600"
+                >
+                  {errorPref}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void elegirPreferencia(15)}
+                disabled={cambiandoPref !== undefined}
+                className="flex w-full items-start gap-3 rounded-xl border border-gris-200 bg-white p-4 text-left transition-colors hover:border-azul-500 hover:bg-azul-50 disabled:opacity-60"
+              >
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-navy-800">
+                    {cambiandoPref === 15 ? 'Guardando…' : 'Con tiempo · 15 min'}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gris-700">
+                    Ideal si va a alejarse. Le avisamos 15 minutos antes.
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void elegirPreferencia(5)}
+                disabled={cambiandoPref !== undefined}
+                className="flex w-full items-start gap-3 rounded-xl border border-gris-200 bg-white p-4 text-left transition-colors hover:border-azul-500 hover:bg-azul-50 disabled:opacity-60"
+              >
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                  </svg>
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-navy-800">
+                    {cambiandoPref === 5 ? 'Guardando…' : 'Rápido · 5 min'}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gris-700">
+                    Ideal si está cerca. Le avisamos 5 minutos antes.
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={cerrarModalAviso}
+                className="w-full text-center text-xs text-gris-500 underline"
+              >
+                Decidir después
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {turno.estado === 'WAITING' && turno.preferencia_aviso_minutos !== null && (
+          <div className="mt-3 flex min-w-0 justify-center">
+            <button
+              type="button"
+              onClick={() => setPasoModalAviso(2)}
+              className="text-xs text-gris-500 underline hover:text-azul-600"
+            >
+              Cambiar preferencia de aviso
+            </button>
           </div>
-        ) : null}
+        )}
+
+        {turno.estado === 'WAITING' && turno.preferencia_aviso_minutos === null && yaDecidio && (
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={reabrirModalAviso}
+              className="boton-primario px-3 py-2 text-xs sm:px-4 sm:text-sm"
+            >
+              🔔 Quiero que me avisen
+            </button>
+          </div>
+        )}
+
+
 
         <p className="mt-4 text-center text-[11px] text-gris-700">
           {vivo ? 'Actualización en vivo activa' : 'Actualización automática'} · No
@@ -471,12 +644,8 @@ export default function TurnoCiudadano() {
           cancela con constancia de que fue el, no la ventanilla.
         */}
         {(turno.estado === 'WAITING' || turno.estado === 'CALLED') && (
-          <div className="mt-4 rounded-xl border border-gris-100 bg-white px-4 py-3">
-            <details>
-              <summary className="cursor-pointer text-xs font-semibold text-gris-700">
-                No quiero que se atienda mi turno
-              </summary>
-              <div className="mt-3 space-y-2">
+          <Acordeon titulo="No quiero que se atienda mi turno">
+              <div className="space-y-2">
                 <p className="text-xs leading-relaxed text-gris-700">
                   Puede oponerse a que se atienda su turno. Se registra su
                   consideracion y el turno se cancela. Si cree que hubo un
@@ -504,8 +673,7 @@ export default function TurnoCiudadano() {
                   {oponiendo ? 'Registrando…' : 'Registrar mi consideración'}
                 </button>
               </div>
-            </details>
-          </div>
+            </Acordeon>
         )}
 
         {/*
@@ -528,11 +696,8 @@ export default function TurnoCiudadano() {
           navegador entrega una direccion de aviso que pertenece a su
           proveedor de correo, y eso es un tercero.
         */}
-        <details className="mt-4 rounded-xl border border-gris-100 bg-white px-4 py-3 text-left">
-          <summary className="cursor-pointer text-xs font-semibold text-gris-700">
-            Aviso de privacidad
-          </summary>
-          <div className="mt-2 space-y-2 text-xs leading-relaxed text-gris-700">
+        <Acordeon titulo="Aviso de privacidad">
+          <div className="space-y-2 text-xs leading-relaxed text-gris-700">
             <p>
               <strong>Que se guarda.</strong> El codigo de su turno, su estado y
               las horas en que se emitio, se llamo y se atendio.{' '}
@@ -561,7 +726,33 @@ export default function TurnoCiudadano() {
               cuando quiera, en la ventanilla de la Direccion de Catastro.
             </p>
           </div>
-        </details>
+        </Acordeon>
+        <Acordeon titulo="¿Cerró esta ventana?">
+          <div className="space-y-2 text-xs leading-relaxed text-gris-700">
+            <p>
+              Su turno <strong>sigue en la fila</strong> aunque cierre esta
+              ventana. Para volver a consultarlo:
+            </p>
+            <ol className="ml-4 list-decimal space-y-1">
+              <li>
+                <strong>Escanee de nuevo el código QR</strong> de su boleto.
+              </li>
+              <li>
+                <strong>Busque esta página en el historial</strong> de su
+                navegador (suele estar en el menú de los tres puntos, en
+                «Historial»).
+              </li>
+              <li>
+                <strong>Acuda a la ventanilla</strong> con su código impreso:
+                el operador puede reimprimir el QR.
+              </li>
+            </ol>
+            <p className="text-gris-500">
+              Si no encuentra su boleto ni recuerda el código, el operador
+              puede ayudarle en ventanilla.
+            </p>
+          </div>
+        </Acordeon>
 
         </div>
 
@@ -575,42 +766,30 @@ export default function TurnoCiudadano() {
           FORMA del riel —que es lo que aporta la referencia— y se cambia el
           contenido por los números del propio turno.
         */}
-        <aside className="space-y-4">
-          <div className="rounded-2xl bg-navy-800 p-5 text-white">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-white/60">
-              Tu turno en números
-            </h2>
-            <div className="mt-3 space-y-0">
-              {turno.estado === 'WAITING' && (
-                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
-                  <span className="text-sm text-white/80">Posición</span>
-                  <b className="text-lg">{turno.posicion}</b>
+        <aside className="min-w-0 space-y-4">
+          {turno.estado === 'WAITING' && (
+            <div className="rounded-2xl bg-azul-600 p-4 text-white sm:p-5">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-white/70">
+                Tu turno en números
+              </h2>
+              <div className="mt-3 space-y-0">
+                <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/20 py-2.5">
+                  <span className="truncate text-sm text-white/85">Posición</span>
+                  <b className="shrink-0 text-lg">{turno.posicion}</b>
                 </div>
-              )}
-              {turno.estado === 'WAITING' && (
-                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
-                  <span className="text-sm text-white/80">Personas delante</span>
-                  <b className="text-lg">{turno.personas_delante}</b>
+                <div className="flex min-w-0 items-center justify-between gap-2 py-2.5">
+                  <span className="truncate text-sm text-white/85">Personas delante</span>
+                  <b className="shrink-0 text-lg">{turno.personas_delante}</b>
                 </div>
-              )}
-              {turno.tiempo_estimado_minutos != null && (
-                <div className="flex items-center justify-between border-b border-white/10 py-2.5">
-                  <span className="text-sm text-white/80">Tiempo estimado</span>
-                  <b className="text-lg">{turno.tiempo_estimado_minutos} min</b>
-                </div>
-              )}
-              <div className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-white/80">Módulo</span>
-                <b className="text-lg">{turno.modulo ?? '—'}</b>
               </div>
+              <p className="mt-3 break-words text-xs leading-relaxed text-white/70">
+                Solo ve los números de <strong className="text-white">su</strong>{' '}
+                turno. El sistema no muestra los turnos de los demás ciudadanos.
+              </p>
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-white/60">
-              Solo ve los números de <strong className="text-white/80">su</strong>{' '}
-              turno. El sistema no muestra los turnos de los demás ciudadanos.
-            </p>
-          </div>
+          )}
 
-          <div className="rounded-2xl border border-gris-200 bg-white p-5">
+          <div className="rounded-2xl border border-gris-200 bg-white p-4 sm:p-5">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gris-500">
               Sin cuenta, sin datos
             </h2>
@@ -634,6 +813,56 @@ export default function TurnoCiudadano() {
  * (un reloj es el tiempo, un calendario es la fecha, una lista son los
  * datos del turno) y evita tener que leer la etiqueta.
  */
+/**
+ * Acordeón animado: grid-template-rows 0fr → 1fr (transición real, sin JS).
+ */
+function Acordeon({
+  titulo,
+  children,
+}: {
+  titulo: string
+  children: ReactNode
+}) {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-gris-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-xs font-semibold text-gris-700 transition-colors hover:bg-gris-50 sm:px-4 sm:py-3 sm:text-sm"
+      >
+        <span className="min-w-0 break-words">{titulo}</span>
+        <svg
+          className={`h-4 w-4 shrink-0 transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            abierto ? 'rotate-180' : ''
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
+          abierto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-t border-gris-100 px-3 py-2.5 sm:px-4 sm:py-3">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Dato({ etiqueta, valor, icono, destacado }: {
   etiqueta: string
   valor: string
@@ -646,17 +875,17 @@ function Dato({ etiqueta, valor, icono, destacado }: {
       contener <dt> y <dd> (HTML), y axe lo comprueba (regla
       `definition-list`).
     */
-    <div className="flex items-center gap-3 px-1 py-2">
-      <dt className="flex flex-1 items-center gap-3 text-sm text-gris-700">
+    <div className="flex min-w-0 items-center gap-3 px-1 py-2">
+      <dt className="flex min-w-0 flex-1 items-center gap-3 text-sm text-gris-700">
         {icono && (
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
             <IconoDato nombre={icono} />
           </span>
         )}
-        {etiqueta}
+        <span className="min-w-0 break-words">{etiqueta}</span>
       </dt>
       <dd
-        className={`text-sm font-bold ${
+        className={`shrink-0 text-sm font-bold ${
           destacado ? 'text-ambar-600' : 'text-navy-800'
         }`}
       >

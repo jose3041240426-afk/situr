@@ -161,7 +161,7 @@ export default function GestionUsuarios() {
                               modulos.find((m) => m.codigo === u.modulo_codigo)?.id ?? '',
                             )
                           }}
-                          className="boton-secundario px-3 py-1.5 text-xs"
+                          className="boton-secundario boton-pildora px-3 py-1.5 text-xs"
                         >
                           Asignar módulo
                         </button>

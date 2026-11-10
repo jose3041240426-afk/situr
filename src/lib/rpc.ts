@@ -15,6 +15,7 @@ import type {
   RespuestaGenerarTurno,
   RespuestaGenerarTurnosMasivos,
   RespuestaProgramarAviso,
+  RespuestaAvisoTurno,
   RespuestaLlamarSiguiente,
   RespuestaOperacionTurno,
   RespuestaPeriodo,
@@ -184,6 +185,24 @@ export async function cancelarAvisoSiguiente(turnoId: string): Promise<boolean> 
 /** Los minutos que la consola puede ofrecer (5, 10, 15 por defecto). */
 export async function opcionesAviso(): Promise<number[]> {
   return rpc<number[]>('opciones_aviso_minutos', {})
+}
+
+/**
+ * Avisa a un turno concreto que ya está en atención (CALLED/SERVING).
+ *
+ * El operador elige los minutos y el cron manda el push a ese ciudadano. A
+ * diferencia de `programarAvisoSiguiente` (que avisa a los siguientes de la
+ * cola), aquí el aviso va a quien ya está siendo atendido o llamado, con la
+ * hora que elija el operador.
+ */
+export async function programarAvisoTurno(
+  turnoId: string,
+  minutos: number,
+): Promise<RespuestaAvisoTurno> {
+  return rpc<RespuestaAvisoTurno>('programar_aviso_turno', {
+    p_turno_id: turnoId,
+    p_minutos: minutos,
+  })
 }
 
 /**
@@ -719,4 +738,74 @@ export async function manifestarConsideraciones(
  */
 export async function maximoEnAtencion(): Promise<number> {
   return rpc<number>('maximo_en_atencion', {})
+}
+
+/**
+ * El ciudadano elige con cuánta anticipación quiere el aviso.
+ * `null` = usar el default del sistema. Solo funciona con el token y solo
+ * mientras el turno está en `WAITING`.
+ */
+export async function actualizarPreferenciaAviso(
+  token: string,
+  minutos: number | null,
+): Promise<{
+  ok: boolean
+  preferencia_aviso_minutos: number | null
+  mensaje: string
+}> {
+  const { data, error } = await supabase.rpc('actualizar_preferencia_aviso', {
+    p_token: token,
+    p_minutos: minutos,
+  })
+  if (error) throw traducirError(error)
+  return data as {
+    ok: boolean
+    preferencia_aviso_minutos: number | null
+    mensaje: string
+  }
+}
+
+/**
+ * Historial paginado por turno (migración 019).
+ *
+ * Reemplaza a `listarHistorial()` para la pantalla del historial: con 1000
+ * turnos, traer todas las transiciones colapsaba el navegador. Esta versión
+ * filtra por fecha, pagina por turno, y devuelve las transiciones anidadas.
+ */
+export interface TurnoHistorialPaginado {
+  turno_id: string
+  codigo_turno: string
+  estado_actual: EstadoTurno
+  prioridad: PrioridadTurno
+  denominacion_tramite: string
+  clave_tramite: string
+  transiciones: Array<{
+    turno_id: string
+    codigo_turno: string
+    estado_anterior: EstadoTurno | null
+    estado_nuevo: EstadoTurno
+    estado_actual: EstadoTurno
+    fecha: string
+    motivo: string | null
+    nombre_usuario: string | null
+    codigo_modulo: string | null
+    denominacion_modulo: string | null
+  }>
+}
+
+export async function listarHistorialPaginado(
+  fecha: string,
+  filtro: string | undefined,
+  pagina: number,
+  porPagina = 10,
+): Promise<{ total: number; turnos: TurnoHistorialPaginado[] }> {
+  const { data, error } = await supabase.rpc('listar_historial_paginado', {
+    p_fecha: fecha,
+    p_filtro: filtro?.trim() || null,
+    p_limite: porPagina,
+    p_offset: (pagina - 1) * porPagina,
+  })
+  if (error) throw traducirError(error)
+  const r = data as { total: number; turnos: TurnoHistorialPaginado[] }
+  return { total: r.total ?? 0, turnos: r.turnos ?? [] }
 }

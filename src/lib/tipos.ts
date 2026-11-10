@@ -265,6 +265,15 @@ export interface RespuestaProgramarAviso {
   turnos: TurnoAvisado[]
 }
 
+/** `programar_aviso_turno(turnoId, minutos)` (migración 014, aviso a un turno concreto). */
+export interface RespuestaAvisoTurno {
+  ok: true
+  minutos: number
+  aviso_programado_en: string
+  turno_id: string
+  codigo_turno: string
+}
+
 /** `llamar_siguiente_turno(modulo_id?, tramite_id?)` */
 export interface RespuestaLlamarSiguiente {
   ok: true
@@ -314,6 +323,10 @@ export interface TurnoPublico {
   llamado_en: string | null
   tiempo_estimado_minutos: number | null
   token_expira_en: string | null
+  /** Preferencia del ciudadano: minutos de anticipación (null = default). */
+  preferencia_aviso_minutos: number | null
+  /** Primera vez que el ciudadano abrió este enlace (null = es ahora). */
+  token_primer_acceso: string | null
 }
 
 /** `abrir_periodo_operativo(fecha)` / `cerrar_periodo_operativo(periodo_id)` */

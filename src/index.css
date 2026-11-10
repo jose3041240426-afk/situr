@@ -185,6 +185,10 @@
     @apply bg-rojo-500 text-white hover:bg-rojo-600;
   }
 
+  .boton-omision {
+    @apply bg-rojo-500 text-white hover:bg-rojo-600;
+  }
+
   .boton-ok {
     @apply bg-verde-500 text-white hover:bg-verde-600;
   }
@@ -2830,4 +2834,1176 @@ body {
   .selector-propio-lista {
     animation: none;
   }
+}
+
+/* ===========================================================================
+   Iconos de acción de la lista «En atención ahora»
+   ===========================================================================
+
+   Omitir y cancelar caben como icono porque son acciones de fila y el texto
+   empujaba «Iniciar atención» fuera en pantallas de 1024 px. El nombre
+   accesible lo lleva el botón (`aria-label`); el icono va `aria-hidden`.
+
+   Se pintan con máscara y `currentColor`, no con un SVG incrustado: el mismo
+   icono sirve blanco sobre el botón rojo y oscuro sobre el botón blanco, sin
+   duplicar el archivo ni tocar el color a mano.
+
+   El `1em` del icono se ajusta con la clase de tamaño del span (`text-base`).
+*/
+
+.ix--cancelled,
+.bi--skip-forward-circle-fill {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.ix--cancelled {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='black' d='M256 42.667c117.821 0 213.334 95.513 213.334 213.333c0 117.821-95.513 213.334-213.334 213.334c-117.82 0-213.333-95.513-213.333-213.334C42.667 138.18 138.18 42.667 256 42.667M85.334 256c0 94.257 76.41 170.667 170.666 170.667c39.44 0 75.754-13.378 104.654-35.843L121.177 151.347C98.71 180.247 85.334 216.56 85.334 256M256 85.334c-39.439 0-75.753 13.377-104.653 35.843l239.477 239.477c22.465-28.9 35.843-65.214 35.843-104.654c0-94.256-76.41-170.666-170.667-170.666'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.bi--skip-forward-circle-fill {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M4.79 5.093A.5.5 0 0 0 4 5.5v5a.5.5 0 0 0 .79.407L7.5 8.972V10.5a.5.5 0 0 0 .79.407L11 8.972V10.5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-1 0v1.528L8.29 5.093a.5.5 0 0 0-.79.407v1.528z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.coolicons--repeat-fill {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M18.586 7H5a1 1 0 0 0-1 1v3a1 1 0 0 1-2 0V8a3 3 0 0 1 3-3h13.586l-1.293-1.293a1 1 0 0 1 1.414-1.414l3 3a1 1 0 0 1 0 1.414l-3 3a1 1 0 0 1-1.414-1.414ZM22 16a3 3 0 0 1-3 3H5.414l1.293 1.293a.999.999 0 1 1-1.414 1.414l-3-3a1 1 0 0 1 0-1.414l3-3a.999.999 0 1 1 1.414 1.414L5.414 17H19a1 1 0 0 0 1-1v-3a1 1 0 0 1 2 0Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+.andrsrxn--clock {
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none'%3E%3Ccircle cx='12' cy='12' r='10.25' fill='black' opacity='.2'/%3E%3Ccircle cx='12' cy='12' r='10.25' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5'/%3E%3Cpath stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m16.04 15.78l-2.93-1.95c-.87-.58-1.3-.87-1.54-1.32c-.24-.44-.24-.96-.24-2.01V6.31'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+}
+
+/* ===========================================================================
+   Iconos de acción del turno (reloj "avisar" y "repetir llamada")
+   ===========================================================================
+   Las clases .andrsrxn--clock y .coolicons--repeat-fill estaban declaradas
+   más arriba SOLO con la máscara (--svg + mask-image), pero sin las
+   propiedades que convierten un span vacío en un icono visible:
+   display, width, height y background-color.
+
+   Por eso el botón del reloj (avisar al turno en atención) y el de repetir
+   la llamada salían como un recuadro vacío. Esta regla los completa sin
+   tocar el bloque original.
+   =========================================================================== */
+.coolicons--repeat-fill,
+.andrsrxn--clock {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* ===========================================================================
+   Animación del modal «Avisar al turno» (P13)
+   ===========================================================================
+   Al pulsar el reloj junto a «Finalizar» se abre un modal para elegir cuántos
+   minutos faltan. Tres gestos, cortos y apagables:
+
+   - La campana entra, suena dos veces y lanza un halo hacia fuera.
+   - Los botones 5 / 10 / 15 entran escalonados (60/120/180/240 ms).
+   - «5 min» (el caso urgente) tiene un pulso suave TRES veces y se detiene:
+     un pulso infinito al lado de una acción es una distracción, uno que se
+     apaga deja la marca de «esto es lo urgente» sin marear.
+
+   Con prefers-reduced-motion, todo se apaga y el modal sigue funcionando.
+   =========================================================================== */
+
+.aviso-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+/* --- la campana ------------------------------------------------------- */
+
+.aviso-campana {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 0.25rem;
+  border-radius: 999px;
+  background: var(--color-azul-50);
+  color: var(--color-azul-500);
+  animation: aviso-campana-aparece 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.aviso-campana::before {
+  content: '';
+  display: block;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: currentColor;
+  -webkit-mask: var(--icono-campana) center / contain no-repeat;
+  mask: var(--icono-campana) center / contain no-repeat;
+  animation: aviso-campana-suena 1.2s ease-in-out 180ms 2 both;
+  transform-origin: 50% 10%;
+}
+
+/* El halo: un anillo que se expande con box-shadow (no un borde que se
+   engorda con scale, que se ve sucio). */
+.aviso-campana::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(18, 115, 234, 0.55);
+  animation: aviso-campana-halo 1.6s ease-out 380ms 1 both;
+  pointer-events: none;
+}
+
+/* Campana SVG enmascarada: hereda el color del contenedor sin duplicar el SVG. */
+.aviso-campana {
+  --icono-campana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'/%3E%3Cpath d='M13.7 21a2 2 0 0 1-3.4 0'/%3E%3C/svg%3E");
+}
+
+@keyframes aviso-campana-aparece {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes aviso-campana-suena {
+  0%, 100% { transform: rotate(0); }
+  15%      { transform: rotate(-18deg); }
+  30%      { transform: rotate(16deg); }
+  45%      { transform: rotate(-12deg); }
+  60%      { transform: rotate(10deg); }
+  80%      { transform: rotate(-4deg); }
+}
+
+@keyframes aviso-campana-halo {
+  0%   { box-shadow: 0 0 0 0 rgba(18, 115, 234, 0.55); }
+  100% { box-shadow: 0 0 0 16px rgba(18, 115, 234, 0); }
+}
+
+/* --- los botones 5 / 10 / 15 ----------------------------------------- */
+
+.aviso-modal-opciones > button {
+  animation: aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.aviso-modal-opciones > button:nth-child(1) { animation-delay: 60ms; }
+.aviso-modal-opciones > button:nth-child(2) { animation-delay: 120ms; }
+.aviso-modal-opciones > button:nth-child(3) { animation-delay: 180ms; }
+.aviso-modal-opciones > button:nth-child(4) { animation-delay: 240ms; }
+
+.aviso-modal-opciones > button:hover:not(:disabled) {
+  background: var(--color-azul-50);
+  border-color: var(--color-azul-500);
+  color: var(--color-azul-700);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px -8px rgba(18, 115, 234, 0.4);
+}
+
+/* «5 min» es el caso urgente: pulso 3 veces y se apaga. */
+.aviso-modal-opciones > button:nth-child(1) {
+  animation:
+    aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) 60ms 1 both,
+    aviso-opcion-late 1.8s ease-in-out 600ms 3;
+}
+
+@keyframes aviso-opcion-entra {
+  from { transform: translateY(6px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes aviso-opcion-late {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(18, 115, 234, 0); }
+  50%      { box-shadow: 0 0 0 6px rgba(18, 115, 234, 0.14); }
+}
+
+/* Movimiento reducido: sin campana ni pulso; el modal sigue funcionando. */
+@media (prefers-reduced-motion: reduce) {
+  .aviso-campana,
+  .aviso-campana::before,
+  .aviso-campana::after,
+  .aviso-modal-opciones > button,
+  .aviso-modal-opciones > button:nth-child(1) {
+    animation: none;
+  }
+  .aviso-modal-opciones > button:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Modal — entrada profesional (sobrescribe las versiones anteriores)
+   ===========================================================================
+   QUÉ CAMBIA FRENTE A LA VERSIÓN ANTERIOR
+
+     1. Curva `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out-quint): el 70 % del
+        recorrido ocurre en el primer 30 % del tiempo. Así el modal "llega"
+        rápido y luego se asienta — que es lo que hace que se sienta sólido
+        en vez de flotante.
+
+     2. El velo no solo hace fade: **desenfoca a la vez**. El blur crece de
+        0 a 8 px en 320 ms. No es decoración: la profundidad separa el modal
+        del contenido de fondo, y el ojo humano lo lee como "esto está
+        delante".
+
+     3. La caja sube 16 px y escala de 0.96 a 1. Apenas se nota el
+        movimiento (16 px no son 40), pero el ojo lo registra como que la
+        caja se eleva.
+
+     4. La sombra se profundiza durante la animación (de 8 px a 48 px de
+        blur). La caja pasa de "apoyada" a "flotando" sin que se vea el
+        cambio: es lo que hace que un modal se sienta profesional — el
+        peso visual aparece con la animación.
+
+     5. Los hijos directos de `.aviso-modal` entran escalonados: campana,
+        texto, botones, ayuda. Sigue la jerarquía del marcado, así el ojo
+        lee primero lo importante.
+
+     6. La salida es más rápida que la entrada (180 ms contra 320 ms).
+        Cerrar debe sentirse inmediato; abrir puede tomarse su tiempo.
+
+     7. En móvil la caja entra desde abajo, como una hoja. Es el mismo gesto
+        que el sistema usa para las acciones contextuales.
+
+   Con `prefers-reduced-motion: reduce` todo se apaga y el modal sigue
+   funcionando.
+   ============================================================================ */
+
+/* --- el velo: fade + desenfoque progresivo -------------------------------- */
+
+.modal-velo {
+  animation: modal-velo-pro 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes modal-velo-pro {
+  from {
+    opacity: 0;
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* --- la caja: sube 16 px + escala, con sombra creciente ------------------ */
+
+.modal-caja {
+  animation:
+    modal-caja-pro 320ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    modal-sombra-pro 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes modal-caja-pro {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-sombra-pro {
+  from {
+    box-shadow:
+      0 0 0 1px rgba(23, 43, 68, 0.04),
+      0 2px 4px rgba(23, 43, 68, 0.04),
+      0 8px 16px -6px rgba(23, 43, 68, 0.10);
+  }
+  to {
+    box-shadow:
+      0 0 0 1px rgba(23, 43, 68, 0.06),
+      0 4px 8px rgba(23, 43, 68, 0.06),
+      0 24px 48px -12px rgba(23, 43, 68, 0.25);
+  }
+}
+
+/* --- los hijos de .aviso-modal entran escalonados ----------------------- */
+
+.modal-caja .aviso-modal > * {
+  animation: modal-hijo-entra 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.modal-caja .aviso-modal > *:nth-child(1) { animation-delay: 100ms; }
+.modal-caja .aviso-modal > *:nth-child(2) { animation-delay: 160ms; }
+.modal-caja .aviso-modal > *:nth-child(3) { animation-delay: 220ms; }
+.modal-caja .aviso-modal > *:nth-child(4) { animation-delay: 280ms; }
+
+@keyframes modal-hijo-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- salida: 180 ms, rápida y decidida ---------------------------------- */
+
+.modal-saliendo {
+  animation: modal-velo-sale-pro 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.modal-saliendo .modal-caja {
+  animation: modal-caja-sale-pro 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes modal-velo-sale-pro {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes modal-caja-sale-pro {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+
+/* --- móvil: la caja entra desde abajo, como una hoja -------------------- */
+
+@media (max-width: 40rem) {
+  .modal-caja {
+    animation:
+      modal-caja-movil-pro 320ms cubic-bezier(0.22, 1, 0.36, 1) both,
+      modal-sombra-pro 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes modal-caja-movil-pro {
+    from { opacity: 0; transform: translateY(32px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .modal-saliendo .modal-caja {
+    animation: modal-caja-sale-movil-pro 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  @keyframes modal-caja-sale-movil-pro {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(24px); }
+  }
+}
+
+/* --- reduced motion ---------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-velo,
+  .modal-caja,
+  .modal-saliendo,
+  .modal-saliendo .modal-caja,
+  .modal-caja .aviso-modal > * {
+    animation: none;
+  }
+  .modal-caja {
+    box-shadow:
+      0 0 0 1px rgba(23, 43, 68, 0.06),
+      0 4px 8px rgba(23, 43, 68, 0.06),
+      0 24px 48px -12px rgba(23, 43, 68, 0.25);
+  }
+}
+
+/* ===========================================================================
+   Modal — contenido escalonado (universal)
+   ===========================================================================
+   QUE RESUELVE
+
+   Antes solo el modal de «Avisar» tenía sus hijos en cascada. Los otros
+   (Omitir, Cancelar, Cerrar periodo, Llamar al siguiente, QR, Módulo)
+   aparecían de golpe dentro de la caja.
+
+   Aquí se cubren los DOS patrones que aparecen en el código:
+
+     A) Cuerpo con UN wrapper único (`.space-y-4`, `.text-center`,
+        `.aviso-modal`, `form.space-y-4`, …): se animan SUS HIJOS. Es el
+        caso más común: `div.space-y-4 > [p, ul, p, div]`.
+
+     B) Cuerpo con VARIOS hijos directos (raro, pero posible): se animan
+        ellos. No se entra a nietos porque no hay wrapper que los agrupe
+        visualmente.
+
+   Los delays van por posición con `--retraso-modal`: 60, 120, 180, 240,
+   300, 360, 420, 480 ms. `!important` en el delay porque el bloque
+   anterior (el del modal de «Avisar») ya dejó reglas con `nth-child(N)`
+   para esos mismos hijos; sin `!important`, la cascada se rompería en
+   ese modal y solo en ese.
+
+   `will-change` NO se pone a propósito: la animación dura 280 ms y solo
+   ocurre al abrir. Forzar composición permanente en 30+ elementos que
+   están quietos el 99 % del tiempo es peor que la ganancia.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1) Selector común: A + B + el caso específico del modal de «Avisar»
+   --------------------------------------------------------------------------- */
+.modal-caja > div:nth-child(2) > :only-child > *,
+.modal-caja > div:nth-child(2) > :not(:only-child),
+.modal-caja .aviso-modal > * {
+  animation: modal-hijo-entra 280ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation-delay: var(--retraso-modal, 0ms) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   2) Delays por posición (60 ms por paso, tope a los 8 hijos)
+   --------------------------------------------------------------------------- */
+
+/* Hijo 1 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(1),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(1),
+.modal-caja .aviso-modal > :nth-child(1) {
+  animation-delay: 60ms !important;
+}
+
+/* Hijo 2 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(2),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(2),
+.modal-caja .aviso-modal > :nth-child(2) {
+  animation-delay: 120ms !important;
+}
+
+/* Hijo 3 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(3),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(3),
+.modal-caja .aviso-modal > :nth-child(3) {
+  animation-delay: 180ms !important;
+}
+
+/* Hijo 4 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(4),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(4),
+.modal-caja .aviso-modal > :nth-child(4) {
+  animation-delay: 240ms !important;
+}
+
+/* Hijo 5 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(5),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(5),
+.modal-caja .aviso-modal > :nth-child(5) {
+  animation-delay: 300ms !important;
+}
+
+/* Hijo 6 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(6),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(6),
+.modal-caja .aviso-modal > :nth-child(6) {
+  animation-delay: 360ms !important;
+}
+
+/* Hijo 7 */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(7),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(7),
+.modal-caja .aviso-modal > :nth-child(7) {
+  animation-delay: 420ms !important;
+}
+
+/* Hijo 8+ (el resto, en bloque, para que no se acumule un retraso eterno) */
+.modal-caja > div:nth-child(2) > :only-child > :nth-child(n+8),
+.modal-caja > div:nth-child(2) > :not(:only-child):nth-child(n+8),
+.modal-caja .aviso-modal > :nth-child(n+8) {
+  animation-delay: 480ms !important;
+}
+
+/* ---------------------------------------------------------------------------
+   3) Un caso especial: si el wrapper tiene más de 8 hijos reales
+      (poco probable, pero posible en el historial), el resto comparte
+      el último delay. No se escalona infinito: 480 ms ya se siente "en
+      cascada" sin retrasar la lectura.
+   --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   4) Movimiento reducido: se apaga la cascada, no el modal.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .modal-caja > div:nth-child(2) > :only-child > *,
+  .modal-caja > div:nth-child(2) > :not(:only-child),
+  .modal-caja .aviso-modal > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ===========================================================================
+   Botón «Finalizar» (azul, con hover que se hace más grande)
+   ===========================================================================
+   POR QUÉ AZUL Y NO ROJO
+
+   «Finalizar» completa el turno: es la acción que el operador quiere hacer
+   al terminar. Rojo se usa en este sistema para lo destructivo (Cancelar,
+   Omitir, Cerrar periodo). Pintarlo rojo lo haría parecer una acción
+   peligrosa cuando es justo lo contrario: el cierre exitoso de la atención.
+
+   Azul es el color de la acción primaria del resto de la consola («Llamar»,
+   «Iniciar atención», «Emitir»). Con esto, Finalizar queda al mismo nivel
+   visual que esas acciones — es lo que es.
+
+   Antes era verde (`boton-ok`). El verde se conserva donde significa
+   «completado» (chip de estado COMPLETED, contadores de estadísticas), pero
+   como botón de acción se leía como una familia distinta al resto del
+   sistema. Azul lo unifica sin perder el significado: el chip de la fila
+   sigue verde, el botón de la fila sigue azul.
+   ============================================================================ */
+
+.boton-finalizar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--color-azul-500);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  /*
+   * Transiciones cortas y con la misma curva en las tres propiedades.
+   * `transform` va con `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out-quint):
+   * el 70 % del crecimiento ocurre en el primer 30 % del tiempo, así el
+   * botón «late» un poco al pasar el cursor y no se queda flotando.
+   *
+   * No se usa `transition: all` (lo que tenía el original): animar `all`
+   * mete también `display` y `width` en la transición, y al deshabilitarse
+   * el botón salta en vez de transicionar. Aquí cada propiedad va explícita.
+   */
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 1px 3px rgba(23, 43, 68, 0.12);
+}
+
+.boton-finalizar:hover:not(:disabled) {
+  background: var(--color-azul-600);
+  /* 1.05, no 1.1: un 10 % en una fila con varios botones se siente como un
+     salto. 5 % se registra como «se hizo un poco más grande» sin marear. */
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px -2px rgba(18, 115, 234, 0.4);
+}
+
+.boton-finalizar:active:not(:disabled) {
+  /* El clic se siente: se encoge un 2 % por debajo del tamaño base. */
+  transform: scale(0.98);
+  box-shadow: 0 1px 2px rgba(18, 115, 234, 0.3);
+}
+
+/* Foco de teclado: anillo propio porque la sombra azul del hover lo taparía. */
+.boton-finalizar:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+.boton-finalizar:disabled {
+  background: var(--color-gris-300);
+  color: var(--color-gris-700);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ===========================================================================
+   Botón del reloj (icon-only, ghost)
+   ===========================================================================
+   QUÉ CAMBIA
+
+   Antes era un `boton-secundario` (fondo blanco, borde gris, padding 0.625rem):
+   el icono quedaba dentro de una cajita con contorno. Eso es ruido visual en
+   una fila que ya tiene un botón de texto («Finalizar»): dos estilos de botón
+   para dos acciones del mismo nivel.
+
+   Ahora es un botón *ghost*: en reposo, solo el icono del reloj, sin fondo ni
+   borde. Al pasar el cursor aparece un círculo azul-50 muy suave, el icono
+   crece un 12 % y se eleva 1 px. Es el patrón de iconos de acción de
+   Linear/Notion/Things: discreto cuando no se usa, generoso cuando se apunta.
+
+   La forma circular (`border-radius: 50 %` + 36×36 px) da un área de clic de
+   36 px: el mínimo recomendado para un dedo es 44 px, pero este botón se usa
+   con ratón o con el pulgar en una fila de 10 turnos; 36 px es el compromiso
+   razonable sin romper la densidad de la tabla.
+   ============================================================================ */
+
+.boton-reloj {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-azul-500);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.boton-reloj:hover:not(:disabled) {
+  background: var(--color-azul-50);
+  color: var(--color-azul-600);
+  /* 1.12 sube más que el 5 % de Finalizar: aquí el icono es lo único que
+     hay, así que un poco más de recorrido se lee como «responde al cursor»
+     sin sentirse exagerado. Además sube 1 px, gesto de «levitar» clásico
+     en iconos de acción. */
+  transform: translateY(-1px) scale(1.12);
+}
+
+.boton-reloj:active:not(:disabled) {
+  background: var(--color-azul-100);
+  transform: translateY(0) scale(0.94);
+}
+
+.boton-reloj:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+.boton-reloj:disabled {
+  color: var(--color-gris-300);
+  cursor: not-allowed;
+}
+
+/* ===========================================================================
+   Reduced motion: los botones siguen cambiando de color, pero no se mueven.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .boton-finalizar {
+    transition: background-color 0.18s ease, box-shadow 0.22s ease;
+  }
+  .boton-finalizar:hover:not(:disabled),
+  .boton-finalizar:active:not(:disabled) {
+    transform: none;
+  }
+  .boton-reloj {
+    transition: background-color 0.18s ease, color 0.18s ease;
+  }
+  .boton-reloj:hover:not(:disabled),
+  .boton-reloj:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Botón «Finalizar» — translación vertical y hover rojo
+   ===========================================================================
+   Sustituye el efecto de escala por el de TRANSLACIÓN del bloque de
+   referencia: el botón se eleva 7 px al pasar el cursor y proyecta una
+   sombra grande debajo. Al hacer clic baja a 1 px (feedback táctil).
+
+   POR QUÉ ROJO EN HOVER Y AZUL EN REPOSO
+
+   Azul en reposo: es la acción primaria del sistema, igual que «Llamar» o
+   «Emitir». El operador sabe que el botón está ahí y lo va a hacer bien.
+
+   Rojo al pasar el cursor: «Finalizar» CIERRA el proceso. No lo cancela,
+   pero sí lo termina. El rojo aparece en el momento de mayor intención
+   (cuando el dedo ya está encima) y recuerda que el clic tiene
+   consecuencias: el turno queda atendido y la fila desaparece. Es la
+   convención del semáforo — no avisa de un peligro, marca un punto de no
+   retorno. Vuelve a azul al salir el cursor.
+
+   El rojo es `rojo-500` (#dc2626), no `rojo-600`: da un aviso más vivo.
+   Texto blanco, contraste 5.13:1 (pasa AA). La sombra usa
+   `rgba(220, 38, 38, 0.4)` — el mismo rojo al 40 % — porque una sombra
+   neutra sobre fondo rojo se ve sucia.
+
+   `transition` con la lista exacta, no `all`: `all` anima también
+   `width`/`padding`, que no cambian aquí, pero en estado disabled darían
+   saltos. Timing `0.3s ease 0s`, el del bloque de referencia.
+   ============================================================================ */
+
+button.boton-finalizar {
+  transition:
+    background-color 0.3s ease 0s,
+    box-shadow 0.3s ease 0s,
+    color 0.3s ease 0s,
+    transform 0.3s ease 0s;
+}
+
+button.boton-finalizar:hover:not(:disabled) {
+  background: var(--color-rojo-500);
+  color: #fff;
+  box-shadow: 0 15px 20px rgba(220, 38, 38, 0.4);
+  transform: translateY(-7px);
+}
+
+button.boton-finalizar:active:not(:disabled) {
+  background: var(--color-rojo-600);
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(153, 27, 27, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ===========================================================================
+   Botón del reloj — translación menor, sin escala
+   ===========================================================================
+   Sin contenedor (solo icono), pero el hover ya no escala: se eleva.
+   4 px, no 7, porque el icono mide 36×36 y un -7 lo despegaría visualmente
+   de la fila. Fondo `azul-50` suave (sin borde, sin blanco) como en los
+   iconos de acción de Linear/Notion/Things.
+   ============================================================================ */
+
+button.boton-reloj {
+  transition:
+    background-color 0.3s ease 0s,
+    color 0.3s ease 0s,
+    box-shadow 0.3s ease 0s,
+    transform 0.3s ease 0s;
+}
+
+button.boton-reloj:hover:not(:disabled) {
+  background: var(--color-azul-50);
+  color: var(--color-azul-600);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px -2px rgba(18, 115, 234, 0.35);
+}
+
+button.boton-reloj:active:not(:disabled) {
+  background: var(--color-azul-100);
+  color: var(--color-azul-600);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(18, 115, 234, 0.25);
+}
+
+/* ===========================================================================
+   Reduced motion: los botones siguen cambiando de color, pero no se mueven.
+   Se usa `button.boton-*` para igualar la especificidad de las reglas de
+   arriba; si no, el override del bloque anterior no las anularía.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  button.boton-finalizar {
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  button.boton-finalizar:hover:not(:disabled),
+  button.boton-finalizar:active:not(:disabled) {
+    transform: none;
+  }
+  button.boton-reloj {
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  button.boton-reloj:hover:not(:disabled),
+  button.boton-reloj:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Botones de minutos del modal «Preparar al siguiente turno»
+   ===========================================================================
+   Mismo hover que «Finalizar» —translación −7 px y sombra grande— pero SIN
+   el cambio a rojo. Aquí no hay nada destructivo: se está preparando al
+   siguiente, no cerrando nada. El fondo se queda en la familia del azul
+   (`azul-50` al hover, `azul-100` al clic) y el texto sube a `azul-700`
+   para mantener el contraste.
+
+   El `box-shadow` usa el azul de acción al 35-40 %. Una sombra neutra
+   (negra) sobre un botón con borde blanco se ve como una mancha; la sombra
+   del mismo color que el foco se lee como luz, que es la convención de
+   Material 3 y de Vercel.
+
+   La curva es la del bloque de referencia (`0.3s ease 0s`). El
+   `transition` lista las propiedades explícitamente, no `all`: animar
+   `all` incluye `padding` y `width`, que aquí no cambian pero que en
+   estado `disabled` darían saltos de layout.
+   ============================================================================ */
+
+button.boton-aviso-minutos {
+  transition:
+    background-color 0.3s ease 0s,
+    border-color 0.3s ease 0s,
+    color 0.3s ease 0s,
+    box-shadow 0.3s ease 0s,
+    transform 0.3s ease 0s;
+}
+
+button.boton-aviso-minutos:hover:not(:disabled) {
+  background: var(--color-azul-50);
+  border-color: var(--color-azul-500);
+  color: var(--color-azul-700);
+  box-shadow: 0 15px 20px rgba(18, 115, 234, 0.35);
+  transform: translateY(-7px);
+}
+
+button.boton-aviso-minutos:active:not(:disabled) {
+  background: var(--color-azul-100);
+  border-color: var(--color-azul-600);
+  color: var(--color-azul-700);
+  box-shadow: 0 4px 8px rgba(18, 115, 234, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Reduced motion: sin desplazamiento, pero el cambio de color se queda. */
+@media (prefers-reduced-motion: reduce) {
+  button.boton-aviso-minutos {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  button.boton-aviso-minutos:hover:not(:disabled),
+  button.boton-aviso-minutos:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Fix: el hover de los minutos no se veía por `animation-fill-mode: both`
+   ===========================================================================
+   La animación de entrada de `.aviso-modal-opciones > button` termina con
+   `transform: translateY(0)` y, con `fill-mode: both`, ese valor se queda
+   pegado indefinidamente. En la cascada de CSS, las animaciones van por
+   encima de las reglas normales —incluso de `:hover`, incluso con
+   `!important`—, así que el `transform: translateY(-7px)` del hover no
+   tenía ningún efecto.
+
+   `backwards` (en lugar de `both`) hace lo mismo DURANTE el delay (aplica
+   el 0% para que el botón no aparezca de golpe), pero NO retiene el 100%
+   al terminar. Al acabarse la animación, el `transform` vuelve a las
+   reglas normales y el `:hover` por fin puede escribir el suyo.
+
+   Se reescriben los cinco selectores (base + 4 nth-child) porque el
+   shorthand `animation:` de la regla con más especificidad gana al
+   `animation-fill-mode` suelto; hay que tocar el shorthand.
+
+   Mismo `aviso-opcion-late` (el pulso de «5 min») se queda con su
+   `fill-mode` por defecto (`none`): libera `box-shadow` en cuanto terminan
+   sus 3 iteraciones (~5,4 s), y el hover del box-shadow ya funciona.
+   ============================================================================ */
+
+.aviso-modal-opciones > button {
+  animation: aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.aviso-modal-opciones > button:nth-child(1) {
+  animation:
+    aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) 60ms 1 backwards,
+    aviso-opcion-late 1.8s ease-in-out 600ms 3;
+}
+
+.aviso-modal-opciones > button:nth-child(2) {
+  animation: aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) 120ms 1 backwards;
+}
+
+.aviso-modal-opciones > button:nth-child(3) {
+  animation: aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) 180ms 1 backwards;
+}
+
+.aviso-modal-opciones > button:nth-child(4) {
+  animation: aviso-opcion-entra 340ms cubic-bezier(0.22, 1, 0.36, 1) 240ms 1 backwards;
+}
+
+/* ===========================================================================
+   Botones de minutos — píldora con fondo azul sólido al hover
+   ===========================================================================
+   QUÉ CAMBIA RESPECTO AL BLOQUE ANTERIOR
+
+   Reposo:  blanco con borde gris (el `boton-secundario` de siempre).
+   Hover:   fondo AZUL-500 SÓLIDO + texto blanco + PÍLDORA (999px) + 7 px
+            de elevación + sombra azul grande.
+   Clic:    fondo azul-600 + 1 px.
+
+   POR QUÉ `!important`
+   El `boton-secundario` es una clase Tailwind con `rounded-lg` (8 px) y
+   `bg-white`. La especificidad de `.boton-secundario` es 0,1,0; la de
+   `button.boton-aviso-minutos` es 0,1,1. Debería ganar sola, pero Tailwind
+   v4 aplica `rounded-lg` como `border-radius: 0.5rem` a veces con mayor
+   prioridad de la cuenta (por el orden de capas). Para no depender del
+   orden de `@layer`, se fuerza con `!important` en las tres propiedades
+   del cambio (fondo, texto, radio). El `background` del reposo se
+   mantiene (lo pone el botón), solo se sobrescribe el `:hover`.
+
+   La sombra es azul-500 al 40 %, no negra: una sombra oscura sobre un
+   botón azul se lee como una mancha; la del mismo tono se lee como luz.
+
+   Las transiciones de `border-radius` no se animan (no tiene sentido
+   morfológico), pero el `transition` del shorthand lo listaría como
+   propiedad inerte: se omite para no confundir.
+   ============================================================================ */
+
+button.boton-aviso-minutos {
+  border-radius: 999px !important;
+  transition:
+    background-color 0.3s ease 0s,
+    color 0.3s ease 0s,
+    border-color 0.3s ease 0s,
+    box-shadow 0.3s ease 0s,
+    transform 0.3s ease 0s;
+}
+
+button.boton-aviso-minutos:hover:not(:disabled) {
+  background: var(--color-azul-500) !important;
+  border-color: var(--color-azul-500) !important;
+  color: #fff !important;
+  box-shadow: 0 15px 20px rgba(18, 115, 234, 0.4) !important;
+  transform: translateY(-7px) !important;
+}
+
+button.boton-aviso-minutos:active:not(:disabled) {
+  background: var(--color-azul-600) !important;
+  border-color: var(--color-azul-600) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 8px rgba(18, 115, 234, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.boton-aviso-minutos {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  button.boton-aviso-minutos:hover:not(:disabled),
+  button.boton-aviso-minutos:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Contenedor de los minutos: cuna hundida
+   ===========================================================================
+   PROBLEMA: el fondo `azul-50` (casi blanco) y los botones blancos del
+   `boton-secundario` se confundían. Los botones parecían "pegados" al
+   fondo en vez de estar dentro de algo.
+
+   SOLUCIÓN (patrón de carril / segmented control)
+
+   1. El CONTENEDOR se hunde: `box-shadow: inset` arriba-oscuro y
+      abajo-claro, como el riel de un switch iOS. Se lee como una cuna y
+      los botones pasan a estar "dentro" de ella, no "encima" del mismo
+      color.
+
+   2. Los BOTONES flotan: `box-shadow` externa muy sutil (1 px de
+      contacto + 2 px de difusión). Ya no se confunden con el fondo
+      porque proyectan una sombra propia encima de él.
+
+   3. El borde del contenedor (`gris-200`) cierra la cuna por los cuatro
+      lados. Sin él, un `box-shadow: inset` sobre fondo claro a veces se
+      ve como una mancha sin forma.
+
+   POR QUÉ `inset` Y NO UN BORDE MÁS GRUESO
+   Un borde de 2 px por dentro solo se aplica a los 4 lados, sin
+   gradiente. El `inset` sí puede tener dos luces (arriba oscura, abajo
+   clara) y eso es lo que da la sensación de profundidad real sin tocar
+   el `padding` ni el tamaño del contenedor.
+
+   La sombra exterior del contenedor es MUY sutil a propósito: aquí ya
+   hay mucha sombra (la caja del modal, la del hover del botón). Sumar
+   otra encima convertiría el grupo en una "caja dentro de una caja".
+   Solo se pone una micro-luz de 0 1px 0 blanco debajo, para separar del
+   blanco de la tarjeta cuando caiga sobre uno de los párrafos.
+
+   Todo respeta `prefers-reduced-motion`: la sombra no anima nada, así
+   que no hace falta apagarla.
+   ============================================================================ */
+
+.aviso-modal-opciones {
+  /* Un poco más de padding: la cuna necesita respirar para que el inset
+     se vea; con 0.5rem el inset quedaba casi pegado a los botones. */
+  padding: 0.55rem 0.65rem;
+  border-radius: 999px;
+  background: var(--color-azul-50);
+  /* Borde suave: cierra la cuna por los cuatro lados sin competir con el
+     inset. */
+  border: 1px solid var(--color-gris-200);
+
+  /*
+   * Sombra interior: dos luces (arriba oscura, abajo clara) → profundidad.
+   * Sombra exterior: 1 px blanco debajo → separa del blanco de la tarjeta
+   * cuando el contenedor cae sobre un párrafo.
+   */
+  box-shadow:
+    inset 0 1px 3px rgba(23, 43, 68, 0.10),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* ===========================================================================
+   Botones de minuto: en reposo, flotan sobre la cuna
+   ===========================================================================
+   La sombra externa de reposo es la que hace que los botones "estén por
+   encima" del azul del contenedor. Es MUY pequeña (1 px de contacto + 2 px
+   de difusión) a propósito: ya hay sombra grande en el hover, esta solo
+   separa en reposo.
+
+   Al hacer hover, la sombra de reposo se sustituye por la grande azul.
+   ============================================================================ */
+
+button.boton-aviso-minutos {
+  /* `box-shadow` en el shorthand del reposo: la sombra del `boton-secundario`
+     original tiene la misma especificidad, pero la de aquí va después en el
+     CSS. Si en algún momento se reordena el CSS, esta sigue ganando porque
+     el selector es más específico. */
+  box-shadow:
+    0 1px 2px rgba(23, 43, 68, 0.10),
+    0 1px 0 rgba(23, 43, 68, 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* La sombra del contenedor y de los botones NO es movimiento; el bloque
+     queda igual. No hace falta apagarla. */
+}
+
+/* ===========================================================================
+   Cuna + botones del modal de minutos — versión visible
+   ===========================================================================
+   La versión anterior era demasiado sutil: los tonos (azul-50 casi blanco,
+   sombra de 0.10) no se distinguían del blanco de la tarjeta del modal.
+   Aquí se sube el contraste en las tres capas, sin que se vea "pesado":
+
+     · FONDO del contenedor     azul-50  → azul-100
+     · BORDE del contenedor     gris-200 → gris-300
+     · INSET                   0.10/3px → 0.18/4px  (más profundo y más oscuro)
+     · SOMBRA exterior contenedor: se añade 0 2px 4px rgba(23,43,68,0.08) para
+       separarlo del blanco de la tarjeta del modal, no solo del párrafo
+     · BOTONES en reposo        sombra de 0.10/2px → 0.14/4px + contacto
+       de 0.08/2px. Ahora se ven claramente "encima" de la cuna.
+     · BOTONES en reposo        se añade un `outline` interior blanco de 1 px
+       (ring interno) que separa el borde del botón del fondo azul aunque
+       el botón caiga justo en el borde de la cuna.
+
+   El radio de la cuna y los botones sigue en píldora (999px). Los botones
+   conservan el hover −7 px azul sólido que ya tenían.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   Contenedor: cuna más profunda y más marcada
+   --------------------------------------------------------------------------- */
+.aviso-modal-opciones {
+  background: var(--color-azul-100) !important;
+  border: 1px solid var(--color-gris-300) !important;
+  box-shadow:
+    inset 0 2px 4px rgba(23, 43, 68, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 4px rgba(23, 43, 68, 0.08) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Botones: en reposo, sombra real (ya no son "planos")
+   --------------------------------------------------------------------------- */
+button.boton-aviso-minutos {
+  /* Sombra de reposo: un filo de contacto (1 px casi sin difusión) + una
+     sombra media. Es la diferencia entre "pegado" y "apoyado". */
+  box-shadow:
+    0 1px 2px rgba(23, 43, 68, 0.14),
+    0 2px 4px rgba(23, 43, 68, 0.08),
+    /* El anillo interior blanco evita que el borde del botón se "coma" con
+       el azul del contenedor cuando está justo al borde de la cuna. */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  /*
+   * El borde explícito: el `boton-secundario` ya trae `border-gris-200`, pero
+   * se fuerza uno un poco más oscuro para que el botón tenga un contorno
+   * definido sobre el `azul-100` de la cuna.
+   */
+  border-color: var(--color-gris-300) !important;
+}
+
+/* Hover: el botón mantiene la elevación grande, y ahora la sombra azul se
+   ve aún más porque el fondo del contenedor es más oscuro. Se refuerza
+   ligeramente (0.40 → 0.45) para que no se quede corta. */
+button.boton-aviso-minutos:hover:not(:disabled) {
+  box-shadow: 0 15px 20px rgba(18, 115, 234, 0.45) !important;
+  border-color: var(--color-azul-500) !important;
+}
+
+/* Clic: mismo ajuste. */
+button.boton-aviso-minutos:active:not(:disabled) {
+  box-shadow: 0 4px 8px rgba(18, 115, 234, 0.35) !important;
+  border-color: var(--color-azul-600) !important;
+}
+
+/* ===========================================================================
+   .boton-pildora — píldora con hover elevado y azul sólido
+   ===========================================================================
+   Extrae el efecto de los botones de minutos del modal «Avisar al siguiente
+   turno» a una clase reutilizable. Se aplica a cualquier botón que deba
+   sentirse "vivo" al pasar el cursor: «Asignar módulo», «Buscar», etc.
+
+   Reposo: mantiene el fondo del botón que lo acompaña (boton-secundario o
+   boton-primario), pero con forma de píldora completa.
+   Hover: fondo azul-500 sólido + texto blanco + −7px + sombra azul grande.
+   Active: azul-600 + −1px.
+
+   El !important es necesario porque boton-secundario y boton-primario ya
+   definen border-radius, background y color con su propia especificidad.
+   =========================================================================== */
+
+button.boton-pildora {
+  border-radius: 999px !important;
+  transition:
+    background-color 0.3s ease 0s,
+    color 0.3s ease 0s,
+    border-color 0.3s ease 0s,
+    box-shadow 0.3s ease 0s,
+    transform 0.3s ease 0s;
+}
+
+button.boton-pildora:hover:not(:disabled) {
+  background: var(--color-azul-500) !important;
+  border-color: var(--color-azul-500) !important;
+  color: #fff !important;
+  box-shadow: 0 15px 20px rgba(18, 115, 234, 0.45) !important;
+  transform: translateY(-7px) !important;
+}
+
+button.boton-pildora:active:not(:disabled) {
+  background: var(--color-azul-600) !important;
+  border-color: var(--color-azul-600) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 8px rgba(18, 115, 234, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+button.boton-pildora:focus-visible {
+  outline: 3px solid var(--color-azul-400);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.boton-pildora {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  button.boton-pildora:hover:not(:disabled),
+  button.boton-pildora:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Sombra de reposo para .boton-pildora
+   ===========================================================================
+   Los botones de minutos tienen una sombra sutil en reposo que los hace
+   "flotar" sobre el fondo blanco del modal. Sin ella, un botón blanco con
+   borde gris parece pegado a la tarjeta (parece una caja de texto).
+
+   Esta regla se aplica después de la de `.boton-pildora` (arriba), así que
+   sobreescribe el `box-shadow` de reposo. El `:hover` sigue teniendo
+   prioridad porque va después y lleva `!important` con la sombra grande.
+
+   El `inset 0 0 0 1px rgba(255,255,255,0.9)` es un anillo interior blanco:
+   evita que el borde gris se "coma" con el fondo claro cuando el botón
+   está justo al borde de la tarjeta. Solo tiene efecto visual si el botón
+   es blanco (boton-secundario); en un botón azul (boton-primario) el anillo
+   blanco también se ve bien porque separa el relleno del borde.
+   =========================================================================== */
+
+button.boton-pildora {
+  box-shadow:
+    0 1px 2px rgba(23, 43, 68, 0.18),
+    0 2px 4px rgba(23, 43, 68, 0.10),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9) !important;
 }
