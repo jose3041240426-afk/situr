@@ -147,6 +147,15 @@ self.addEventListener('push', (event) => {
     carga = {}
   }
 
+  // Aviso a la página abierta, para que se vea en pantalla aunque el
+  // sistema operativo no muestre la notificación (bloqueo, canal silenciado,
+  // ahorro de batería). Es diagnóstico y no rompe nada si no hay página.
+  try {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      for (const c of cs) c.postMessage({ tipo: 'push-recibido', carga })
+    })
+  } catch (e) { /* sin clientes, no hace nada */ }
+
   const titulo = carga.title || 'SITUR · Su turno'
   const cuerpo = carga.body || 'Su turno está próximo.'
   const folio = carga.codigo || ''

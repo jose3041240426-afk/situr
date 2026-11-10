@@ -51,6 +51,8 @@ export default function TurnoCiudadano() {
   const [yaDecidio, setYaDecidio] = useState(false)
   const [probandoAviso, setProbandoAviso] = useState(false)
   const [resultadoPrueba, setResultadoPrueba] = useState<string | null>(null)
+  const [diagnostico, setDiagnostico] = useState<string | null>(null)
+  const [probandoDiag, setProbandoDiag] = useState(false)
   /** Activando la suscripción push (paso 1 → paso 2). */
   const [activando, setActivando] = useState(false)
   /** Error visible del paso 1 (suscripción). */
@@ -279,6 +281,33 @@ export default function TurnoCiudadano() {
       setPasoModalAviso(2)
     } finally {
       setActivando(false)
+    }
+  }
+
+  async function comprobarAviso() {
+    setProbandoDiag(true)
+    setDiagnostico(null)
+    try {
+      const sw = await navigator.serviceWorker.getRegistration('/')
+      const sub = sw ? await sw.pushManager.getSubscription() : null
+      const partes = []
+      partes.push(`Permiso: ${'Notification' in window ? Notification.permission : 'sin Notification'}`)
+      partes.push(`Service Worker: ${sw ? (sw.active ? 'activo' : 'no activo') : 'no registrado'}`)
+      partes.push(`Suscripción: ${sub ? 'guardada en el navegador' : 'no hay'}`)
+      if (sub) {
+        try {
+          const r = await fetch(`/api/probar-aviso?token=${encodeURIComponent(token)}`)
+          const d = await r.json()
+          partes.push(`Servidor: ${d.ok ? 'enviado (debe sonar)' : d.motivo}`)
+        } catch {
+          partes.push('Servidor: no respondió')
+        }
+      }
+      setDiagnostico(partes.join(' · '))
+    } catch (e) {
+      setDiagnostico('No se pudo comprobar: ' + (e instanceof Error ? e.message : 'desconocido'))
+    } finally {
+      setProbandoDiag(false)
     }
   }
 
@@ -729,6 +758,20 @@ export default function TurnoCiudadano() {
             {resultadoPrueba && (
               <p className="max-w-xs text-center text-[11px] text-gris-700">
                 {resultadoPrueba}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void comprobarAviso()}
+              disabled={probandoDiag}
+              className="text-[11px] text-gris-400 underline hover:text-azul-600 disabled:opacity-60"
+            >
+              {probandoDiag ? 'Comprobando…' : 'Comprobar el aviso'}
+            </button>
+            {diagnostico && (
+              <p className="max-w-xs text-center text-[11px] text-gris-500">
+                {diagnostico}
               </p>
             )}
           </div>
