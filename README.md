@@ -451,6 +451,7 @@ Las claves VAPID se generan una vez con `scripts/generar-secretos.mjs`.
 | `scripts/arrancar.mjs` | Crea el administrador en Supabase Auth y lo enlaza con `usuarios.auth_uid`; comprueba que el sistema responde |
 | `scripts/conectar-supabase.sh` | **Base de datos**: enlaza el proyecto, aplica las 20 migraciones, siembra los catálogos y comprueba que responde |
 | `scripts/subir-vercel.sh` | **Aplicación**: pasa las variables de `secretos.env` a Vercel y despliega |
+| `scripts/psql-supabase.sh` | Sesión SQL contra el proyecto de Supabase (o una consulta con `-c`) |
 | `scripts/desplegar.sh` | Los dos anteriores, en orden |
 
 Los tres de despliegue aceptan `--dry-run` (enseñan lo que harían sin tocar
