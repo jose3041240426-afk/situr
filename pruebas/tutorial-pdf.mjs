@@ -112,6 +112,8 @@ const html = `<!doctype html>
   li { margin-bottom: 4pt; }
   .portada { text-align: center; padding-top: 55mm; page-break-after: always; }
   .portada p { color: #4a6a99; }
+  /* El cierre no se pega al ultimo paso: cada seccion empieza en su hoja. */
+  .cierre { page-break-before: always; break-before: page; margin-top: 4mm; }
 </style></head><body>
 
 <div class="portada">

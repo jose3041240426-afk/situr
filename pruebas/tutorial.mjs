@@ -28,7 +28,15 @@
  *     real y un push service. Se documenta el paso, no se finge la captura.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
@@ -150,14 +158,40 @@ const escritorio = await navegador.newContext({
   deviceScaleFactor: 1,
 })
 let contextoMovil = null
+let perfilMovil = null
+
+/*
+  El contexto del ciudadano va con PERFIL PERSISTENTE, y no con uno incógnito
+  como el del operador.
+
+  El motivo es el modal de aviso en dos pasos: para llegar al segundo paso el
+  ciudadano tiene que suscribirse de verdad a los avisos push, y **Chrome
+  desactiva el Push API en modo incógnito** (crbug.com/41124656). Con perfil
+  propio la suscripción se crea contra FCM y el recorrido enseña el flujo
+  real en vez de quedarse en el paso 1 con un error.
+
+  El perfil se crea en un directorio nuevo de cada vuelta y se borra al
+  cerrar: lo que interesa del perfil es que NO sea incógnito, no conservar
+  nada entre ejecuciones.
+*/
 const movil = async () => {
   if (!contextoMovil) {
-    contextoMovil = await navegador.newContext({
+    perfilMovil = mkdtempSync(path.join(tmpdir(), 'situr-movil-'))
+    contextoMovil = await chromium.launchPersistentContext(perfilMovil, {
+      executablePath: chrome,
+      headless: true,
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
+      args: ['--no-sandbox', '--disable-extensions', '--disable-background-networking'],
     })
+    // El permiso de notificaciones se concede ANTES de preguntarle al
+    // ciudadano: si no, el diálogo del navegador sale en medio de la captura
+    // y el paso 2 no se puede enseñar.
+    await contextoMovil
+      .grantPermissions(['notifications'], { origin: new URL(urlBase).origin })
+      .catch(() => undefined)
   }
   return contextoMovil
 }
@@ -228,8 +262,13 @@ async function quitarMarcas(pagina) {
  * primera carga tarda en montar, y una foto de una página vacía es una
  * foto que no enseña nada. Si el texto no aparece, es un fallo del
  * recorrido, no una foto rara.
+ *
+ * `respiro` cambia la pausa entre que el texto aparece y la foto (por
+ * omisión, 900 ms). Se puede bajar a 0 cuando la pantalla cambia sola a los
+ * pocos milisegundos y la foto tiene que cogerla ANTES (el portal del
+ * ciudadano, que abre su modal de aviso 800 ms después de pintar).
  */
-async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
+async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = [], respiro) {
   if (debeVerse && process.env.SITUR_SIN_CHECK !== '1') {
     try {
       await pagina.getByText(debeVerse, { exact: false }).first().waitFor({
@@ -298,7 +337,8 @@ async function capturar(pagina, slug, titulo, texto, debeVerse, marcas = []) {
   // Un respiro antes de la foto: si se captura en el mismo instante en que
   // el texto aparece, la pagina puede estar todavia pintando y la foto sale
   // a medio hacer, o el renderizador se queda sin aire.
-  if (debeVerse) await espera(process.env.SITUR_SIN_CHECK === '1' ? 4000 : 900)
+  if (debeVerse)
+    await espera(process.env.SITUR_SIN_CHECK === '1' ? 4000 : (respiro ?? 900))
   for (const [objetivo, etiqueta] of marcas) await marcar(pagina, objetivo, etiqueta)
   // La captura se reintenta: si el renderizador se queda sin memoria a
   // media foto, antes que dejar el tutorial a medias se prueba otra vez.
@@ -336,6 +376,42 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 async function cerrarMovil() {
   await contextoMovil?.close().catch(() => undefined)
   contextoMovil = null
+  // El perfil temporal se borra: en una máquina con poco disco el perfil de
+  // Chromium crece y /tmp se llena (si /tmp se llena, Chromium crashea).
+  if (perfilMovil) {
+    try {
+      rmSync(perfilMovil, { recursive: true, force: true })
+    } catch {
+      // No estorba: si el directorio no se puede borrar, se queda y ya.
+    }
+    perfilMovil = null
+  }
+}
+
+/**
+ * Pulsa el boton cuyo nombre accesible es EXACTAMENTE `texto`.
+ *
+ * `pulsar()` busca por subcadena (`button:has-text`), y eso muerde cuando el
+ * texto es corto y aparece dentro de la etiqueta de otro control: «Llamar»
+ * tambien casa con el selector «Modulo al que llamar», que va antes en el
+ * DOM, asi que el clic abria el desplegable de modulos y el dialogo de
+ * confirmacion de la llamada no llegaba a abrirse nunca. Para esos botones
+ * se busca el nombre accesible exacto, que Playwright calcula como lo
+ * anunciaria un lector de pantalla.
+ */
+async function pulsarExacto(pagina, texto) {
+  const boton = pagina.getByRole('button', { name: texto, exact: true }).first()
+  try {
+    await boton.waitFor({ state: 'visible', timeout: 25000 })
+    await boton.click()
+  } catch (e) {
+    const visto = await pagina
+      .evaluate(() => document.body?.innerText?.slice(0, 300) ?? '')
+      .catch(() => '(no se pudo leer la pagina)')
+    throw new Error(
+      `No se pudo pulsar «${texto}» (exacto).\n      Lo que si se ve: ${visto.replace(/\n/g, ' | ')}`,
+    )
+  }
 }
 
 /**
@@ -495,7 +571,15 @@ if (await botonAbrir.count()) {
 // ===========================================================================
 // 3. Emitir un turno y ver el boleto
 // ===========================================================================
-await op.selectOption('select.selector', { index: 0 }).catch(() => {})
+/*
+  El trámite viene elegido (el primero del catálogo) y el control es un
+  `Selector` propio, no un `<select>` nativo, así que no hay `selectOption`
+  que hacer aquí: se espera a que el formulario esté montado y se emite.
+*/
+await op
+  .locator('button[aria-haspopup="listbox"]')
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
 await op.waitForTimeout(300)
 await pulsar(op, 'Emitir turno')
 await op.waitForTimeout(2800)
@@ -537,24 +621,214 @@ await op.emulateMedia({ media: 'screen' })
 await op.waitForTimeout(400)
 
 // ===========================================================================
-// 4. El ciudadano escanea el QR
+// 3b. Emitir un lote (la mañana entera, de una vez)
+// ===========================================================================
+/*
+  La consola tiene DOS modos de emisión (migración 009): un turno, o un lote
+  repartido por trámite. Además, este paso es el que deja la jornada con más
+  de diez turnos emitidos, que es lo que hace que el historial enseñe su
+  paginador de verdad (migración 019) y no una sola página con tres filas.
+*/
+await op.locator('label[for="modo-varios-turnos"]').click()
+await op.locator('input[placeholder="ej. 100"]').fill('12')
+await pulsar(op, 'Repartir')
+// El botón solo dice «Emitir 12 turnos» cuando el reparto suma 12: esperar a
+// ese texto comprueba que «Repartir» repartió de verdad.
+await op
+  .locator('button:has-text("Emitir 12 turnos")')
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await pulsar(op, 'Emitir 12 turnos')
+await capturar(
+  op,
+  'lote',
+  'Emitir un lote de turnos',
+  'En **«Varios turnos»** se escribe un total y se pulsa **«Repartir»**, que' +
+    ' lo divide entre los trámites elegidos. Después, **«Emitir 12 turnos»**' +
+    ' da de alta los doce de una sola llamada atómica: o salen los doce o no' +
+    ' sale ninguno. La notificación flotante deja los folios a la vista para' +
+    ' poder dictarlos.',
+  '12 turnos emitidos',
+  [[op.locator('.notificacion').first(), 'los folios del lote, recién emitidos']],
+)
+
+// ===========================================================================
+// 3c. El papel que ya se entregó (marca manual)
+// ===========================================================================
+/*
+  LA CASILLA DETRÁS DEL NÚMERO (migración 020).
+
+  De un lote salen doce papeles iguales. Cuando el operador entrega uno a una
+  persona, el turno sigue en WAITING y nada lo distingue de los otros once que
+  quedan en el montón. El código del turno es la casilla: se pulsa una vez y
+  la fila se ilumina de azul. No se deshace, porque nadie registra que un
+  papel vuelva al montón; y la marca no cambia el estado ni el orden de
+  llamada: es información de recepción.
+*/
+/*
+  El aviso del lote del paso anterior sigue abierto y flota sobre la tabla:
+  se cierra antes de fotografiar, o taparía las filas de abajo.
+*/
+await op.keyboard.press('Escape')
+await op.waitForTimeout(400)
+await op.locator('label:has-text("C-002")').first().click()
+await op.waitForTimeout(1500)
+// La cola, encuadrada desde su cabecera: si no, la foto arranca a media
+// página y no se ve a qué tabla pertenece la fila marcada.
+await op
+  .locator('h2:has-text("Cola de espera")')
+  .first()
+  .evaluate((el) => el.scrollIntoView({ block: 'start' }))
+await op.waitForTimeout(400)
+await capturar(
+  op,
+  'papel-entregado',
+  'El papel que ya se entregó',
+  'El operador entregó el papel **C-002** a una persona. El turno sigue **en ' +
+    'espera**, pero ese papel ya no está en el montón: al pulsar el código se ' +
+    'marca y la fila se ilumina de azul. La casilla está **detrás del ' +
+    'número** y se pulsa una sola vez; deshacerla exigiría saber si el papel ' +
+    'vuelve, y eso nadie lo registra.',
+  'el papel ya tiene dueño',
+  [[op.locator('tr:has-text("C-002")').first(), 'este papel ya tiene dueño']],
+)
+
+// ===========================================================================
+// 4. El ciudadano escanea el QR, y el portal pregunta por el aviso
 // ===========================================================================
 const ciudad = await (await movil()).newPage()
 await abrir(ciudad, `/turno/${token}`)
+/*
+  Respiro 0: el portal abre el modal de aviso 800 ms después de pintar el
+  turno (DRS §5.2, paso 3: el permiso se pide DESPUÉS de mostrar el turno).
+  La primera foto tiene que coger la ficha ANTES de que se abra el diálogo.
+*/
 await capturar(
   ciudad,
   'ciudadano',
   'El ciudadano escanea el QR',
   'Al escanear el QR, el teléfono abre el portal: el **estado** arriba, ' +
     'el **código de turno** en su caja, y debajo los datos del turno con ' +
-    'su icono. A la derecha, **«Tu turno en números»**. **No hay cuenta, ' +
+    'su icono. Más abajo, **«Tu turno en números»**. **No hay cuenta, ' +
     'ni registro, ni correo, ni teléfono**: el token del QR es la única ' +
     'credencial, y solo mientras el turno siga vivo.',
   'SU TURNO',
-  [[ciudad.locator('h1.text-5xl').first(), 'su código']],
+  [[ciudad.locator('h1').first(), 'su código']],
+  0,
 )
 
-await ciudad.locator('summary:has-text("Aviso de privacidad")').click()
+/*
+  EL AVISO EN DOS PASOS (RF-028).
+
+  Paso 1: la pregunta, sin pedir todavía ningún permiso al navegador. Si el
+  ciudadano dice que no, se guarda la decisión y no se vuelve a preguntar.
+*/
+await ciudad
+  .getByText('¿Le avisamos cuando se acerque su turno?', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await capturar(
+  ciudad,
+  'aviso-paso-1',
+  'El aviso, paso 1 de 2',
+  'A los pocos milisegundos de abrir el portal aparece **«¿Le avisamos ' +
+    'cuando se acerque su turno?»**. Se pulsa **«Sí, avísame»**: recién ' +
+    'entonces el navegador pide permiso para notificar, nunca antes de ' +
+    'haber enseñado el turno. **«No, gracias»** deja la decisión guardada ' +
+    'y no vuelve a molestar.',
+  '¿Le avisamos cuando se acerque su turno?',
+  [[ciudad.locator('button:has-text("Sí, avísame")'), '«Sí, avísame»']],
+)
+
+await pulsar(ciudad, 'Sí, avísame')
+/*
+  El paso 2 solo se alcanza si la suscripción salió bien: la suscripción es
+  real (endpoint de FCM, claves p256dh y auth) y viaja a `/api/suscripcion`,
+  que es por donde el Edge Middleware aplica el límite por IP + token.
+*/
+await ciudad
+  .getByText('¿Cómo prefiere el aviso?', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 30000 })
+await capturar(
+  ciudad,
+  'aviso-paso-2',
+  'El aviso, paso 2 de 2',
+  'Con la suscripción activa, el segundo paso pregunta **cómo** quiere el ' +
+    'aviso: **«Con tiempo · 15 min»** para el que se va a alejar, o ' +
+    '**«Rápido · 5 min»** para el que está cerca. Se elige el primero.',
+  '¿Cómo prefiere el aviso?',
+  [[ciudad.locator('button:has-text("Con tiempo · 15 min")'), '«Con tiempo · 15 min»']],
+)
+
+await pulsar(ciudad, 'Con tiempo · 15 min')
+// La preferencia guardada es lo que hace aprecer «Cambiar preferencia…»:
+// ver ese botón es la comprobación de que se guardó.
+await ciudad
+  .getByText('Cambiar preferencia de aviso', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await capturar(
+  ciudad,
+  'preferencia-guardada',
+  'La preferencia, guardada',
+  'El portal vuelve a su sitio con la preferencia ya escrita en la base, ' +
+    'ligada al token: aparece **«Cambiar preferencia de aviso»**. No hace ' +
+    'falta cuenta ni correo: el turno es el que recibe el aviso.',
+  'Cambiar preferencia de aviso',
+  [[ciudad.locator('button:has-text("Cambiar preferencia de aviso")'), 'su preferencia, ya guardada']],
+)
+
+/*
+  RECARGA: la decisión se recuerda. Al volver a entrar no se vuelve a abrir
+  el modal, y la preferencia sigue ahí. Se comprueba de verdad: si el modal
+  se reabriera, el `waitFor` de «detached» fallaría.
+*/
+await ciudad.reload({ waitUntil: 'domcontentloaded' })
+await ciudad
+  .getByText('Cambiar preferencia de aviso', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await espera(1600)
+await ciudad
+  .getByText('¿Cómo prefiere el aviso?', { exact: false })
+  .first()
+  .waitFor({ state: 'detached', timeout: 4000 })
+await capturar(
+  ciudad,
+  'preferencia-recarga',
+  'La preferencia sobrevive a la recarga',
+  'Se recarga la página y **no vuelve a salir la pregunta**: la elección ' +
+    'quedó guardada con el turno. Si le hubiera dado a «No, gracias», aquí ' +
+    'aparecería el botón **«Quiero que me avisen»** para cambiar de opinión.',
+  'Cambiar preferencia de aviso',
+)
+
+/*
+  CAMBIAR DE PREFERENCIA: el mismo paso 2, abierto desde el enlace.
+*/
+await pulsar(ciudad, 'Cambiar preferencia de aviso')
+await ciudad
+  .getByText('¿Cómo prefiere el aviso?', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await capturar(
+  ciudad,
+  'cambiar-preferencia',
+  'Cambiar la preferencia después',
+  'Se pulsa **«Cambiar preferencia de aviso»** y vuelve el paso 2: la ' +
+    'decisión no es definitiva. Esta vez se elige **«Rápido · 5 min»**.',
+  '¿Cómo prefiere el aviso?',
+  [[ciudad.locator('button:has-text("Rápido · 5 min")'), '«Rápido · 5 min»']],
+)
+await pulsar(ciudad, 'Rápido · 5 min')
+await ciudad
+  .getByText('Cambiar preferencia de aviso', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await espera(600)
+
+await ciudad.locator('button:has-text("Aviso de privacidad")').click()
 await ciudad.waitForTimeout(900)
 await capturar(
   ciudad,
@@ -564,9 +838,9 @@ await capturar(
     'sistema cumple de verdad qué se guarda, durante cuánto, quién es el ' +
     'tercero cuando se aceptan los avisos y cómo se retira el permiso.',
   'Aviso de privacidad',
-  [[ciudad.locator('summary:has-text("Aviso de privacidad")'), '«Aviso de privacidad»']],
+  [[ciudad.locator('button:has-text("Aviso de privacidad")'), '«Aviso de privacidad»']],
 )
-await ciudad.locator('summary:has-text("Aviso de privacidad")').click()
+await ciudad.locator('button:has-text("Aviso de privacidad")').click()
 await ciudad.waitForTimeout(500)
 // El portal del ciudadano ya no hace falta hasta el paso del turno llamado:
 // se cierra entero (el contexto incluido) para no acumular renderizadores.
@@ -588,14 +862,14 @@ await capturar(
     'orden es global entre trámites (no es un «orden por trámite» que ' +
     'jerarquice sin querer).',
   'EL SISTEMA VA A LLAMAR A',
-  [[op.locator('button:has-text("Llamar")').first(), '«Llamar»']],
+  [[op.getByRole('button', { name: 'Llamar', exact: true }), '«Llamar»']],
 )
 /*
   La llamada ahora pide confirmación (v1.9): «Llamar» abre un diálogo con a
   quién va a llamar el sistema y con lo que va a pasar. El tutorial recoge
   ese diálogo, porque es parte del flujo.
 */
-await pulsar(op, 'Llamar')
+await pulsarExacto(op, 'Llamar')
 await op.waitForTimeout(1200)
 await capturar(
   op,
@@ -627,9 +901,9 @@ await capturar(
   'El teléfono se repinta solo: el portal sondea su turno cada diez ' +
     'segundos (el camino rápido es un canal de difusión que solo dice ' +
     '«cambió», nunca lleva datos). Nadie tiene que recargar, y el ciudadano ' +
-    'no ve nada de otros turnos.',
-  'SU TURNO',
-  [[ciudadActualizada.locator('h1.text-5xl').first(), 'ya llamado']],
+    'no ve nada de otros turnos. El estado dice **«Llamado»**.',
+  'Llamado',
+  [[ciudadActualizada.locator('h1').first(), 'ya llamado']],
 )
 
 // ===========================================================================
@@ -649,37 +923,65 @@ await capturar(
 )
 
 // ===========================================================================
-// 8. Atender y finalizar
+// 8. Iniciar la atención, ver el portal y finalizar
 // ===========================================================================
 await abrir(op, '/admin/turnos')
 await op.waitForTimeout(2500)
 await capturar(
   op,
   'atencion',
-  'El turno, ahora en atención',
-  'El turno llamado pasa a «En atención ahora», con su módulo. Se pulsa ' +
-    '**«Atender»** cuando el ciudadano llega a la ventanilla.',
-  'Atender',
-  [[op.locator('button:has-text("Atender")').first(), '«Atender»']],
+  'El turno llamado, en la lista',
+  'El turno llamado aparece en **«En atención ahora»** con su módulo y sus ' +
+    'acciones: **«Repetir»**, **«Omitir»**, **«Cancelar»** y, la que toca ' +
+    'aquí, **«Iniciar atención»**. Se pulsa cuando el ciudadano llega a la ' +
+    'ventanilla: hasta ese instante no empieza a contar el tiempo de ' +
+    'atención.',
+  'Iniciar atención',
+  [[op.locator('button:has-text("Iniciar atención")').first(), '«Iniciar atención»']],
 )
-if (await op.locator('button:has-text("Finalizar")').count()) {
-  await op.locator('button:has-text("Finalizar")').first().click()
-} else {
-  await op.locator('button:has-text("Atender")').first().click()
-  await op.waitForTimeout(2000)
-  await op.locator('button:has-text("Finalizar")').first().click()
-}
+await pulsar(op, 'Iniciar atención')
+await op.waitForTimeout(2500)
+
+/*
+  El ciudadano lo ve en su teléfono, con el MISMO enlace. Basta con
+  recargar: la página nueva pregunta al abrirse y el turno ya dice
+  «En atención».
+*/
+await ciudadActualizada.reload({ waitUntil: 'domcontentloaded' })
+await capturar(
+  ciudadActualizada,
+  'en-atencion',
+  'El portal, ya en atención',
+  'El mismo enlace y el mismo teléfono: el estado pasó de **«Llamado»** a ' +
+    '**«En atención»**. No hubo que escanear nada de nuevo ni pedirle al ' +
+    'ciudadano que recargara: el portal pregunta por su turno al abrirse.',
+  'En atención',
+  [[ciudadActualizada.locator('h1').first(), 'su código']],
+)
+await ciudadActualizada.close().catch(() => undefined)
+await cerrarMovil()
+
+// La consola, otra vez, para cerrar el turno.
+await abrir(op, '/admin/turnos')
 await op.waitForTimeout(2500)
 await capturar(
   op,
   'finalizar',
   'Atender y finalizar',
-  'Se pulsa **«Finalizar»** y el turno queda atendido. Cada transición ' +
-    'queda en el historial y en la auditoría, con el operador, la hora y el ' +
-    'motivo. Esa traza es inmutable: ni el propio administrador puede ' +
-    'editarla.',
-  'No hay turnos en curso',
+  'El turno en atención lleva su reloj y el botón **«Finalizar»**. Se pulsa ' +
+    'y el turno queda atendido. Cada transición queda en el historial y en ' +
+    'la auditoría, con el operador, la hora y el motivo. Esa traza es ' +
+    'inmutable: ni el propio administrador puede editarla.',
+  'Finalizar',
+  [[op.locator('button:has-text("Finalizar")').first(), '«Finalizar»']],
 )
+await pulsar(op, 'Finalizar')
+// La comprobación de que se cerró: el panel de «en curso» se queda vacío.
+await op
+  .getByText('No hay turnos en curso', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await op.waitForTimeout(600)
 
 // ===========================================================================
 // 9. Un segundo ciudadano, y su oposicion
@@ -697,20 +999,40 @@ const token2 = (
 
 const ciudad2 = await (await movil()).newPage()
 await abrir(ciudad2, `/turno/${token2}`)
+/*
+  A este segundo ciudadano TAMBIÉN le sale el modal de aviso al abrir (es su
+  primer turno sin preferencia decidida). Se le dice «No, gracias» antes de
+  seguir: además es la muestra de que la decisión se respeta sin molestar.
+*/
+await ciudad2
+  .getByText('¿Le avisamos cuando se acerque su turno?', { exact: false })
+  .first()
+  .waitFor({ state: 'visible', timeout: 25000 })
+await pulsar(ciudad2, 'No, gracias')
+await espera(600)
 await capturar(
   ciudad2,
   'oposicion',
   'El ciudadano se opone al tratamiento',
-  'Se despliega **«No quiero que se atienda mi turno»**. Toda persona ' +
-    'titular puede oponerse a que traten sus datos por causa legítima. Como ' +
-    'el ciudadano no deja datos de identidad, el derecho se ejerce por su ' +
-    'propio token: escribe su consideración y el turno queda cancelado.',
+  'Se despliega **«No quiero que se atienda mi turno»** (el acordeón se ' +
+    'abre con animación). Toda persona titular puede oponerse a que traten ' +
+    'sus datos por causa legítima. Como el ciudadano no deja datos de ' +
+    'identidad, el derecho se ejerce por su propio token: escribe su ' +
+    'consideración y el turno queda cancelado.',
   'No quiero que se atienda',
-  [[ciudad2.locator('summary:has-text("No quiero que se atienda")'), '«No quiero que se atienda…»']],
+  [
+    [
+      ciudad2.locator('button:has-text("No quiero que se atienda mi turno")'),
+      '«No quiero que se atienda…»',
+    ],
+  ],
 )
-await ciudad2.locator('summary:has-text("No quiero que se atienda")').click()
+await ciudad2.locator('button:has-text("No quiero que se atienda mi turno")').click()
 await ciudad2.waitForTimeout(800)
-await ciudad2.fill('textarea', 'Prefiero esperar en ventanilla, no quiero el aviso.')
+await ciudad2.fill(
+  'textarea',
+  'No autorizo que usen mis datos para avisarme. Prefiero preguntar en la ventanilla.',
+)
 await ciudad2.click('button:has-text("Registrar mi consideración")')
 await ciudad2.waitForTimeout(3000)
 await capturar(
@@ -738,33 +1060,77 @@ await capturar(
   'retirados',
   'El operador ve que el ciudadano se retiró',
   'El turno ya no está en la cola: está cancelado, y el derecho a oponerse ' +
-    'exige cesar. Pero **no desaparece sin más**: la tarjeta «Retirados por ' +
-    'el titular» deja constancia y muestra lo que el ciudadano escribió, ' +
-    'para que el operador sepa que se retiró y no que el sistema lo perdió.',
-  'RETIRADOS POR EL TITULAR',
-  [[op.locator('section:has-text("RETIRADOS POR EL TITULAR")'), 'aquí se ve la retirada']],
+    'exige cesar. Pero **no desaparece sin más**: sale una notificación breve ' +
+    'con el código del turno, que no se va a llamar y que se cierra sola. La ' +
+    'consideración entera queda en el historial, que es donde se consulta.',
+  'Un ciudadano se retiró',
+  [[op.locator('.notificacion').first(), 'la notificación de la retirada']],
 )
 
 // ===========================================================================
-// 11. Historial, estadisticas, catalogos
+// 11. Historial paginado, estadisticas, catalogos, usuarios
 // ===========================================================================
-for (const [ruta, slug, titulo, texto, debe] of [
+/*
+  EL HISTORIAL NUEVO (migración 019): se pagina en el servidor y se filtra
+  por fecha y por código. Con los 14 turnos de esta jornada hay dos páginas,
+  así que el paginador se ve de verdad y no es un adorno.
+*/
+const hist = await escritorio.newPage()
+await abrir(hist, '/admin/historial')
+await capturar(
+  hist,
+  'historial',
+  'El historial, ahora paginado',
+  'Quién hizo qué, cuándo y por qué. **Arriba están los filtros**: la ' +
+    'fecha del periodo y el código del turno. Cada turno tiene su ' +
+    '**recorrido** en una línea de tiempo con sus transiciones, en orden, y ' +
+    'la página solo carga diez turnos de golpe —**«Mostrando 1–10 de 14»**— ' +
+    'porque con mil turnos el navegador no puede pedirlos todos.',
+  'turnos para hoy',
   [
-    '/admin/historial',
-    'historial',
-    'El historial',
-    'Quién hizo qué, cuándo y por qué. Cada turno tiene su **recorrido**: ' +
-      'una línea de tiempo con sus transiciones, en orden. Cada cambio de ' +
-      'estado queda registrado, y la auditoría es inmutable por diseño.',
-    'Historial',
+    [hist.locator('input[type="date"]').first(), 'la fecha del periodo'],
+    [hist.locator('nav.paginador').first(), 'el paginador: hay más página'],
   ],
+)
+
+// Se pasa a la segunda página: comprueba que el paginador no solo se pinta.
+await hist.locator('label[for="cola-pagina-2"]').click()
+await capturar(
+  hist,
+  'historial-pagina-2',
+  'La segunda página del historial',
+  'El paginador es de verdad: al elegir **«2»** la base devuelve el tramo ' +
+    'siguiente y el rótulo dice **«Mostrando 11–14 de 14»**. La consulta se ' +
+    'hace en el servidor; al navegador solo le llegan las diez filas de la ' +
+    'página que está viendo.',
+  /Mostrando 11/,
+  [[hist.locator('nav.paginador').first(), 'página 2 de 2']],
+)
+
+// Y el filtro por código, con el turno real que se emitió al principio.
+await hist.locator('input[placeholder="A-001"]').fill(codigoTurno)
+await pulsar(hist, 'Buscar')
+await capturar(
+  hist,
+  'historial-filtro',
+  'El historial filtrado por código',
+  `Se escribe **${codigoTurno}** en el campo de código y se pulsa ` +
+    '**«Buscar»**: el historial se queda solo con ese turno y dice ' +
+    '**«1 turno para hoy»**. Sirve para responder a un ciudadano que ' +
+    'llega a ventanilla preguntando qué pasó con su turno.',
+  'turno para hoy',
+  [[hist.locator('button:has-text("Buscar")'), '«Buscar»']],
+)
+await hist.close().catch(() => undefined)
+
+for (const [ruta, slug, titulo, texto, debe] of [
   [
     '/admin/estadisticas',
     'estadisticas',
     'Las estadísticas',
     'Turnos generados, atendidos, cancelados y omitidos, y el tiempo ' +
       'promedio de atención, por trámite y por periodo.',
-    'Estad',
+    'Por trámite',
   ],
   [
     '/admin/catalogos',
@@ -772,7 +1138,7 @@ for (const [ruta, slug, titulo, texto, debe] of [
     'Los catálogos',
     'Trámites y módulos. Lo que el operador puede elegir al emitir es lo ' +
       'que está aquí, y nada más.',
-    'Cat',
+    'Trámites',
   ],
   [
     '/admin/usuarios',
@@ -780,7 +1146,7 @@ for (const [ruta, slug, titulo, texto, debe] of [
     'Los usuarios',
     'Quién opera, con qué rol y en qué módulo. El rol decide qué puede ' +
       'hacer: un supervisor no opera turnos.',
-    'Usuarios',
+    'Personal con acceso',
   ],
 ]) {
   /*
@@ -795,7 +1161,43 @@ for (const [ruta, slug, titulo, texto, debe] of [
 }
 
 // ===========================================================================
-// 12. El documento
+// 12. La salida, con confirmación
+// ===========================================================================
+/*
+  «Cerrar sesión» vive al pie de la barra, pegado a la navegación: un clic de
+  más al ir a pulsar «Historial» cortaba el trabajo en ventanilla y obligaba a
+  volver a entrar con el segundo factor. Ahora pregunta antes, y cancelar deja
+  al operador donde estaba.
+*/
+const salida = await escritorio.newPage()
+await abrir(salida, '/admin/turnos')
+// El aviso de los retirados del paso 25 sigue abierto y saldría en la foto.
+const cerrarAviso = salida.locator('button[aria-label="Cerrar la notificación"]')
+if (await cerrarAviso.count()) {
+  await cerrarAviso.first().click()
+  await salida.waitForTimeout(400)
+}
+await salida.locator('button:has-text("Cerrar sesión")').first().click()
+await salida.waitForTimeout(900)
+await capturar(
+  salida,
+  'salir',
+  'Cerrar sesión pregunta antes',
+  'Pulsar **«Cerrar sesión»** no cierra nada: abre esta confirmación. Se ' +
+    'pierde la sesión —no los datos: los turnos están en la base—, pero el ' +
+    'clic está al lado de las secciones del menú y salir sin querer obliga a ' +
+    'volver a entrar con la verificación en dos pasos. **«Cancelar»**, o ' +
+    'Escape, devuelve al operador justo donde estaba.',
+  '¿Seguro que quiere salir?',
+  [[salida.locator('[role="dialog"]'), 'la confirmación']],
+)
+// Se cierra con Escape: el recorrido no debe dejar la sesión tirada.
+await salida.keyboard.press('Escape')
+await salida.waitForTimeout(700)
+await salida.close().catch(() => undefined)
+
+// ===========================================================================
+// 13. El documento
 // ===========================================================================
 writeFileSync(
   path.join(destino, 'pasos.json'),
@@ -860,7 +1262,7 @@ md.push('  servidor de Realtime, así que aquí solo se ve el sondeo.')
 md.push('')
 md.push('---')
 md.push('')
-md.push('Lo que se ve aquí está respaldado por `migracion/verificar-todo.sh` (138')
+md.push('Lo que se ve aquí está respaldado por `migracion/verificar-todo.sh` (151')
 md.push('aserciones, migración, concurrencia y sincronía del DRS) y por')
 md.push('`npm run alto-impacto` (accesibilidad y comportamiento, 8 pantallas, 0')
 md.push('hallazgos).')
@@ -975,7 +1377,7 @@ que <strong>no</strong> se ha podido enseñar aquí, y por qué:</p>
 </ul>
 
 <p style="margin-top:10pt;font-size:9.5pt;color:#4a6a99">
-Lo que se ve aquí está respaldado por <code>migracion/verificar-todo.sh</code> (138 aserciones, migración,
+Lo que se ve aquí está respaldado por <code>migracion/verificar-todo.sh</code> (151 aserciones, migración,
 concurrencia y sincronía del DRS) y por <code>npm run alto-impacto</code> (accesibilidad y comportamiento,
 8 pantallas, 0 hallazgos).
 </p>

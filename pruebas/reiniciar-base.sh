@@ -50,13 +50,32 @@ echo "==> Aplicando el esquema y la semilla"
 # Los stubs delante: los roles `anon`, `authenticated` y `service_role` y el
 # esquema `auth` con `auth.uid()`, que en Supabase ya existen y en un
 # PostgreSQL local no.
-if ! psql -X -q -v ON_ERROR_STOP=1 -d "$BASE" -f "$DIR/00_stubs.sql" >/dev/null 2>&1; then
+# Si los stubs fallan, se muestra el error: un `>/dev/null` aquí deja el
+# mensaje «fallaron los stubs» sin ninguna pista de por qué.
+if ! salida=$(psql -X -q -v ON_ERROR_STOP=1 -d "$BASE" -f "$DIR/00_stubs.sql" 2>&1); then
   rojo "  fallaron los stubs"
+  printf '%s\n' "$salida" | tail -5
   exit 1
 fi
-for f in "$APP"/supabase/migrations/*_0[1-6]_*.sql; do
-  if ! psql -X -q -v ON_ERROR_STOP=1 -d "$BASE" -f "$f" >/dev/null 2>&1; then
+
+# TODAS las migraciones del repositorio, con dos excepciones: la 07 (pg_cron)
+# y la 08 (Realtime) son de Supabase —ni la extensión `pg_cron` ni el esquema
+# `realtime` existen en un PostgreSQL normal— y en local el sistema funciona
+# igual, porque el cron del push lo lleva Vercel.
+#
+# El resto hace falta entero: la 09 trae los turnos por lote y el aviso
+# programado, la 10 y la 11 los límites de atención y de llamada, la 12 la
+# consulta por código, la 14 el aviso a los próximos, la 16 y la 17 la
+# preferencia de aviso y la 19 la paginación del historial. Con solo las
+# seis primeras la aplicación arranca pero la consola falla en cuanto se
+# emite un lote o se abre el historial.
+for f in "$APP"/supabase/migrations/*.sql; do
+  case "$(basename "$f")" in
+    *_07_*|*_08_*) continue ;;
+  esac
+  if ! salida=$(psql -X -q -v ON_ERROR_STOP=1 -d "$BASE" -f "$f" 2>&1); then
     rojo "  falló $(basename "$f")"
+    printf '%s\n' "$salida" | tail -5
     exit 1
   fi
 done
@@ -67,5 +86,16 @@ echo "==> Enlazando el administrador con la autenticación del arnés"
 psql -X -q -v ON_ERROR_STOP=1 -d "$BASE" -c \
   "UPDATE usuarios SET auth_uid = '11111111-1111-1111-1111-111111111111'
    WHERE numero_empleado = 'EMP-0001';" >/dev/null
+
+# PostgREST no vuelve a leer el esquema solo: guarda la caché en memoria y
+# solo la recarga cuando se lo avisa. Al recrear la base, las RPC nuevas
+# (preferencia de aviso, historial paginado, turnos por lote…) existen en
+# PostgreSQL pero PostgREST sigue respondiendo «no la encuentro» con la
+# caché de antes. Es el mismo aviso que da `levantar.sh` al montar el stack.
+echo "==> Avisando a PostgREST de que recargue el esquema"
+for i in $(seq 1 10); do
+  psql -X -q -d "$BASE" -c "NOTIFY pgrst, 'reload schema';" >/dev/null 2>&1 || true
+  sleep 0.3
+done
 
 verde "  base '$BASE' lista"
