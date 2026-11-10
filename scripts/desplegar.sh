@@ -1,153 +1,94 @@
 #!/usr/bin/env bash
 # ============================================================================
-# SITUR — Despliegue
+# SITUR — Poner el sistema a servir: base de datos y aplicación
 #
-# Hace, en orden, lo que hace falta para que el sistema quede sirviendo:
+#   scripts/desplegar.sh [opciones]
 #
-#   1. Comprueba que `secretos.env` está completo (sin REEMPLAZAR).
-#   2. Aplica las migraciones al proyecto de Supabase (`supabase db push`).
-#   3. Pasa las variables de entorno a Vercel, para producción y para
-#      staging.
-#   4. Despliega.
+# Hace las dos cosas en orden, delegando en los dos scripts que las saben
+# hacer por separado:
 #
-# Es idempotente: se puede volver a correr sin romper nada.
+#   1. `conectar-supabase.sh` → enlaza el proyecto, aplica las 20 migraciones,
+#      siembra los catálogos y comprueba que la base responde.
+#   2. `subir-vercel.sh`      → pasa las variables de `secretos.env` a Vercel
+#      y despliega.
 #
-# La cuenta NO está atada al código: la URL y las claves se leen de
-# `secretos.env`. Si el asesor decide que la cuenta definitiva es otra
-# (punto 14 de PREGUNTAS_para_el_asesor.txt), se cambia el proyecto con
-# `--proyecto=<ref>` y se vuelve a correr este mismo script.
+# Antes comprobaba las dos cosas él mismo y duplicaba la lista de variables;
+# al añadir una migración o una variable había que acordarse de tres sitios.
+# Ahora cada paso vive en su script y este solo los encadena.
 #
-# Requisitos: la CLI de Supabase (`npm i -g supabase`) y la de Vercel
-# (`npm i -g vercel`), con `supabase link` y `vercel link` ya hechos.
+# OPCIONES
+#   --proyecto=<ref>  Referencia del proyecto de Supabase (o SUPABASE_PROJECT_REF).
+#   --db-url=<url>    Cadena de conexión (o SUPABASE_DB_URL).
+#   --staging         Despliegue de previsualización en Vercel.
+#   --saltar-base     No toca Supabase (solo despliega).
+#   --saltar-vercel   No despliega (solo prepara la base).
+#   --sin-semilla     No aplica `supabase/seed.sql`.
+#   --dry-run         Muestra lo que haría, sin tocar nada.
 #
-# Uso:  scripts/desplegar.sh [--staging] [--saltar-migraciones]
-#                                [--proyecto=<ref-supabase>]
+# QUÉ HACE FALTA
+#   · `secretos.env`:   node scripts/generar-secretos.mjs
+#   · CLI de Supabase:  npm i -g supabase     (o pasar --db-url)
+#   · CLI de Vercel:    npm i -g vercel
 # ============================================================================
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP="$(dirname "$DIR")"
-SECRETOS="$APP/secretos.env"
 
-AMBIENTE="production"
-SALTAR_MIGRACIONES=0
 PROYECTO=""
+DB_URL=""
+AMBIENTE=""
+SALTAR_BASE=0
+SALTAR_VERCEL=0
+SIN_SEMILLA=0
+DRY=""
+
+rojo()  { printf '\033[31m%s\033[0m\n' "$1"; }
+verde() { printf '\033[32m%s\033[0m\n' "$1"; }
+
 for arg in "$@"; do
   case "$arg" in
-    --staging) AMBIENTE="staging" ;;
-    --proyecto=*) PROYECTO="${arg#--proyecto=}" ;;
-    --saltar-migraciones) SALTAR_MIGRACIONES=1 ;;
-    *) echo "Opción desconocida: $arg" >&2; exit 1 ;;
+    --proyecto=*)     PROYECTO="${arg#--proyecto=}" ;;
+    --db-url=*)       DB_URL="${arg#--db-url=}" ;;
+    --staging)        AMBIENTE="--staging" ;;
+    --saltar-base|--saltar-migraciones) SALTAR_BASE=1 ;;
+    --saltar-vercel)  SALTAR_VERCEL=1 ;;
+    --sin-semilla)    SIN_SEMILLA=1 ;;
+    --dry-run)        DRY="--dry-run" ;;
+    -h|--help)        sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) rojo "Opción desconocida: $arg"; exit 1 ;;
   esac
 done
 
-rojo() { printf '\033[31m%s\033[0m\n' "$1"; }
-verde() { printf '\033[32m%s\033[0m\n' "$1"; }
+echo "SITUR — despliegue completo"
+echo "=============================================================="
 
 # ---------------------------------------------------------------------------
-echo "SITUR — despliegue a $AMBIENTE"
-echo "=============================================================="
-
-# --- 1) Secretos ----------------------------------------------------------
-if [ ! -f "$SECRETOS" ]; then
-  rojo "Falta $SECRETOS"
-  echo "  Genérelo con:  node scripts/generar-secretos.mjs" >&2
-  exit 1
+# 1. La base
+# ---------------------------------------------------------------------------
+if [ "$SALTAR_BASE" -eq 1 ]; then
+  echo "==> Base de datos omitida (--saltar-base)"
+else
+  args=()
+  [ -n "$PROYECTO" ] && args+=("--proyecto=$PROYECTO")
+  [ -n "$DB_URL" ] && args+=("--db-url=$DB_URL")
+  [ "$SIN_SEMILLA" -eq 1 ] && args+=("--sin-semilla")
+  [ -n "$DRY" ] && args+=("$DRY")
+  bash "$DIR/conectar-supabase.sh" ${args[@]+"${args[@]}"}
 fi
 
-# shellcheck disable=SC1090
-set -a; . "$SECRETOS"; set +a
-
-FALTAN=()
-for v in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY \
-         VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY CRON_SECRET; do
-  valor="${!v:-}"
-  if [ -z "$valor" ] || [ "$valor" = "REEMPLAZAR" ]; then
-    FALTAN+=("$v")
-  fi
-done
-
-if [ ${#FALTAN[@]} -gt 0 ]; then
-  rojo "Faltan estos valores en secretos.env: ${FALTAN[*]}"
-  echo "  Edite el archivo y vuelva a correr." >&2
-  exit 1
-fi
-verde "Secretos completos."
-
-# --- 2) Migraciones -------------------------------------------------------
-if [ "$SALTAR_MIGRACIONES" -eq 0 ]; then
-  if ! command -v supabase >/dev/null 2>&1; then
-    rojo "Falta la CLI de Supabase:  npm i -g supabase"
-    exit 1
-  fi
+# ---------------------------------------------------------------------------
+# 2. La aplicación
+# ---------------------------------------------------------------------------
+if [ "$SALTAR_VERCEL" -eq 1 ]; then
   echo
-  echo "==> Migraciones a Supabase"
-  if [ -n "$PROYECTO" ]; then
-    # Enlazar a otro proyecto es lo que hace falta cuando la cuenta
-    # definitiva cambia (punto 14 de PREGUNTAS_para_el_asesor.txt).
-    supabase link --project-ref "$PROYECTO"
-  fi
-  supabase db push --include-all
-  verde "Migraciones aplicadas."
+  echo "==> Despliegue omitido (--saltar-vercel)"
 else
-  echo "==> Migraciones omitidas (--saltar-migraciones)"
-fi
-
-# --- 3) Variables de entorno en Vercel ------------------------------------
-if ! command -v vercel >/dev/null 2>&1; then
-  rojo "Falta la CLI de Vercel:  npm i -g vercel"
-  exit 1
+  echo
+  args=()
+  [ -n "$AMBIENTE" ] && args+=("$AMBIENTE")
+  [ -n "$DRY" ] && args+=("$DRY")
+  bash "$DIR/subir-vercel.sh" ${args[@]+"${args[@]}"}
 fi
 
 echo
-echo "==> Variables de entorno en Vercel ($AMBIENTE)"
-
-# Las que van al navegador: la clave anon y la pública de VAPID.
-# Las del servidor: la service_role, la privada de VAPID y el CRON_SECRET.
-# `vercel env add` con `--sensitive` marca las secretas, que Vercel no
-# muestra en los logs de las funciones.
-setvar() {
-  local nombre="$1" valor="$2" sensible="$3"
-  if [ "$sensible" = "sensible" ]; then
-    printf '%s' "$valor" | vercel env add "$nombre" "$AMBIENTE" --sensitive --force >/dev/null
-  else
-    printf '%s' "$valor" | vercel env add "$nombre" "$AMBIENTE" --force >/dev/null
-  fi
-  echo "    $nombre"
-}
-
-setvar VITE_SUPABASE_URL        "$SUPABASE_URL"
-setvar VITE_SUPABASE_ANON_KEY   "$SUPABASE_ANON_KEY"
-setvar VITE_VAPID_PUBLIC_KEY    "$VAPID_PUBLIC_KEY"
-
-setvar SUPABASE_URL             "$SUPABASE_URL" sensible
-setvar SUPABASE_ANON_KEY        "$SUPABASE_ANON_KEY" sensible
-setvar SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY" sensible
-setvar VAPID_PUBLIC_KEY         "$VAPID_PUBLIC_KEY" sensible
-setvar VAPID_PRIVATE_KEY        "$VAPID_PRIVATE_KEY" sensible
-setvar VAPID_SUBJECT            "$VAPID_SUBJECT"
-setvar CRON_SECRET              "$CRON_SECRET" sensible
-
-# Upstash es opcional: sin él, el middleware deja pasar.
-if [ -n "${UPSTASH_REDIS_REST_URL:-}" ] && [ "$UPSTASH_REDIS_REST_URL" != "REEMPLAZAR" ]; then
-  setvar UPSTASH_REDIS_REST_URL  "$UPSTASH_REDIS_REST_URL" sensible
-  setvar UPSTASH_REDIS_REST_TOKEN "${UPSTASH_REDIS_REST_TOKEN:-}" sensible
-  verde "    Upstash configurado (límite de tasa activo)."
-else
-  echo "    Upstash sin configurar: el middleware no limitará (aceptable en el primer despliegue)."
-fi
-
-# --- 4) Despliegue --------------------------------------------------------
-echo
-echo "==> Despliegue"
-cd "$APP"
-vercel --prod --yes
-verde "Desplegado."
-
-echo
-echo "=============================================================="
-echo "Pasos que quedan a mano:"
-echo "  1) node scripts/arrancar.mjs   → crea el administrador y lo enlaza"
-echo "  2) Activar pg_cron en el panel de Supabase (Database > Extensions)"
-echo "  3) Comprobar que el cron de Vercel corre:  el aviso de un turno"
-echo "     cercano debe llegar en menos de un minuto"
+verde "Listo."

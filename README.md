@@ -179,23 +179,31 @@ sistema funciona igual. Con él, se aplica.
 
 #### Paso 5 · Aplicar el esquema y los datos
 
+Hay un script que hace los tres pasos de una vez —enlazar, migrar y
+sembrar— y al final comprueba que la base responde:
+
 ```bash
-supabase db push
+scripts/conectar-supabase.sh --proyecto=<ref>   --db-url="postgres://postgres:<clave>@db.<ref>.supabase.co:5432/postgres"
 ```
 
-Aplica las migraciones de `supabase/migrations/` en orden: 12 tablas, 6
-vistas, las RPC, la RLS y los permisos. Es idempotente.
+Aplica las **20 migraciones** de `supabase/migrations/` en orden (12 tablas,
+5 ENUM, 6 vistas, las RPC, la RLS y los permisos) y después
+`supabase/seed.sql` con los catálogos y la configuración. Las dos cosas son
+idempotentes: se puede repetir sin miedo.
 
-Ahora los **datos** (roles, trámites, módulos, configuración y el
-administrador). La CLI no los aplica, así que van por `psql`:
+Si prefieres hacerlo a mano, es exactamente esto:
 
 ```bash
-# La cadena de conexión está en Project Settings → Database → Connection string
+supabase db push --include-all
+# La cadena está en Project Settings → Database → Connection string
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
 ```
 
 > Si `psql` no está instalado: `apt install postgresql-client`. La cadena
-> lleva la contraseña de la base; puedes ponerla en la variable `PGPASSWORD`.
+> lleva la contraseña de la base; puedes ponerla en `PGPASSWORD`.
+>
+> `--solo-comprobar` no aplica nada: solo dice si el esquema está al día.
+> `--sin-semilla` sirve cuando la base ya tiene datos reales.
 
 #### Paso 6 · Crear el administrador y enlazarlo
 
@@ -426,7 +434,13 @@ Las claves VAPID se generan una vez con `scripts/generar-secretos.mjs`.
 | `scripts/generar-secretos.mjs` | Crea `secretos.env` con VAPID, `CRON_SECRET` y la contraseña del administrador (permisos 600) |
 | `scripts/enlace-local.mjs` | Pasa a `.env.local` **solo** las variables públicas |
 | `scripts/arrancar.mjs` | Crea el administrador en Supabase Auth y lo enlaza con `usuarios.auth_uid`; comprueba que el sistema responde |
-| `scripts/desplegar.sh` | Migra la base, pasa las variables a Vercel y despliega |
+| `scripts/conectar-supabase.sh` | **Base de datos**: enlaza el proyecto, aplica las 20 migraciones, siembra los catálogos y comprueba que responde |
+| `scripts/subir-vercel.sh` | **Aplicación**: pasa las variables de `secretos.env` a Vercel y despliega |
+| `scripts/desplegar.sh` | Los dos anteriores, en orden |
+
+Los tres de despliegue aceptan `--dry-run` (enseñan lo que harían sin tocar
+nada) y son idempotentes. `conectar-supabase.sh` funciona con la CLI de
+Supabase o, si no está instalada, con `psql` y una `--db-url`.
 
 ---
 
@@ -755,8 +769,24 @@ lo correcto, porque mejor no enviar avisos que dejarlos abiertos a internet
 ## 8. Despliegue en Vercel
 
 ```bash
-scripts/desplegar.sh --proyecto=<ref>
+scripts/desplegar.sh --proyecto=<ref> \
+  --db-url="postgres://postgres:<clave>@db.<ref>.supabase.co:5432/postgres"
 ```
+
+Eso encadena los dos pasos: **`conectar-supabase.sh`** (migraciones y
+semilla) y **`subir-vercel.sh`** (variables de entorno y despliegue). Si
+quieres hacerlos por separado:
+
+```bash
+scripts/conectar-supabase.sh --proyecto=<ref> --db-url=...   # solo la base
+scripts/subir-vercel.sh                                      # solo Vercel
+```
+
+`subir-vercel.sh` comprueba la sesión (`vercel login`), enlaza el proyecto la
+primera vez y sube las variables de `secretos.env`: las públicas sin marcar y
+las secretas con `--sensitive`, para que Vercel no las enseñe en los logs.
+`--staging` despliega una previsualización en vez de producción y `--dry-run`
+enseña lo que haría.
 
 El script migra la base, pasa las variables de entorno a Vercel (las
 sensibles con `--sensitive`) y despliega.
