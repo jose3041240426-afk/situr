@@ -14,6 +14,8 @@ import { supabase } from '../lib/supabase'
 import {
   pedirPermiso,
   pushSoportado,
+  estadoPermiso,
+  type EstadoPermiso,
   registrarServiceWorker,
   suscribirAvisos,
   recordarTokenEnElServiceWorker,
@@ -51,6 +53,16 @@ export default function TurnoCiudadano() {
   const [activando, setActivando] = useState(false)
   /** Error visible del paso 1 (suscripción). */
   const [errorSuscripcion, setErrorSuscripcion] = useState<string | null>(null)
+  /*
+   * Lo que el navegador dice del permiso AHORA.
+   *
+   * Sin esto, el modal ofrecía «Sí, avísame» aunque el navegador tuviera los
+   * avisos bloqueados para el sitio: el botón se pulsaba y no pasaba nada
+   * visible, porque `requestPermission()` devuelve «denied» al instante y sin
+   * abrir ningún diálogo. El ciudadano se quedaba mirando una pantalla que no
+   * responde.
+   */
+  const [permiso, setPermiso] = useState<EstadoPermiso>('default')
   /** Error visible del paso 2 (guardar preferencia). */
   const [errorPref, setErrorPref] = useState<string | null>(null)
   /**
@@ -176,6 +188,7 @@ export default function TurnoCiudadano() {
       // Se vuelve a chequear dentro del timer: si el ciudadano interactuó
       // durante los 800 ms (por ejemplo, cerró el modal), no abrir.
       if (interactuoRef.current) return
+      setPermiso(estadoPermiso())
       setPasoModalAviso(1)
     }, 800)
     return () => window.clearTimeout(t)
@@ -243,13 +256,17 @@ export default function TurnoCiudadano() {
     }
     setActivando(true)
     try {
-      const permiso = await pedirPermiso()
-      if (!permiso) {
+      const concedido = await pedirPermiso()
+      if (!concedido) {
+        setPermiso(estadoPermiso())
         setErrorSuscripcion(
-          'Necesitamos permiso de notificaciones. Actívelo en la configuración del navegador y vuelva a intentarlo.',
+          estadoPermiso() === 'denied'
+            ? 'Los avisos están bloqueados para este sitio. Ábralos en los ajustes del navegador (Notificaciones → permitir) y vuelva a intentarlo.'
+            : 'No se pudo pedir el permiso de notificaciones. Inténtelo desde el navegador del móvil, no desde una vista incrustada.',
         )
         return
       }
+      setPermiso('granted')
       const ok = await suscribirAvisos(token)
       if (!ok) {
         setErrorSuscripcion(
@@ -267,6 +284,7 @@ export default function TurnoCiudadano() {
   function reabrirModalAviso() {
     setErrorSuscripcion(null)
     setErrorPref(null)
+    setPermiso(estadoPermiso())
     setPasoModalAviso(1)
   }
 
@@ -514,22 +532,57 @@ export default function TurnoCiudadano() {
                   {errorSuscripcion}
                 </p>
               )}
+
+              {/*
+                El navegador manda. Si los avisos están bloqueados —o el
+                navegador no los admite— no se ofrece un botón que no va a
+                hacer nada: se explica cómo desbloquearlos y se deja cerrar.
+              */}
+              {permiso === 'denied' && (
+                <p className="rounded-lg border border-ambar-500/30 bg-ambar-50 px-3 py-2 text-xs font-semibold text-ambar-600">
+                  Este navegador tiene los avisos <strong>bloqueados</strong> para
+                  este sitio. Para activarlos: candado o «Aa» en la barra de
+                  direcciones → Notificaciones → Permitir. Después, recargue esta
+                  página.
+                </p>
+              )}
+
+              {!pushSoportado() && (
+                <p className="rounded-lg border border-ambar-500/30 bg-ambar-50 px-3 py-2 text-xs font-semibold text-ambar-600">
+                  Este navegador no admite avisos push. En <strong>iPhone</strong>{' '}
+                  hay que añadir la página a la pantalla de inicio (Compartir →
+                  «Añadir a pantalla de inicio») y abrirla desde ahí.
+                </p>
+              )}
+
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => void activarAviso()}
-                  disabled={activando}
-                  className="boton-primario w-full py-3 disabled:opacity-60"
-                >
-                  {activando ? 'Activando…' : 'Sí, avísame'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cerrarModalAviso}
-                  className="boton-secundario w-full py-3"
-                >
-                  No, gracias
-                </button>
+                {permiso === 'denied' || !pushSoportado() ? (
+                  <button
+                    type="button"
+                    onClick={cerrarModalAviso}
+                    className="boton-primario w-full py-3"
+                  >
+                    Entendido
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void activarAviso()}
+                      disabled={activando}
+                      className="boton-primario w-full py-3 disabled:opacity-60"
+                    >
+                      {activando ? 'Activando…' : 'Sí, avísame'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cerrarModalAviso}
+                      className="boton-secundario w-full py-3"
+                    >
+                      No, gracias
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </Modal>

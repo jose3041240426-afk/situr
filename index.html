@@ -7,6 +7,12 @@
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" type="image/svg+xml" href="/icono.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- iOS: sin esto, «Añadir a pantalla de inicio» abre una pestaña normal
+         y Web Push no funciona (Safari solo lo permite en apps instaladas). -->
+    <link rel="apple-touch-icon" href="/icono-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SITUR" />
     <title>SITUR · Dirección de Catastro</title>
   </head>
   <body>
