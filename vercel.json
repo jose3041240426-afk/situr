@@ -9,12 +9,6 @@
       "destination": "/index.html"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/push",
-      "schedule": "0 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/sw.js",

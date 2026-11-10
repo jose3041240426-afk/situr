@@ -1,0 +1,53 @@
+# ============================================================================
+# SITUR — Programador de los avisos push
+# ============================================================================
+# El plan gratuito de Vercel solo admite un cron al día, y el aviso de turno
+# cercano necesita ejecutarse cada pocos minutos. Este flujo hace de cron:
+# llama a `/api/push` con el mismo `CRON_SECRET` que usa Vercel.
+#
+# LO QUE HAY QUE CONFIGURAR UNA VEZ
+#   GitHub → Settings → Secrets and variables → Actions → New repository
+#   secret:   CRON_SECRET = <el valor de secretos.env>
+#
+# Sin ese secreto, el endpoint responde 401 y no se envía nada, que es lo
+# correcto: mejor no avisar que dejar el envío abierto a internet.
+#
+# CADA CUÁNTO
+#   GitHub no permite menos de 5 minutos, y en horas de mucha carga puede
+#   tardar algo más. Para un aviso «15 minutos antes» es suficiente. Si hace
+#   falta al minuto, se apunta un cron externo (cron-job.org) al mismo
+#   endpoint.
+# ============================================================================
+
+name: Avisos push
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  # Botón para lanzarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+jobs:
+  empujar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar al emisor de avisos
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Falta el secreto CRON_SECRET en el repositorio."
+            exit 1
+          fi
+          respuesta=$(curl -sS --max-time 60 -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -w '\n%{http_code}' \
+            https://situr.vercel.app/api/push)
+          codigo=$(printf '%s' "$respuesta" | tail -n1)
+          cuerpo=$(printf '%s' "$respuesta" | sed '$d')
+          echo "HTTP $codigo · $cuerpo"
+          # Solo falla si el endpoint no contestó bien: un 200 con cero
+          # enviados es lo normal cuando no hay turnos cerca.
+          [ "$codigo" = "200" ] || exit 1

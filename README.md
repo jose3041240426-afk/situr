@@ -781,22 +781,26 @@ que es un tercero.
 
 ### El cron
 
-```json
-{ "crons": [{ "path": "/api/push", "schedule": "0 0 * * *" }] }
+El aviso lo envía `POST /api/push`, que exige `CRON_SECRET`. **Con el plan
+gratuito de Vercel no hay cron cada minuto** (Hobby solo admite uno diario, y
+uno diario mandaría avisos a medianoche), así que el programador es un flujo
+de GitHub Actions:
+
+```yaml
+# .github/workflows/avisos.yml
+on:
+  schedule:
+    - cron: '*/5 * * * *'
 ```
 
-> **Ojo con el plan de Vercel.** El aviso de verdad quiere ejecutarse **cada
-> minuto** (`* * * * *`), pero el plan **Hobby solo admite crons diarios** y
-> rechaza el despliegue con ese valor. El repositorio trae `0 0 * * *` para que
-> el despliegue funcione en cualquier cuenta. Con **Pro**, cambia la expresión
-> a `* * * * *` y vuelve a desplegar; sin Pro, hay dos caminos:
->
-> - **Un cron externo** (cron-job.org, GitHub Actions, el cron de un servidor)
->   que llame a `POST /api/push` cada minuto con `Authorization: Bearer
->   $CRON_SECRET`. Es lo mismo que haría Vercel.
-> - **Dejarlo en diario**, sabiendo que el aviso llegará con un día de retraso:
->   el portal del ciudadano sigue funcionando por sondeo y por el canal de
->   difusión, así que el sistema no se rompe, solo pierde el aviso.
+Se configura una sola vez: **Settings → Secrets and variables → Actions →
+`CRON_SECRET`** con el valor de `secretos.env`. El flujo también se puede
+lanzar a mano desde la pestaña **Actions**.
+
+Cinco minutos es lo mínimo que permite GitHub; para un aviso «15 minutos
+antes» sobra. Si se quiere al minuto, se apunta un cron externo
+(cron-job.org) al mismo endpoint con el mismo `Bearer`, o se sube a Vercel
+Pro y se pone el cron en `* * * * *`.
 
 **Configurar `CRON_SECRET`**: sin él, `/api/push` se rechaza en producción, y es
 lo correcto, porque mejor no enviar avisos que dejarlos abiertos a internet
