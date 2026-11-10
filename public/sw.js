@@ -152,19 +152,31 @@ self.addEventListener('push', (event) => {
   const folio = carga.codigo || ''
 
   event.waitUntil(
-    self.registration.showNotification(titulo, {
-      body: cuerpo,
-      icon: '/icono-192.png',
-      badge: '/icono-192.png',
-      tag: folio ? `situr-${folio}` : 'situr-turno',
-      renotify: false,
-      // El aviso NO lleva el token ni una URL: el destino lo resuelve este
-      // Service Worker con lo que tiene guardado en local.
-      data: { folio },
-      vibrate: [120, 60, 120],
-    }),
+    (async () => {
+      try {
+        await self.registration.showNotification(titulo, {
+          body: cuerpo,
+          icon: '/icono-192.png',
+          badge: '/icono-192.png',
+          tag: folio ? `situr-${folio}` : 'situr-turno',
+          renotify: true,
+          data: { folio },
+          vibrate: [120, 60, 120],
+        })
+      } catch (e) {
+        console.error('[situr/sw] showNotification falló:', e && e.message ? e.message : e)
+        try {
+          await self.registration.showNotification(titulo, {
+            body: cuerpo,
+            tag: folio ? `situr-${folio}` : 'situr-turno',
+            data: { folio },
+          })
+        } catch (e2) {
+          console.error('[situr/sw] ni sin icono se pudo mostrar:', e2 && e2.message ? e2.message : e2)
+        }
+      }
+    })(),
   )
-})
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

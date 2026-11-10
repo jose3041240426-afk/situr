@@ -49,6 +49,8 @@ export default function TurnoCiudadano() {
   const [pasoModalAviso, setPasoModalAviso] = useState<0 | 1 | 2>(0)
   /** El ciudadano ya cerró el modal alguna vez (eligió o dijo No). */
   const [yaDecidio, setYaDecidio] = useState(false)
+  const [probandoAviso, setProbandoAviso] = useState(false)
+  const [resultadoPrueba, setResultadoPrueba] = useState<string | null>(null)
   /** Activando la suscripción push (paso 1 → paso 2). */
   const [activando, setActivando] = useState(false)
   /** Error visible del paso 1 (suscripción). */
@@ -277,6 +279,22 @@ export default function TurnoCiudadano() {
       setPasoModalAviso(2)
     } finally {
       setActivando(false)
+    }
+  }
+
+  async function probarAviso() {
+    setProbandoAviso(true)
+    setResultadoPrueba(null)
+    try {
+      const r = await fetch(`/api/probar-aviso?token=${encodeURIComponent(token)}`)
+      const d = await r.json()
+      setResultadoPrueba(d.ok
+        ? 'Se envió un aviso de prueba. Debe sonar en este móvil en unos segundos.'
+        : `No se pudo: ${d.motivo}`)
+    } catch {
+      setResultadoPrueba('No se pudo contactar con el servidor. Revise la conexión.')
+    } finally {
+      setProbandoAviso(false)
     }
   }
 
@@ -688,6 +706,33 @@ export default function TurnoCiudadano() {
           {vivo ? 'Actualización en vivo activa' : 'Actualización automática'} · No
           requiere cuenta ni datos personales
         </p>
+
+        {/*
+          DIAGNÓSTICO DEL AVISO.
+
+          El aviso depende de dos cosas que el ciudadano no ve: que el
+          Service Worker esté activo y que el navegador permita notificar.
+          Este botón manda un aviso de prueba a este turno y dice en
+          pantalla lo que pasó. Si dice «enviado» y no sonó, el bloqueo
+          está en el sistema operativo, no en la app.
+        */}
+        {pushSoportado() && (
+          <div className="mt-3 flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void probarAviso()}
+              disabled={probandoAviso}
+              className="text-xs text-gris-500 underline hover:text-azul-600 disabled:opacity-60"
+            >
+              {probandoAviso ? 'Enviando…' : 'Probar el aviso'}
+            </button>
+            {resultadoPrueba && (
+              <p className="max-w-xs text-center text-[11px] text-gris-700">
+                {resultadoPrueba}
+              </p>
+            )}
+          </div>
+        )}
 
         {/*
           EL DERECHO A OPONERSE (RF-033, LFPDPPP art. 21).
