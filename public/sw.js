@@ -29,6 +29,7 @@
  */
 
 const DB_SITUR = 'situr'
+const VERSION_SW = '2026-11-10-3'
 const ALMACEN = 'tokens'
 const CLAVE_TOKEN = 'actual'
 
@@ -143,7 +144,8 @@ self.addEventListener('push', (event) => {
   let carga = {}
   try {
     carga = event.data ? event.data.json() : {}
-  } catch {
+  } catch (e) {
+    console.error('[situr/sw] payload no es JSON:', e && e.message ? e.message : e)
     carga = {}
   }
 

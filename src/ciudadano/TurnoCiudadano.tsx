@@ -51,6 +51,13 @@ export default function TurnoCiudadano() {
   const [yaDecidio, setYaDecidio] = useState(false)
   const [probandoAviso, setProbandoAviso] = useState(false)
   const [resultadoPrueba, setResultadoPrueba] = useState<string | null>(null)
+  /*
+   * Respaldo del push: si el navegador no muestra la notificación (permiso
+   * bloqueado, batería en ahorro, navegador incrustado), el ciudadano sigue
+   * viendo el aviso mientras tenga el portal abierto. No sustituye al push,
+   * que es el único que llega con la pestaña cerrada.
+   */
+  const [avisoEnPantalla, setAvisoEnPantalla] = useState<string | null>(null)
   const [diagnostico, setDiagnostico] = useState<string | null>(null)
   const [probandoDiag, setProbandoDiag] = useState(false)
   /** Activando la suscripción push (paso 1 → paso 2). */
@@ -212,6 +219,15 @@ export default function TurnoCiudadano() {
    * cuando el ciudadano acepta el aviso, para que un token regenerado
    * (RF-007) sustituya al anterior.
    */
+  useEffect(() => {
+    if (!turno) return
+    if (turno.estado === 'CALLED') {
+      setAvisoEnPantalla('Su turno fue llamado. Acuda a ' + (turno.codigo_modulo ?? 'su módulo') + '.')
+    } else if (turno.estado === 'SKIPPED' || turno.estado === 'CANCELLED' || turno.estado === 'COMPLETED') {
+      setAvisoEnPantalla(null)
+    }
+  }, [turno])
+
   useEffect(() => {
     void recordarTokenEnElServiceWorker(token)
   }, [token])
@@ -403,6 +419,14 @@ export default function TurnoCiudadano() {
 
   return (
     <div className="min-h-screen bg-gris-50">
+      {avisoEnPantalla && (
+        <div
+          className="fixed inset-x-0 top-0 z-50 mx-auto mt-2 max-w-md rounded-xl border-2 border-azul-500 bg-azul-50 px-4 py-3 text-center text-sm font-semibold text-navy-800 shadow-lg"
+          role="alert"
+        >
+          {avisoEnPantalla}
+        </div>
+      )}
       {/*
         LA CABECERA, con la marca y la hora.
 
