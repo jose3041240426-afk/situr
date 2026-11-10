@@ -177,6 +177,21 @@ UPSTASH_REDIS_REST_TOKEN=<de upstash.com, o vacío>
 **Upstash es opcional**: sin él, el límite de tasa del §10 no se aplica y el
 sistema funciona igual. Con él, se aplica.
 
+La **contraseña de la base** no va en `secretos.env`. Vive un nivel arriba,
+en la carpeta del proyecto, en `secretos-bd.env` (permisos 600, fuera del
+repositorio):
+
+```
+secretos-bd.env          ← fuera de app/
+SUPABASE_DB_PASSWORD=...
+SUPABASE_PROJECT_REF=<ref>
+```
+
+`scripts/conectar-supabase.sh` la lee de ahí y se la pasa a `psql` por
+`PGPASSWORD`, así que la contraseña no aparece ni en la URL ni en la lista de
+procesos. Si el archivo se copia por error dentro de `app/`, el script avisa
+y el `.gitignore` lo bloquea.
+
 #### Paso 5 · Aplicar el esquema y los datos
 
 Hay un script que hace los tres pasos de una vez —enlazar, migrar y

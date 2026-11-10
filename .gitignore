@@ -11,6 +11,10 @@ dist
 
 # Secretos de la instalación
 secretos.env
+# Credenciales de la base: viven en la carpeta del proyecto, un nivel
+# arriba (fuera del repositorio). Esta regla es solo una red de
+# seguridad por si alguien las copia aquí dentro.
+secretos-bd.env
 
 # Backups locales de la sesión (contienen secretos y ruido)
 .env.local.bak-*

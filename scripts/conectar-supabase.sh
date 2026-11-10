@@ -29,6 +29,13 @@
 #   · Una sesión:          supabase login    (o SUPABASE_ACCESS_TOKEN)
 #   · O bien `psql` y una `--db-url` (no hace falta la CLI ni el login).
 #
+# CREDENCIALES
+#   La contraseña de la base NO vive en este repositorio. El script lee, si
+#   existe, `../secretos-bd.env` (la carpeta del proyecto, fuera de `app/`),
+#   con SUPABASE_DB_PASSWORD y SUPABASE_PROJECT_REF. Con esos dos datos arma
+#   la cadena de conexión y se la pasa a psql por PGPASSWORD, no en la URL:
+#   así la contraseña no aparece en la lista de procesos del sistema.
+#
 # DESPUÉS
 #   Copia en `secretos.env` (o en Vercel) la URL y las claves del proyecto:
 #   Project Settings → API. `scripts/desplegar.sh` las lee de ahí.
@@ -62,8 +69,37 @@ for arg in "$@"; do
   esac
 done
 
+# ---------------------------------------------------------------------------
+# Credenciales fuera del repositorio.
+#
+# `app/` es el repositorio: cualquier cosa que se meta ahí puede acabar en un
+# commit. La contraseña de la base vive en la carpeta del proyecto, un nivel
+# arriba, en `secretos-bd.env` (permisos 600).
+# ---------------------------------------------------------------------------
+CREDENCIALES="$(dirname "$APP")/secretos-bd.env"
+if [ -f "$CREDENCIALES" ]; then
+  # Sin `set -a`: no se exporta el archivo entero, solo lo que haga falta.
+  # shellcheck disable=SC1090
+  . "$CREDENCIALES"
+  PROYECTO="${PROYECTO:-${SUPABASE_PROJECT_REF:-}}"
+  DB_URL="${DB_URL:-${SUPABASE_DB_URL:-}}"
+  if [ -z "$DB_URL" ] && [ -n "${SUPABASE_DB_PASSWORD:-}" ] && [ -n "$PROYECTO" ]; then
+    # URL sin contraseña: psql la toma de PGPASSWORD.
+    DB_URL="postgres://postgres@db.${PROYECTO}.supabase.co:5432/postgres"
+    export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+    gris "Credenciales leídas de $(basename "$CREDENCIALES")"
+  fi
+fi
+
 echo "SITUR — conexión con Supabase"
 echo "=============================================================="
+
+# Un `secretos-bd.env` dentro del repositorio es un accidente esperando a
+# pasar: se avisa y se sigue, para que el usuario lo mueva.
+if [ -f "$APP/secretos-bd.env" ]; then
+  rojo "Ojo: hay un secretos-bd.env DENTRO del repositorio ($APP)."
+  echo "  Muévelo a $(dirname "$APP")/secretos-bd.env: ahí no se sube." >&2
+fi
 
 if [ -z "$PROYECTO" ] && [ -z "$DB_URL" ]; then
   rojo "Falta el proyecto."
