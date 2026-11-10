@@ -83,12 +83,25 @@ if [ -f "$CREDENCIALES" ]; then
   . "$CREDENCIALES"
   PROYECTO="${PROYECTO:-${SUPABASE_PROJECT_REF:-}}"
   DB_URL="${DB_URL:-${SUPABASE_DB_URL:-}}"
-  if [ -z "$DB_URL" ] && [ -n "${SUPABASE_DB_PASSWORD:-}" ] && [ -n "$PROYECTO" ]; then
-    # URL sin contraseña: psql la toma de PGPASSWORD.
-    DB_URL="postgres://postgres@db.${PROYECTO}.supabase.co:5432/postgres"
+
+  # La contraseña va SIEMPRE por PGPASSWORD, aunque la cadena venga del
+  # archivo: así no queda escrita dentro de la URL (ni en `ps`, ni en un
+  # mensaje de error).
+  if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
     export PGPASSWORD="$SUPABASE_DB_PASSWORD"
-    gris "Credenciales leídas de $(basename "$CREDENCIALES")"
   fi
+
+  # Sin cadena: se arma con el host configurado (el pooler, normalmente) o,
+  # si no hay, con el host directo del proyecto.
+  if [ -z "$DB_URL" ] && [ -n "$PROYECTO" ]; then
+    if [ -n "${SUPABASE_DB_HOST:-}" ]; then
+      DB_URL="postgres://${SUPABASE_DB_USER:-postgres.${PROYECTO}}@${SUPABASE_DB_HOST}:5432/postgres"
+    else
+      DB_URL="postgres://postgres@db.${PROYECTO}.supabase.co:5432/postgres"
+    fi
+  fi
+
+  gris "Credenciales leídas de $(basename "$CREDENCIALES")"
 fi
 
 echo "SITUR — conexión con Supabase"
