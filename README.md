@@ -773,8 +773,21 @@ que es un tercero.
 ### El cron
 
 ```json
-{ "crons": [{ "path": "/api/push", "schedule": "* * * * *" }] }
+{ "crons": [{ "path": "/api/push", "schedule": "0 0 * * *" }] }
 ```
+
+> **Ojo con el plan de Vercel.** El aviso de verdad quiere ejecutarse **cada
+> minuto** (`* * * * *`), pero el plan **Hobby solo admite crons diarios** y
+> rechaza el despliegue con ese valor. El repositorio trae `0 0 * * *` para que
+> el despliegue funcione en cualquier cuenta. Con **Pro**, cambia la expresión
+> a `* * * * *` y vuelve a desplegar; sin Pro, hay dos caminos:
+>
+> - **Un cron externo** (cron-job.org, GitHub Actions, el cron de un servidor)
+>   que llame a `POST /api/push` cada minuto con `Authorization: Bearer
+>   $CRON_SECRET`. Es lo mismo que haría Vercel.
+> - **Dejarlo en diario**, sabiendo que el aviso llegará con un día de retraso:
+>   el portal del ciudadano sigue funcionando por sondeo y por el canal de
+>   difusión, así que el sistema no se rompe, solo pierde el aviso.
 
 **Configurar `CRON_SECRET`**: sin él, `/api/push` se rechaza en producción, y es
 lo correcto, porque mejor no enviar avisos que dejarlos abiertos a internet
@@ -783,6 +796,8 @@ lo correcto, porque mejor no enviar avisos que dejarlos abiertos a internet
 ---
 
 ## 8. Despliegue en Vercel
+
+**En producción:** <https://situr.vercel.app>
 
 ```bash
 scripts/desplegar.sh --proyecto=<ref> \
@@ -821,7 +836,7 @@ app/
 │   ├── turno.ts             La consulta pública del turno
 │   └── ultimas-llamadas.ts  La pantalla pública (RF-020)
 ├── docs/capturas/            Capturas del README (las saca el tutorial)
-├── middleware.ts             Límite de tasa (IP + token / IP + cuenta)
+├── middleware.edge.ts        Límite de tasa (escrito, pendiente de conectar en Vercel)
 ├── public/
 │   ├── sw.js                 Service Worker: guarda el token y muestra el aviso
 │   └── manifest.webmanifest

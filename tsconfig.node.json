@@ -14,5 +14,5 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "api", "middleware.ts"]
+  "include": ["vite.config.ts", "api", "middleware.edge.ts"]
 }

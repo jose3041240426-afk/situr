@@ -35,8 +35,8 @@ interface FilaCola {
   mensaje: string
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url)
+async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url, `https://${req.headers.get('host') ?? 'localhost'}`)
 
   // Solo el cron de Vercel debe poder disparar el envío.
   if (!esLlamadaLegitima(req, url)) {
@@ -168,3 +168,12 @@ function esLlamadaLegitima(req: Request, url: URL): boolean {
   void url
   return true
 }
+
+/*
+ * Vercel (runtime de Node) no usa el valor que devuelve un `export
+ * default`: hay que declarar cada método HTTP como export con nombre.
+ * En desarrollo lo monta el plugin de Vite, que sí acepta el handler
+ * suelto; el cuerpo y el comportamiento son los mismos.
+ */
+export const GET = handler
+export const POST = handler

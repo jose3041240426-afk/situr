@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js'
  */
 export const config = { runtime: 'nodejs' }
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Método no permitido.' }), {
       status: 405,
@@ -76,3 +76,11 @@ export default async function handler(req: Request): Promise<Response> {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   })
 }
+
+/*
+ * Vercel (runtime de Node) no usa el valor que devuelve un `export
+ * default`: hay que declarar cada método HTTP como export con nombre.
+ * En desarrollo lo monta el plugin de Vite, que sí acepta el handler
+ * suelto; el cuerpo y el comportamiento son los mismos.
+ */
+export const POST = handler

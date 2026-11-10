@@ -23,7 +23,7 @@ import { createClient } from '@supabase/supabase-js'
  */
 export const config = { runtime: 'nodejs' }
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Método no permitido.' }), {
       status: 405,
@@ -42,7 +42,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   // La RPC acota el límite a 20 por su cuenta; aquí solo se pide un número
   // pequeño y nunca se acepta lo que pida el cliente sin tope.
-  const url = new URL(req.url)
+  const url = new URL(req.url, `https://${req.headers.get('host') ?? 'localhost'}`)
   const pedido = Number.parseInt(url.searchParams.get('limite') ?? '8', 10)
   const limite = Number.isFinite(pedido) ? Math.min(Math.max(pedido, 1), 20) : 8
 
@@ -70,3 +70,11 @@ export default async function handler(req: Request): Promise<Response> {
     },
   })
 }
+
+/*
+ * Vercel (runtime de Node) no usa el valor que devuelve un `export
+ * default`: hay que declarar cada método HTTP como export con nombre.
+ * En desarrollo lo monta el plugin de Vite, que sí acepta el handler
+ * suelto; el cuerpo y el comportamiento son los mismos.
+ */
+export const GET = handler

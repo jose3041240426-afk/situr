@@ -1,3 +1,25 @@
+/*
+ * ============================================================================
+ * OJO: ESTE ARCHIVO NO SE DESPLIEGA TODAVÍA
+ * ============================================================================
+ * Era `middleware.ts`, el nombre que Vercel vigila para montar un Edge
+ * Middleware, y por eso el despliegue lo intentaba ejecutar… y respondía
+ * `MIDDLEWARE_INVOCATION_FAILED` a TODAS las peticiones: usa `NextRequest` y
+ * `NextResponse`, que solo existen dentro de un proyecto de Next.js, y esta
+ * aplicación es Vite. El sitio entero devolvía 500.
+ *
+ * Se queda aquí, con su lógica intacta, para cuando se conecte el límite de
+ * tasa de verdad:
+ *
+ *   - En Vercel, un proyecto que no es Next necesita el rate limiting en una
+ *     Edge Function propia (cada `api/*` la llama) o en el proxy del dominio.
+ *   - O se paga el plan que permita crons por minuto y se monta allí.
+ *
+ * Mientras tanto, los endpoints están protegidos por sus propias reglas: el
+ * push exige `CRON_SECRET` y las consultas exigen un token válido.
+ * ============================================================================
+ */
+
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
