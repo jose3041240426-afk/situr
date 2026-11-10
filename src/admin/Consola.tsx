@@ -613,7 +613,15 @@ async function llamar() {
         Si falla (sin red, sin suscripción, token caducado) no se interrumpe
         la llamada: el cron es el respaldo y volverá a intentarlo.
       */
-      const tokenOperador = sesion?.access_token
+      /*
+        El aviso se manda con un token FRESCO: el de `sesion` puede tener
+        una hora de antigüedad y el endpoint lo rechazaría con 401 sin que
+        el operador se enterara (el `.catch` se traga el error). Se pide una
+        sesión nueva aquí, que el cliente de Supabase renueva solo si hace
+        falta; si ya no hay sesión, no se manda y el cron es el respaldo.
+      */
+      const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+      const tokenOperador = sesionFresca?.access_token ?? sesion?.access_token
       if (tokenOperador) {
         void fetch(`/api/push?turno_id=${encodeURIComponent(r.turno_id)}`, {
           method: 'POST',
