@@ -83,7 +83,7 @@ export default function Consola() {
     fallaba con TS6133 (`noUnusedLocals`) y `npm run build` no llegaba a
     compilar, lo que a su vez paraba `pruebas/tutorial.sh` en su paso 3.
   */
-  const { puedeOperar, esAdministrador, mfaPendiente } = useAuth()
+  const { sesion, puedeOperar, esAdministrador, mfaPendiente } = useAuth()
   const navegar = useNavigate()
 
   const [periodoAbierto, setPeriodoAbierto] = useState<PeriodoOperativo | null>(null)
@@ -605,6 +605,21 @@ async function llamar() {
         nombre_trabajador: r.operador,
         numero_empleado: null,
       })
+      /*
+        El aviso del turno llamado no espera al cron: se manda en el acto,
+        desde aquí, con el token del operador. Así el ciudadano se entera en
+        segundos y no en cinco minutos.
+
+        Si falla (sin red, sin suscripción, token caducado) no se interrumpe
+        la llamada: el cron es el respaldo y volverá a intentarlo.
+      */
+      const tokenOperador = sesion?.access_token
+      if (tokenOperador) {
+        void fetch(`/api/push?turno_id=${encodeURIComponent(r.turno_id)}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokenOperador}` },
+        }).catch(() => undefined)
+      }
       await cargar()
     } catch (e) {
       setAviso({

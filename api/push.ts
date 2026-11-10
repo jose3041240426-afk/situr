@@ -4,12 +4,14 @@ import webpush from 'web-push'
 /**
  * SITUR — Emisor de notificaciones push (RF-028, DRS §6).
  *
- * Es la **única** pieza que envía Web Push. Un Vercel Cron la invoca cada
- * minuto; ella:
+ * Es la **única** pieza que envía Web Push. Se llama de dos maneras:
  *
- *   1. pregunta a la base a quién hay que avisar (`suscripciones_por_notificar`),
- *   2. firma con VAPID y entrega el aviso al navegador,
- *   3. marca la entrega (`marcar_aviso_push_enviado`) para no repetirlo.
+ *   1. **Por el cron** (cada 5 minutos, GitHub Actions): recorre la cola de
+ *      avisos y manda los que tocan (`suscripciones_por_notificar`).
+ *   2. **Al llamar un turno**: la consola manda `?turno_id=...` con el token
+ *      del operador, y se envía el aviso **en el acto**, sin esperar al cron.
+ *      Es lo que hace que el ciudadano se entere en segundos y no en cinco
+ *      minutos.
  *
  * No es lógica de negocio de turnos: la **autoridad es PostgreSQL**, que dice
  * a quién avisar y con qué texto. Aquí solo se entrega el mensaje.
@@ -19,7 +21,6 @@ import webpush from 'web-push'
  */
 
 export const config = {
-  // El cron de Vercel llama a esta ruta por GET; también se acepta POST.
   runtime: 'nodejs',
 }
 
@@ -37,14 +38,11 @@ interface FilaCola {
 
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url, `https://${req.headers.get('host') ?? 'localhost'}`)
-
-  // Solo el cron de Vercel debe poder disparar el envío.
-  if (!esLlamadaLegitima(req, url)) {
-    return new Response('No autorizado', { status: 401 })
-  }
+  const turnoId = url.searchParams.get('turno_id')
 
   const supabaseUrl = process.env.SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey = process.env.SUPABASE_ANON_KEY
   const vapidPublic = process.env.VAPID_PUBLIC_KEY
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY
   const vapidSubject = process.env.VAPID_SUBJECT ?? 'mailto:catastro@durango.gob.mx'
@@ -56,20 +54,90 @@ async function handler(req: Request): Promise<Response> {
     )
   }
 
-  webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
+  // Autorización: cron (secreto) o operador (JWT de Supabase).
+  const secreto = process.env.CRON_SECRET
+  const esCron = Boolean(secreto && req.headers.get('authorization') === `Bearer ${secreto}`)
+  let esOperador = false
+
+  if (!esCron && turnoId && anonKey) {
+    // Verifica el JWT del operador contra Supabase y su rol.
+    const cliente = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
+    const { data: { user } } = await cliente.auth.getUser(token)
+    if (user) {
+      const { data: operador } = await createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      }).from('usuarios').select('id, activo, rol_id').eq('auth_uid', user.id).maybeSingle()
+      if (operador?.activo) {
+        const { data: rol } = await createClient(supabaseUrl, serviceKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }).from('roles').select('clave').eq('id', operador.rol_id).maybeSingle()
+        if (rol?.clave === 'ADMINISTRADOR' || rol?.clave === 'AGENTE') {
+          esOperador = true
+        }
+      }
+    }
+  }
+
+  if (!esCron && !esOperador) {
+    if (!secreto && process.env.NODE_ENV !== 'production') {
+      // Desarrollo local: se permite probar.
+    } else {
+      return new Response('No autorizado', { status: 401 })
+    }
+  }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  // 1) La base decide a quién toca avisar.
-  const { data, error } = await supabase.rpc('suscripciones_por_notificar')
-  if (error) {
-    console.error('[situr/push] la cola falló:', error.message)
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+  webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
+
+  // La cola: por turno (inmediato) o la cola completa (cron).
+  let cola: FilaCola[] = []
+
+  if (turnoId) {
+    const { data: turno } = await supabase
+      .from('turnos')
+      .select('id, codigo, folio, modulo_id, modulos(codigo)')
+      .eq('id', turnoId)
+      .maybeSingle()
+
+    if (turno) {
+      const { data: sub } = await supabase
+        .from('suscripciones_push')
+        .select('endpoint, clave_p256dh, clave_auth')
+        .eq('token_publico', (await supabase.from('turnos').select('token_publico').eq('id', turnoId).single()).data?.token_publico ?? '')
+        .eq('activa', true)
+        .maybeSingle()
+
+      if (sub) {
+        cola = [
+          {
+            turno_id: turno.id,
+            endpoint: sub.endpoint,
+            clave_p256dh: sub.clave_p256dh,
+            clave_auth: sub.clave_auth,
+            codigo_turno: turno.codigo,
+            folio: turno.folio,
+            modulo_codigo: (turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? null,
+            tipo_aviso: 'LLAMADO',
+            mensaje: `Su turno ${turno.codigo} fue llamado. Acuda a ${(turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? 'su módulo'}.`,
+          },
+        ]
+      }
+    }
+  } else {
+    const { data, error } = await supabase.rpc('suscripciones_por_notificar')
+    if (error) {
+      console.error('[situr/push] la cola falló:', error.message)
+      return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+    }
+    cola = (data ?? []) as FilaCola[]
   }
 
-  const cola = (data ?? []) as FilaCola[]
   if (cola.length === 0) {
     return new Response(JSON.stringify({ enviados: 0, motivo: 'cola vacía' }), { status: 200 })
   }
@@ -91,17 +159,9 @@ async function handler(req: Request): Promise<Response> {
           codigo: fila.codigo_turno,
           folio: fila.folio,
           modulo: fila.modulo_codigo,
-          // **Sin URL y sin token.** El destino lo resuelve el Service
-          // Worker del propio ciudadano con el token que tiene guardado
-          // en local: mandarlo en el aviso lo mandaría al proveedor de
-          // push, que es un tercero (DRS §5.2, «contenido mínimo del
-          // aviso»). Antes además mandaba el id del turno en una ruta
-          // que espera el token, así que el aviso abría una página de
-          // error.
         }),
       )
 
-      // 3) La marca impide que el cron vuelva a ofrecer el mismo aviso.
       const { error: errMarca } = await supabase.rpc('marcar_aviso_push_enviado', {
         p_turno_id: fila.turno_id,
       })
@@ -112,8 +172,6 @@ async function handler(req: Request): Promise<Response> {
     } catch (e: unknown) {
       const estado = (e as { statusCode?: number })?.statusCode
       if (estado === 404 || estado === 410) {
-        // El navegador eliminó la suscripción: se retira de la base. Se
-        // llama por `turno_id` para que el token no viaje en esta ruta.
         const { error: errBorrado } = await supabase.rpc('eliminar_suscripcion_por_turno', {
           p_turno_id: fila.turno_id,
         })
@@ -132,41 +190,6 @@ async function handler(req: Request): Promise<Response> {
     JSON.stringify({ encolados: cola.length, enviados, fallidos, borrados }),
     { status: 200, headers: { 'content-type': 'application/json' } },
   )
-}
-
-/**
- * Autoriza la llamada al emisor.
- *
- * 1) Con `CRON_SECRET` configurado — **la vía de producción** —: el cron de
- *    Vercel manda `Authorization: Bearer <secreto>` y solo se acepta eso.
- *    Sin este secreto, la función sería un generador de avisos abierto a
- *    internet (DRS §10).
- *
- * 2) Sin secreto y en producción: no se acepta nada. Queda Inaccesible hasta
- *    que se configure `CRON_SECRET`, que es lo correcto: es preferible no
- *    enviar avisos a dejarlos abiertos.
- *
- * 3) En desarrollo: se permite, porque allí el cron no existe y hay que poder
- *    probar el envío a mano.
- */
-function esLlamadaLegitima(req: Request, url: URL): boolean {
-  const secreto = process.env.CRON_SECRET
-  if (secreto) {
-    return req.headers.get('authorization') === `Bearer ${secreto}`
-  }
-  if (process.env.NODE_ENV === 'production') {
-    // ANTES se comparaba la cabecera `Host` con VERCEL_URL, y eso no es una
-    // comprobacion: la cabecera `Host` la elige el cliente, de modo que
-    // cualquiera podia mandarla con el valor correcto y disparar el emisor de
-    // avisos. Fallar cerrado: mejor no enviar avisos que dejarlos abiertos.
-    console.error(
-      '[situr/push] CRON_SECRET no esta configurado: se rechaza el envio. ' +
-        'Genere uno y paselo a Vercel como variable de entorno.',
-    )
-    return false
-  }
-  void url
-  return true
 }
 
 /*
