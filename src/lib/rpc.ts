@@ -279,6 +279,17 @@ export async function cancelarTurno(
   })
 }
 
+/**
+ * RF-026: apunta en la ficha del operador que ya tiene el segundo factor.
+ *
+ * Inscribir el TOTP es cosa de Supabase Auth; el permiso para operar lo
+ * decide `usuarios.mfa_habilitado`. Sin esta llamada, el operador veía «MFA
+ * configurado» y la consola le seguía pidiendo configurarlo.
+ */
+export async function marcarMfaHabilitado(): Promise<{ ok: true; mfa_habilitado: boolean }> {
+  return rpc('marcar_mfa_habilitado', {})
+}
+
 export async function omitirTurno(
   turnoId: string,
   motivo: string,

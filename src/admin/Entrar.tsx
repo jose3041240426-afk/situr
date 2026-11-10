@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { marcarMfaHabilitado } from '../lib/rpc'
 import { Aviso, Campo } from '../components/ui'
 
 /**
@@ -146,6 +147,24 @@ function InscripcionMFA() {
       setError(err.message)
       return
     }
+
+    /*
+     * El factor ya está verificado en Auth; ahora se apunta en la ficha del
+     * operador, que es lo que mira la consola para dejarle operar. Si esta
+     * llamada falla, se dice: el MFA existe pero el permiso no, y quedarse en
+     * «MFA configurado» sería mentir.
+     */
+    try {
+      await marcarMfaHabilitado()
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'El segundo factor quedó inscrito, pero no se pudo habilitar la cuenta.',
+      )
+      return
+    }
+
     setListo(true)
     await recargar()
   }
