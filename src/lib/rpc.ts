@@ -291,6 +291,24 @@ export async function omitirTurno(
   })
 }
 
+/**
+ * Marca que el papel impreso de un turno ya se entregó a una persona.
+ *
+ * No cambia el estado ni el orden de llamada: es una marca de recepción. La
+ * casilla de la cola de espera la pone una sola vez y no se deshace, así que
+ * llamar dos veces no es un error (la RPC es idempotente).
+ */
+export async function marcarTurnoReclamado(turnoId: string): Promise<{
+  ok: true
+  turno_id: string
+  codigo_turno: string
+  reclamado_en: string | null
+  ya_reclamado: boolean
+  estado: EstadoTurno
+}> {
+  return rpc('marcar_turno_reclamado', { p_turno_id: turnoId })
+}
+
 // ===========================================================================
 // PERIODO OPERATIVO  (RF-025, RG-002)
 // ===========================================================================

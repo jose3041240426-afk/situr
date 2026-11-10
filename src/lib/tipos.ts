@@ -109,6 +109,11 @@ export interface FilaCola {
   creado_en: string
   tiempo_estimado_mostrado_minutos: number | null
   tiempo_estimado_minutos: number | null
+  /**
+   * Cuándo el operador marcó que el papel ya se entregó a una persona
+   * (migración 020). `null` = el papel sigue en el montón.
+   */
+  reclamado_en: string | null
 }
 
 /** `vista_turnos_actuales` — los que están en CALLED o SERVING. */
