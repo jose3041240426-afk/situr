@@ -69,6 +69,33 @@ async function leerToken() {
   })
 }
 
+async function guardarRecibo(carga) {
+  try {
+    const bd = await abrirBase()
+    return new Promise((resolver) => {
+      const tx = bd.transaction(ALMACEN, 'readwrite')
+      tx.objectStore(ALMACEN).put(
+        { recibidoEn: new Date().toISOString(), carga: carga || {} },
+        'recibo',
+      )
+      tx.oncomplete = () => resolver(true)
+      tx.onerror = () => resolver(false)
+    })
+  } catch (e) {
+    return false
+  }
+}
+
+async function leerRecibo() {
+  const bd = await abrirBase()
+  return new Promise((resolver) => {
+    const tx = bd.transaction(ALMACEN, 'readonly')
+    const peticion = tx.objectStore(ALMACEN).get('recibo')
+    peticion.onsuccess = () => resolver(peticion.result ?? null)
+    peticion.onerror = () => resolver(null)
+  })
+}
+
 async function borrarToken() {
   const bd = await abrirBase()
   return new Promise((resolver, rechazar) => {
@@ -119,6 +146,12 @@ self.addEventListener('message', (event) => {
 
   if (dato.tipo === 'guardar-token' && typeof dato.token === 'string' && dato.token) {
     event.waitUntil(guardarToken(dato.token).catch(() => undefined))
+  } else if (dato.tipo === 'leer-recibo' && event.ports && event.ports[0]) {
+    event.waitUntil(
+      leerRecibo()
+        .then((r) => event.ports[0].postMessage({ recibo: r }))
+        .catch(() => event.ports[0].postMessage({ recibo: null })),
+    )
   } else if (dato.tipo === 'borrar-token') {
     event.waitUntil(borrarToken().catch(() => undefined))
   } else if (dato.tipo === 'destino' && event.ports && event.ports[0]) {
@@ -164,6 +197,7 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(
     (async () => {
+      await guardarRecibo(carga).catch(() => undefined)
       try {
         await self.registration.showNotification(titulo, {
           body: cuerpo,

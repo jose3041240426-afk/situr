@@ -58,6 +58,7 @@ export default function TurnoCiudadano() {
    * que es el único que llega con la pestaña cerrada.
    */
   const [avisoEnPantalla, setAvisoEnPantalla] = useState<string | null>(null)
+  const [reciboPush, setReciboPush] = useState<{ recibidoEn: string } | null>(null)
   const [diagnostico, setDiagnostico] = useState<string | null>(null)
   const [probandoDiag, setProbandoDiag] = useState(false)
   /** Activando la suscripción push (paso 1 → paso 2). */
@@ -231,6 +232,23 @@ export default function TurnoCiudadano() {
   useEffect(() => {
     void recordarTokenEnElServiceWorker(token)
   }, [token])
+
+  /*
+   * Si el sistema operativo bloqueó la notificación, el push igual llegó al
+   * Service Worker: aquí se muestra cuándo, para que el ciudadano sepa que
+   * el problema no es la app.
+   */
+  useEffect(() => {
+    if (!pushSoportado()) return
+    void registrarServiceWorker().then((reg) => {
+      if (!reg) return
+      const canal = new MessageChannel()
+      canal.port1.onmessage = (e) => {
+        if (e.data && e.data.recibo) setReciboPush(e.data.recibo)
+      }
+      reg.active?.postMessage({ tipo: 'leer-recibo' }, [canal.port2])
+    })
+  }, [])
 
   /** DRS §5.2, paso 3: el permiso se pide DESPUÉS de mostrar el turno. */
 
@@ -759,6 +777,15 @@ export default function TurnoCiudadano() {
           {vivo ? 'Actualización en vivo activa' : 'Actualización automática'} · No
           requiere cuenta ni datos personales
         </p>
+
+        {reciboPush && (
+          <p className="mt-2 text-center text-[11px] text-gris-500">
+            Se recibió un aviso a las{' '}
+            {new Date(reciboPush.recibidoEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}.
+            Si no lo vio, su teléfono bloqueó la notificación: revise los
+            ajustes de Chrome → Notificaciones.
+          </p>
+        )}
 
         {/*
           DIAGNÓSTICO DEL AVISO.
