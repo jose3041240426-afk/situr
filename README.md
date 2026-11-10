@@ -536,12 +536,21 @@ comportamiento, todos con su valor por defecto
 **En una instalación real** (Supabase), la cuenta se crea con
 `scripts/generar-secretos.mjs` + `scripts/arrancar.mjs`:
 
-| Correo | Contraseña |
-|---|---|
-| `admin@catastro.durango.gob.mx` | **Aleatoria**, de 18 bytes en base64url. Se genera en `secretos.env` y hay que cambiarla en el primer acceso, junto con la inscripción del segundo factor (RF-026) |
+| Correo | Rol | Permisos |
+|---|---|---|
+| `admin@catastro.durango.gob.mx` | ADMINISTRADOR | Todo: usuarios, catálogos, periodos, turnos, historial y auditoría |
+| `operador@catastro.durango.gob.mx` | AGENTE | Emitir, llamar y atender turnos de su módulo. Sin usuarios, catálogos ni cierre de jornada |
 
-Esa contraseña **nunca** se escribe en el repositorio: vive en
-`secretos.env`, que tiene permisos 600 y está en el `.gitignore`.
+Las contraseñas son **aleatorias** (18 bytes en base64url) y viven en
+`secretos.env`, con permisos 600 y en el `.gitignore`: **nunca** se escriben en
+el repositorio. En el primer acceso, cada cuenta inscribe su segundo factor
+(RF-026).
+
+Los tres roles (`ADMINISTRADOR`, `SUPERVISOR`, `AGENTE`) vienen de la semilla.
+`fn_puede_operar_turnos()` deja operar a ADMINISTRADOR y AGENTE; SUPERVISOR
+solo mira. El rol `AGENTE` lo añade la migración **021** — antes la función lo
+admitía pero la semilla no lo creaba, así que no había forma de dar de alta a
+un operador que no fuera otro administrador.
 
 ### 4.4 Cómo importar los datos
 

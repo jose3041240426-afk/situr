@@ -19,7 +19,10 @@ INSERT INTO roles (clave, nombre, descripcion) VALUES
      'Acceso total: usuarios, catálogos, periodos, turnos, historial y auditoría.'),
     ('SUPERVISOR',
      'Supervisor',
-     'Supervisión de operación, estadísticas e historial. Sin gestión de usuarios.')
+     'Supervisión de operación, estadísticas e historial. Sin gestión de usuarios.'),
+    ('AGENTE',
+     'Agente de ventanilla',
+     'Atiende turnos en su módulo: emitir, llamar y atender. Sin usuarios, catálogos ni cierre de jornada.')
 ON CONFLICT (clave) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
