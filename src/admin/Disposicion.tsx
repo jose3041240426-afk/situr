@@ -2,6 +2,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { Modal } from '../components/ui'
+import EsqueletoPantalla from './Esqueletos'
 
 /**
  * Marco del panel administrativo.
@@ -130,32 +132,6 @@ function MenuCristal({
   )
 }
 
-/**
- * Lo que se ve mientras llega el chunk de la pantalla.
- *
- * Es un esqueleto, no un «Cargando…» centrado: así el hueco tiene la forma del
- * contenido y no hay salto cuando aparece. Dura pocos milisegundos, pero es
- * justo el instante en que antes se veía la pantalla anterior.
- */
-function CargandoPantalla() {
-  return (
-    <div className="space-y-4" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Cargando pantalla…</span>
-      <div aria-hidden="true" className="tarjeta p-6">
-        <div className="esqueleto-bloque mb-4 h-4 w-40 rounded" />
-        <div className="esqueleto-bloque mb-2 h-5 w-2/3 rounded" />
-        <div className="esqueleto-bloque h-5 w-1/2 rounded" />
-      </div>
-      <div aria-hidden="true" className="tarjeta p-6">
-        <div className="esqueleto-bloque mb-4 h-4 w-32 rounded" />
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="esqueleto-bloque mb-2 h-4 rounded" style={{ width: `${100 - (i % 3) * 9}%` }} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export default function Disposicion({
   titulo,
   children,
@@ -179,6 +155,17 @@ export default function Disposicion({
   )
   const navegar = useNavigate()
   const [abierto, setAbierto] = useState(false)
+  /**
+   * El diálogo de confirmación de salida.
+   *
+   * «Cerrar sesión» estaba al pie de la barra, pegado a la navegación: un
+   * clic de más al ir a pulsar «Historial» y el operador se quedaba fuera,
+   * teniendo que volver a entrar con MFA. No se pierde nada —los turnos
+   * están en la base— pero cortar el trabajo en ventanilla por un roce sí
+   * tiene coste, y es de las pocas acciones que no se pueden deshacer con
+   * otro clic.
+   */
+  const [confirmandoSalida, setConfirmandoSalida] = useState(false)
   /** Menú colapsado a solo-iconos (persistente, solo aplica en lg+). */
   const [colapsado, setColapsado] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -214,17 +201,65 @@ export default function Disposicion({
     navegar('/admin')
   }
 
+  /*
+   * El contenido de la ruta, memorizado.
+   *
+   * `colapsado` vive en este componente, así que plegar el menú lo volvía a
+   * renderizar TODO, incluida la página de dentro: la consola con su tabla de
+   * turnos, las cifras y los modales. Eso era el tirón que se notaba al
+   * plegar y desplegar.
+   *
+   * Memorizado por `pathname`, React reutiliza el mismo elemento y no vuelve a
+   * renderizar la pantalla: el cambio de ancho queda en un layout, no en un
+   * render de React más un layout. Al cambiar de ruta el elemento es nuevo y
+   * la pantalla se pinta como siempre.
+   */
+  const contenido = useMemo(() => children ?? <Outlet />, [children, pathname])
+
+  /*
+   * El acomodo de la barra al plegarla o desplegarla.
+   *
+   * El ancho cambia de una vez —animarlo reflowaba la tabla de turnos en cada
+   * fotograma: medido, 11 fotogramas de hasta 133 ms— y lo que se anima es el
+   * contenido de la propia barra, que son 288 px y no la página entera.
+   *
+   * `yaCambiado` evita la animación de la primera pintura: si el usuario entra
+   * con el menú plegado, no debe verlo entrar deslizándose.
+   */
+  const [yaCambiado, setYaCambiado] = useState(false)
+  const primerRender = useRef(true)
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false
+      return
+    }
+    setYaCambiado(true)
+  }, [colapsado])
+
   return (
     <div className="min-h-screen lg:flex">
-      {/* Barra lateral */}
+      {/*
+        Barra lateral.
+
+        El ancho se anima con `transition-[width]`, pero solo ahora que el
+        contenido de la ruta está memorizado (ver `contenido`): antes cada
+        fotograma re-renderizaba React la consola entera —tabla de turnos,
+        cifras, modales— y además reflowaba, y eso era el tirón. Sin ese
+        re-render, la transición cuesta un layout por fotograma y se ve fluida.
+
+        `motion-safe:` respeta `prefers-reduced-motion`: quien pida menos
+        movimiento no ve la animación, solo el cambio de ancho.
+      */}
       <aside
+        data-animar={yaCambiado ? 'si' : 'no'}
+        data-plegado={colapsado ? 'si' : 'no'}
         className={`${
           abierto ? 'block' : 'hidden'
-        } w-full shrink-0 bg-navy-800 text-gris-100 transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-screen ${
+        } w-full shrink-0 bg-navy-800 text-gris-100 lg:sticky lg:top-0 lg:block lg:h-screen ${
           colapsado ? 'lg:w-20' : 'lg:w-72'
         }`}
       >
-        <div className="flex h-full flex-col">
+        <div className="barra-animada flex h-full flex-col">
           <div
             className={`border-b border-white/10 px-5 py-4 ${
               colapsado ? 'lg:px-2 lg:py-3' : ''
@@ -250,23 +285,19 @@ export default function Disposicion({
                 aria-label={colapsado ? 'Expandir menú' : 'Colapsar menú'}
                 title={colapsado ? 'Expandir menú' : 'Colapsar menú'}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                {/*
+                  Un solo icono para los dos estados: la barra lateral con su
+                  panel. Antes eran dos flechas (‹ y ›) dibujadas a mano, y al
+                  cambiar de estado el botón parecía otro botón.
+                */}
+                <span
+                  className={`text-lg ${
+                    colapsado
+                      ? 'andrsrxn--panel-right-open-filled'
+                      : 'cuida--sidebar-collapse-outline'
+                  }`}
                   aria-hidden="true"
-                >
-                  {colapsado ? (
-                    <path d="m9 18 6-6-6-6" />
-                  ) : (
-                    <path d="m15 18-6-6 6-6" />
-                  )}
-                </svg>
+                />
               </button>
             </div>
           </div>
@@ -288,44 +319,79 @@ export default function Disposicion({
               colapsado ? 'lg:p-2' : ''
             }`}
           >
-            <div className={`px-3 py-2 ${colapsado ? 'lg:hidden' : ''}`}>
-              <p className="truncate text-sm font-semibold text-white">
-                {operador?.nombres ?? 'Operador'}
-              </p>
-              <p className="truncate text-[11px] text-gris-200">
-                {operador?.numero_empleado}
-                {operador?.modulo ? ` · Módulo ${operador.modulo}` : ''}
-              </p>
-              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gris-200">
-                {esAdministrador ? 'Administrador' : operador?.rol ?? 'Operador'}
-              </p>
+            {/*
+              Quién ha iniciado sesión.
+
+              Antes eran tres líneas: el nombre, «EMP-0001 · Módulo M01» y el
+              rol en mayúsculas. El número de empleado no le dice nada al
+              operador (es un dato de nómina, no de la ventanilla) y el rol
+              repetía el nombre cuando la cuenta se llama justamente
+              «Administrador».
+
+              Ahora el icono del rol va ENCIMA del nombre y centrado, como la
+              cabecera de una ficha: escudo para administración, persona para
+              el operador. Debajo, el nombre y el módulo, que sí importa porque
+              decide qué trámites se atienden.
+
+              El rol no se pierde para lectores de pantalla: va en el `title`
+              del icono y en un `sr-only` junto al nombre.
+            */}
+            <div
+              className={`mb-3 flex flex-col items-center gap-1 rounded-xl bg-white/[0.07] px-3 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_18px_-10px_rgba(0,0,0,0.9)] ${
+                colapsado ? 'lg:hidden' : ''
+              }`}
+            >
+              {/*
+                El rol va en el NOMBRE ACCESIBLE del icono, no en un `sr-only`
+                al lado del nombre.
+
+                Antes era un `sr-only` dentro del párrafo blanco: el texto no
+                se ve, pero hereda el `color` del párrafo y el escáner de
+                contraste lo mide igual (1.33:1 sobre la barra). Un falso
+                positivo que aparecía en las seis pantallas del panel.
+
+                Con `role="img"` y `aria-label` el lector de pantalla anuncia
+                «Administrador, imagen» antes del nombre, y no hay texto que
+                medir.
+              */}
+              <span
+                role="img"
+                aria-label={esAdministrador ? 'Administrador' : (operador?.rol ?? 'Operador')}
+                className={`text-xl text-gris-200 ${
+                  esAdministrador ? 'eos-icons--admin' : 'at-icons--person'
+                }`}
+                title={esAdministrador ? 'Administrador' : (operador?.rol ?? 'Operador')}
+              />
+              <div className="min-w-0 max-w-full">
+                <p className="truncate text-sm font-semibold text-white">
+                  {operador?.nombres ?? 'Operador'}
+                </p>
+                {operador?.modulo && (
+                  <p className="truncate text-[11px] text-gris-200">
+                    Módulo {operador.modulo}
+                  </p>
+                )}
+              </div>
             </div>
             <button
               type="button"
-              onClick={cerrarSesion}
+              onClick={() => setConfirmandoSalida(true)}
               aria-label={colapsado ? 'Cerrar sesión' : undefined}
               title={colapsado ? 'Cerrar sesión' : undefined}
-              className={`mt-1 flex w-full items-center rounded-lg text-sm font-semibold text-gris-200 transition-colors hover:bg-white/10 hover:text-white ${
-                colapsado
-                  ? 'lg:justify-center lg:gap-0 lg:px-0 lg:py-2.5'
-                  : 'gap-3 px-3 py-2.5'
-              }`}
+              className={`boton-salir ${colapsado ? 'boton-salir--compacto' : ''}`}
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              {/*
+                Icono con máscara y texto aparte: el hover del botón (el mismo
+                que «Emitir turno») mueve el icono al centro y desvanece el
+                texto, y eso necesita que el icono sea su propia capa.
+              */}
+              <span
+                className="boton-salir-icono basil--logout-solid"
                 aria-hidden="true"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="m16 17 5-5-5-5M21 12H9" />
-              </svg>
-              <span className={colapsado ? 'lg:hidden' : ''}>Cerrar sesión</span>
+              />
+              <span className={`boton-salir-texto ${colapsado ? 'lg:hidden' : ''}`}>
+                Cerrar sesión
+              </span>
             </button>
           </div>
         </div>
@@ -368,9 +434,64 @@ export default function Disposicion({
           cabecera) nunca se suspende y el contenido muestra su esqueleto.
         */}
         <main key={pathname} className="entrada-escalonada p-4 lg:p-8">
-          <Suspense fallback={<CargandoPantalla />}>{children ?? <Outlet />}</Suspense>
+          <Suspense fallback={<EsqueletoPantalla ruta={pathname} />}>
+            {contenido}
+          </Suspense>
         </main>
       </div>
+
+      {/*
+        CONFIRMACIÓN DE SALIDA.
+
+        Misma tarjeta que el resto de los avisos de la consola (icono en
+        círculo, una frase, dos botones), adaptada al azul del sistema en vez
+        del morado del ejemplo original: aquí el color no decora, dice qué
+        botón es el principal.
+
+        El botón de cancelar va primero en el DOM para que el foco inicial del
+        diálogo caiga en la opción que no hace nada.
+      */}
+      {confirmandoSalida && (
+        <Modal
+          titulo="Cerrar sesión"
+          ancho="max-w-sm"
+          onCerrar={() => setConfirmandoSalida(false)}
+        >
+          <div className="text-center">
+            <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-azul-50 text-azul-600">
+              <span className="basil--logout-solid text-2xl" aria-hidden="true" />
+            </span>
+            <p className="text-2xl font-black tracking-tight text-navy-800">
+              ¿Seguro que quiere salir?
+            </p>
+            <p className="mx-auto mt-2 max-w-xs text-sm text-gris-700">
+              Se cierra la sesión en este equipo. No se pierde nada: los turnos
+              siguen guardados y al volver a entrar la consola los encuentra
+              igual.
+            </p>
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                className="boton-secundario"
+                onClick={() => setConfirmandoSalida(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="boton-primario"
+                onClick={() => {
+                  setConfirmandoSalida(false)
+                  void cerrarSesion()
+                }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

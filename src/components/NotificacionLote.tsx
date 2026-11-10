@@ -13,13 +13,17 @@
  * que no ocupa sitio en el flujo de la página y se va sola. El contenedor
  * permanente desaparece.
  *
- * POR QUÉ NO SE CIERRA EN 4 SEGUNDOS
- * Los folios son datos que a veces hay que copiar o dictar. Con un cierre
- * automático corto, el usuario tendría que reabrir algo que ya no existe. Aquí
- * la notificación se queda hasta que se cierra a mano, pero puede apartarse
- * con Escape.
+ * POR QUÉ SE CIERRA SOLA A LOS 8 SEGUNDOS
+ * Antes se quedaba hasta que alguien la cerrara. En una ventanilla eso es una
+ * tarjeta más en pantalla: el operador emite, sigue trabajando y la
+ * notificación acaba tapando la cola. Ocho segundos son de sobra para leer dos
+ * líneas y copiar unos folios; si no llega, la misma información está en el
+ * boleto y en el historial. También se puede cerrar antes con la X o Escape.
  */
 import { useEffect, useRef } from 'react'
+
+/** Cuántos segundos se queda en pantalla antes de irse sola. */
+const SEGUNDOS = 8
 
 type Props = {
   /** Cuántos turnos se emitieron. */
@@ -47,6 +51,16 @@ export default function NotificacionLote({ total, codigos, onCerrar }: Props) {
     }
     window.addEventListener('keydown', alPulsar)
     return () => window.removeEventListener('keydown', alPulsar)
+  }, [onCerrar])
+
+  /*
+   * El cierre automático se cancela al desmontar, así que cerrar a mano no
+   * deja un `onCerrar` pendiente disparándose sobre un componente que ya no
+   * está.
+   */
+  useEffect(() => {
+    const temporizador = window.setTimeout(onCerrar, SEGUNDOS * 1000)
+    return () => window.clearTimeout(temporizador)
   }, [onCerrar])
 
   return (

@@ -12,8 +12,9 @@
  * mismo que va en el QR. Por eso el campo dice «Código» y no «Folio».
  *
  * NO GUARDA NADA
- * La respuesta sale del estado del turno (`WAITING` = libre). No hay una marca
- * que alguien pueda olvidar poner, así que no puede quedar desactualizada.
+ * La respuesta sale del estado del turno (`WAITING` = libre) y de la marca
+ * manual de la cola (migración 020): un papel entregado ya tiene dueño aunque
+ * el turno siga esperando. La consulta la resuelve la RPC, que mira las dos.
  */
 import { useState } from 'react'
 import { consultarTurnoPorCodigo, type ConsultaTurno } from '../lib/rpc'

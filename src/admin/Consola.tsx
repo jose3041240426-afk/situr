@@ -8,6 +8,7 @@ import BotonEmitir from '../components/BotonEmitir'
 import BotonRepartir from '../components/BotonRepartir'
 import Selector from '../components/Selector'
 import NotificacionLote from '../components/NotificacionLote'
+import NotificacionRetirados from '../components/NotificacionRetirados'
 import Paginador from '../components/Paginador'
 import BuscadorPapel from '../components/BuscadorPapel'
 import CodigoQR from '../components/CodigoQR'
@@ -45,6 +46,7 @@ import {
   listarTurnosActuales,
   listarTurnosRetirados,
   llamarSiguiente,
+  marcarTurnoReclamado,
   omitirTurno,
   proponerSiguienteTurno,
   repetirLlamada,
@@ -75,7 +77,13 @@ import { supabase } from '../lib/supabase'
  * lo que la pantalla muestra es lo que la base respondió (RF-008, RN-011).
  */
 export default function Consola() {
-  const { operador, puedeOperar, esAdministrador, mfaPendiente } = useAuth()
+  /*
+    Sin `operador` en el desestructurado: no se usa aquí (el nombre del
+    operador lo pinta `Disposicion`, en la barra lateral). Con él, `tsc -b`
+    fallaba con TS6133 (`noUnusedLocals`) y `npm run build` no llegaba a
+    compilar, lo que a su vez paraba `pruebas/tutorial.sh` en su paso 3.
+  */
+  const { puedeOperar, esAdministrador, mfaPendiente } = useAuth()
   const navegar = useNavigate()
 
   const [periodoAbierto, setPeriodoAbierto] = useState<PeriodoOperativo | null>(null)
@@ -90,6 +98,18 @@ export default function Consola() {
   const [cola, setCola] = useState<FilaCola[]>([])
   /** Turnos que el titular retiró oponiéndose (RF-033). */
   const [retirados, setRetirados] = useState<FilaRetirado[]>([])
+  /**
+   * Si el operador ya cerró el aviso de los retirados.
+   *
+   * La lista se refresca cada 15 s y el array cambia de identidad en cada
+   * vuelta, así que el reinicio se hace comparando los identificadores: si
+   * aparece un retirado nuevo, el aviso vuelve a salir; si es el mismo, no.
+   */
+  const [retiradosVistos, setRetiradosVistos] = useState(false)
+  const claveRetirados = retirados.map((r) => r.turno_id).join(',')
+  useEffect(() => {
+    setRetiradosVistos(false)
+  }, [claveRetirados])
   /** Las cifras del dia, para la fila de tarjetas (RF-022). */
   const [cifras, setCifras] = useState<CifrasPeriodo | null>(null)
   const [actuales, setActuales] = useState<FilaActual[]>([])
@@ -277,6 +297,15 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
    * página 3 a la 2 se sentiría como avanzar. Se guarda la página anterior en
    * una ref y se compara al cambiar.
    */
+  /**
+   * Candado del refresco periódico.
+   *
+   * Con la base lenta, una vuelta de `cargar()` puede tardar más que los 15 s
+   * del intervalo y encadenarse con la siguiente: siete consultas encima de
+   * otras siete, y el panel sin terminar de pintar nunca. Con esto, si hay una
+   * vuelta en curso, la siguiente se salta: el dato llegará igual.
+   */
+  const refrescoEnCurso = useRef(false)
   const paginaAnterior = useRef(paginaActual)
   const direccion = paginaActual > paginaAnterior.current ? 'derecha' : 'izquierda'
   useEffect(() => {
@@ -388,11 +417,37 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       .catch(() => setMinutosAviso([5, 10, 15]))
   }, [])
 
-  // Refresco periódico: la base es la autoridad y el panel refleja lo que
-  // hay, sin depender de que llegue un evento.
+  /*
+   * Refresco periódico: la base es la autoridad y el panel refleja lo que hay,
+   * sin depender de que llegue un evento.
+   *
+   * Con la pestaña OCULTA no se pregunta. El navegador de la ventanilla se
+   * queda abierto toda la mañana y muchas veces detrás de otras ventanas;
+   * siete consultas cada 15 segundos a una pestaña que nadie mira son
+   * PostgREST, base y batería del portátil para nada. Al volver a la pestaña
+   * se refresca de inmediato, así que no se pierde ningún cambio.
+   *
+   * El candado evita que dos vueltas se solapen (ver `refrescoEnCurso`).
+   */
   useEffect(() => {
-    const t = setInterval(() => void cargar(), 15000)
-    return () => clearInterval(t)
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (refrescoEnCurso.current) return
+      refrescoEnCurso.current = true
+      void cargar().finally(() => {
+        refrescoEnCurso.current = false
+      })
+    }, 15000)
+
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void cargar()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', alVolver)
+    }
   }, [cargar])
 
   // Se suscribe a los cambios de `turnos`; el evento solo avisa de que algo
@@ -431,6 +486,33 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     } finally {
       setOcupado(false)
     }
+  }
+
+  /**
+   * Marca el papel de un turno como entregado (migración 020).
+   *
+   * La casilla está detrás del código, en la cola de espera: se pulsa una vez
+   * y el número se queda azul. No se deshace a propósito —nadie registra si
+   * el papel vuelve al montón— y la base es idempotente, así que un doble
+   * clic accidental no cambia nada.
+   *
+   * Se pinta la fila antes de la recarga para que el gesto tenga respuesta
+   * inmediata; la recarga de `ejecutar()` confirma el dato real.
+   */
+  async function marcarReclamado(f: FilaCola) {
+    await ejecutar(
+      async () => {
+        await marcarTurnoReclamado(f.turno_id)
+        setCola((actual) =>
+          actual.map((x) =>
+            x.turno_id === f.turno_id
+              ? { ...x, reclamado_en: new Date().toISOString() }
+              : x,
+          ),
+        )
+      },
+      `${f.codigo_turno}: el papel ya tiene dueño.`,
+    )
   }
 
   async function abrir() {
@@ -1121,11 +1203,17 @@ async function llamar() {
                             aria-hidden="true"
                           />
                         </button>
+                          {/*
+                            Omitir va en blanco, como «Repetir», y no en rojo.
+                            Omitir no destruye la solicitud: el ciudadano
+                            puede reponer el turno en ventanilla. El rojo se
+                            queda para «Cancelar», que sí cierra esa puerta.
+                          */}
                           <button
                             type="button"
                             onClick={() => setModalMotivo({ turno: t, accion: 'omitir' })}
                             disabled={ocupado}
-                            className="boton-omision px-2.5 py-1.5"
+                            className="boton-secundario px-2.5 py-1.5"
                             title="El ciudadano no se presentó. Podrá reponerse en ventanilla."
                             aria-label={`Omitir el turno ${t.codigo_turno}`}
                           >
@@ -1522,7 +1610,18 @@ async function llamar() {
                 }`}
               >
                 {colaPagina.map((f) => (
-                  <tr key={f.turno_id} className="hover:bg-gris-50">
+                  <tr
+                    key={f.turno_id}
+                    /*
+                      El papel ya entregado se ilumina de azul, también en la
+                      fila: en una tabla de diez, mirando solo el número azul
+                      hay que barrer la columna; con la fila entera se ve de un
+                      golpe cuántos papeles quedan en el montón.
+                    */
+                    className={`hover:bg-gris-50 ${
+                      f.reclamado_en ? 'bg-azul-50/50' : ''
+                    }`}
+                  >
                     <td className="px-3 py-2.5">
                       {/*
                         El círculo se reserva para el que decide a quién
@@ -1547,8 +1646,65 @@ async function llamar() {
                         (posición dentro de su trámite)
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap font-bold text-navy-800">
-                      {f.codigo_turno}
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {f.reclamado_en ? (
+                        /*
+                          El papel ya se entregó: el número se queda azul, con
+                          la palomita y la fecha en el tooltip. No hay casilla
+                          que desmarcar —la marca es de un solo sentido— y por
+                          eso aquí ya no queda nada que pulsar.
+                        */
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-azul-50 px-2 py-1 font-bold text-azul-600"
+                          title={`Este papel se entregó el ${formatearFechaHora(f.reclamado_en)}`}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                          {f.codigo_turno}
+                          <span className="sr-only">, papel ya entregado</span>
+                        </span>
+                      ) : (
+                        /*
+                          LA CASILLA ESCONDIDA.
+
+                          El papel del montón se entrega a alguien y el turno
+                          sigue en WAITING: nada más lo distingue de los otros
+                          once. El operador lo marca pulsando el propio código
+                          (la casilla está detrás, invisible, para que el
+                          nombre accesible sea «Marcar el turno C-002» y se
+                          pueda hacer con el teclado). Se pulsa una vez y ya.
+
+                          Un `<input type="checkbox">` de verdad y no un
+                          `<span>`: así funciona con el teclado, con lectores
+                          de pantalla y con el modo de alto contraste.
+                        */
+                        <label
+                          className="inline-flex cursor-pointer items-center rounded-lg px-1 py-1 hover:bg-azul-50"
+                          title="Pulse el código para marcar que este papel ya se entregó"
+                        >
+                          <input
+                            type="checkbox"
+                            className="peer sr-only"
+                            disabled={ocupado}
+                            onChange={() => void marcarReclamado(f)}
+                            aria-label={`Marcar el turno ${f.codigo_turno}: el papel ya tiene dueño`}
+                          />
+                          <span className="rounded font-bold text-navy-800 peer-focus-visible:ring-2 peer-focus-visible:ring-azul-500 peer-focus-visible:ring-offset-2">
+                            {f.codigo_turno}
+                          </span>
+                        </label>
+                      )}
                     </td>
                     <td className="min-w-[9rem] px-3 py-2.5 text-gris-700">
                       {f.denominacion_tramite}
@@ -1684,47 +1840,23 @@ async function llamar() {
 
         Cuando el titular se opone al tratamiento, el turno se cancela: el
         derecho a oponerse exige cesar, no esperar. Por eso **no está en la
-        cola de espera** (esa solo trae los que esperan) y, sin esta tarjeta,
+        cola de espera** (esa solo trae los que esperan) y, sin ningún aviso,
         el turno desaparecía de la pantalla sin dejar rastro: el operador no
         sabía si el ciudadano se había retirado o si el sistema lo había
         perdido.
 
-        Aquí está el rastro, con lo que el titular escribió. No se puede
-        llamar a estos turnos: están cancelados.
+        Antes esto era una tarjeta en mitad de la página, con el texto que
+        había escrito el ciudadano. Ocupaba sitio todo el día para un suceso
+        ocasional, y una opinión ajena acababa presidiendo la consola. Ahora
+        es una notificación flotante y breve: dice qué turno se retiró, no se
+        llama, y se va sola. La constancia con la consideración entera sigue
+        en el historial, que es donde se consulta.
       */}
-      {retirados.length > 0 && (
-        <section className="tarjeta mb-6 overflow-hidden">
-          <div className="border-b border-gris-100 px-6 py-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
-              Retirados por el titular
-            </h2>
-            <p className="mt-0.5 text-xs text-gris-500">
-              {retirados.length}{' '}
-              {retirados.length === 1 ? 'ciudadano se opuso' : 'ciudadanos se opusieron'}{' '}
-              a que se atendiera su turno. No se llamarán.
-            </p>
-          </div>
-          <ul className="divide-y divide-gris-100">
-            {retirados.map((r) => (
-              <li key={r.turno_id} className="px-6 py-4">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-bold text-navy-800">{r.codigo_turno}</span>
-                  <span className="text-sm text-gris-700">
-                    {r.denominacion_tramite}
-                  </span>
-                  {r.codigo_modulo && (
-                    <span className="text-xs text-gris-500">
-                      módulo {r.codigo_modulo}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 rounded bg-ambar-50 px-2 py-1.5 text-sm text-ambar-600">
-                  «{r.consideracion}»
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {retirados.length > 0 && !retiradosVistos && (
+        <NotificacionRetirados
+          retirados={retirados}
+          onCerrar={() => setRetiradosVistos(true)}
+        />
       )}
 
 

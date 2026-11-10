@@ -185,10 +185,6 @@
     @apply bg-rojo-500 text-white hover:bg-rojo-600;
   }
 
-  .boton-omision {
-    @apply bg-rojo-500 text-white hover:bg-rojo-600;
-  }
-
   .boton-ok {
     @apply bg-verde-500 text-white hover:bg-verde-600;
   }
@@ -2564,6 +2560,23 @@ body {
   background: var(--color-verde-500);
 }
 
+/*
+ * Variante ámbar: el aviso de que un ciudadano se retiró (RF-033).
+ *
+ * No es un error —nada ha fallado— pero tampoco una confirmación de algo que
+ * acaba de hacer el operador: es un suceso que llega de fuera y que conviene
+ * ver antes de llamar al siguiente. Verde diría «todo bien»; ámbar dice
+ * «mire esto un segundo».
+ */
+.notificacion--aviso::before {
+  background: var(--color-ambar-500);
+}
+
+.notificacion--aviso .notificacion-icono {
+  background: var(--color-ambar-50);
+  color: var(--color-ambar-600);
+}
+
 @keyframes notificacion-entra {
   0% {
     /* Entra desde abajo, no desde el lateral: se lee como algo que «llega»
@@ -4006,4 +4019,270 @@ button.boton-pildora {
     0 1px 2px rgba(23, 43, 68, 0.18),
     0 2px 4px rgba(23, 43, 68, 0.10),
     inset 0 0 0 1px rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ===========================================================================
+   Icono de «Cerrar sesión» (Basil Icons)
+   ===========================================================================
+   Misma técnica que `.bi--megaphone-fill`: un span vacío con la máscara y el
+   color del texto. Se usa en el diálogo de confirmación de salida, donde el
+   icono es lo primero que se ve.
+
+   El `1em` de tamaño no es un descuido: así el icono crece con la tipografía
+   del contenedor (`text-2xl` = 24 px) y no hay que repetir la medida en cada
+   sitio donde se use.
+   =========================================================================== */
+
+.basil--logout-solid {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M11.25 19a.75.75 0 0 1 .75-.75h6a.25.25 0 0 0 .25-.25V6a.25.25 0 0 0-.25-.25h-6a.75.75 0 0 1 0-1.5h6c.966 0 1.75.784 1.75 1.75v12A1.75 1.75 0 0 1 18 19.75h-6a.75.75 0 0 1-.75-.75'/%3E%3Cpath fill='black' d='M15.612 13.115a1 1 0 0 1-1 1H9.756q-.035.533-.086 1.066l-.03.305a.718.718 0 0 1-1.025.578a16.8 16.8 0 0 1-4.885-3.539l-.03-.031a.72.72 0 0 1 0-.998l.03-.031a16.8 16.8 0 0 1 4.885-3.539a.718.718 0 0 1 1.025.578l.03.305q.051.532.086 1.066h4.856a1 1 0 0 1 1 1z'/%3E%3C/svg%3E");
+  background-color: currentColor;
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* ===========================================================================
+   Iconos del bloque de usuario de la barra lateral
+   ===========================================================================
+   Sustituyen al texto del rol, que repetía el nombre de la cuenta
+   («Administrador» / «ADMINISTRADOR»). Un icono dice lo mismo sin gastar dos
+   líneas de barra: escudo para administración, persona para el operador.
+
+   Misma técnica de máscara que el resto de iconos: el span hereda el color del
+   texto y el tamaño de la tipografía (1em).
+   =========================================================================== */
+
+.eos-icons--admin {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12c5.16-1.26 9-6.45 9-12V5Zm0 3.9a3 3 0 1 1-3 3a3 3 0 0 1 3-3m0 7.9c2 0 6 1.09 6 3.08a7.2 7.2 0 0 1-12 0c0-1.99 4-3.08 6-3.08'/%3E%3C/svg%3E");
+  background-color: currentColor;
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.at-icons--person {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M10 10a4 4 0 0 1 4 4v1H2v-1a4 4 0 0 1 4-4zM9 1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V4a3 3 0 0 1 3-3z'/%3E%3C/svg%3E");
+  background-color: currentColor;
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* ===========================================================================
+   Botón «Cerrar sesión» de la barra lateral
+   ===========================================================================
+   Era un enlace de texto más en la barra: mismo peso visual que «Turnos» o
+   «Historial», y por eso se pulsaba sin querer. Ahora es un botón rojo, que es
+   lo que es (una acción que corta el trabajo).
+
+   El gesto al pasar el cursor es el de «Emitir turno»: el texto se va y el
+   icono ocupa el centro del botón. La mecánica es distinta —aquí el texto se
+   recoge con `max-width: 0` y el flex recentra el icono solo— porque el botón
+   no siempre mide lo mismo: la barra se puede estrechar y el texto cambia de
+   ancho. Con posiciones calculadas a mano, el icono quedaba a 60 px de la
+   palabra; con flex queda siempre pegado, en reposo y en hover.
+
+   El rojo va sobre navy oscuro: blanco sobre #dc2626 da 4.83:1, por encima del
+   mínimo AA para texto normal.
+   =========================================================================== */
+
+.boton-salir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-rojo-500);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    gap 0.35s ease,
+    box-shadow 0.4s ease-in-out,
+    background-color 0.2s ease,
+    transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.boton-salir:hover:not(:disabled) {
+  gap: 0;
+  background: var(--color-rojo-600);
+  box-shadow: 0 0 20px 0 rgba(220, 38, 38, 0.45);
+}
+
+.boton-salir:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.boton-salir:focus-visible {
+  outline: 3px solid #fca5a5;
+  outline-offset: 2px;
+}
+
+.boton-salir-icono.basil--logout-solid {
+  flex-shrink: 0;
+  /* El icono mide 1em: con esto queda en 17 px, el cuerpo de la barra. */
+  font-size: 17px;
+  transition: transform 0.4s ease;
+}
+
+.boton-salir:hover:not(:disabled) .boton-salir-icono {
+  transform: scale(1.5);
+}
+
+.boton-salir-texto {
+  max-width: 14rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity 0.35s ease,
+    max-width 0.35s ease;
+}
+
+.boton-salir:hover:not(:disabled) .boton-salir-texto {
+  opacity: 0;
+  max-width: 0;
+}
+
+/*
+ * Menú colapsado: solo queda el icono, así que el flex ya lo centra y el
+ * hover no tiene texto que recoger.
+ */
+.boton-salir--compacto {
+  padding: 0;
+}
+
+/*
+ * Movimiento reducido: el botón sigue cambiando de color al pasar el cursor,
+ * pero no se recoge el texto ni crece el icono.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .boton-salir,
+  .boton-salir-icono,
+  .boton-salir-texto {
+    transition: none;
+  }
+
+  .boton-salir:hover:not(:disabled) {
+    gap: 0.55rem;
+  }
+
+  .boton-salir:hover:not(:disabled) .boton-salir-texto {
+    opacity: 1;
+    max-width: 14rem;
+  }
+
+  .boton-salir:hover:not(:disabled) .boton-salir-icono {
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Icono de retraer/expandir el menú
+   ===========================================================================
+   Sustituye a las dos flechas dibujadas a mano (una por estado). El icono es
+   el mismo en los dos: la barra lateral, con el panel marcado a la izquierda.
+   Al retraerla, el propio panel del icono dice hacia dónde se va.
+   =========================================================================== */
+
+.cuida--sidebar-collapse-outline {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' fill-rule='evenodd' d='M6.416 4.767a2.65 2.65 0 0 0-2.65 2.65v8.832a2.65 2.65 0 0 0 2.65 2.65h1.461V4.767h-1.46Zm0-1.767A4.416 4.416 0 0 0 2 7.416v8.833a4.416 4.416 0 0 0 4.416 4.417h11.168A4.416 4.416 0 0 0 22 16.248V7.416A4.416 4.416 0 0 0 17.584 3zm3.228 1.767v14.132h7.94a2.65 2.65 0 0 0 2.65-2.65V7.416a2.65 2.65 0 0 0-2.65-2.65h-7.94Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-color: currentColor;
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* El otro estado del botón del menú: el panel abierto, con la flecha a la
+   derecha. */
+.andrsrxn--panel-right-open-filled {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  --svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none'%3E%3Cpath stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m7.2 15.9l1.08-1.07c1.33-1.33 2-2 2-2.83s-.67-1.5-2-2.83L7.21 8.1'/%3E%3Cpath fill='black' d='M14.65 2.72c2.44 0 3.67 0 4.58.52a4 4 0 0 1 1.52 1.52c.52.91.52 2.13.52 4.58v5.32c0 2.45 0 3.67-.52 4.58a4 4 0 0 1-1.52 1.52c-.91.52-2.14.52-4.58.52z'/%3E%3Cpath stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M10.74 21.28h2.53c3.77 0 5.65 0 6.82-1.17c1.18-1.17 1.18-3.06 1.18-6.83v-2.56c0-3.77 0-5.66-1.18-6.83c-1.17-1.17-3.05-1.17-6.82-1.17h-2.53c-3.78 0-5.66 0-6.83 1.17s-1.17 3.06-1.17 6.83v2.56c0 3.77 0 5.66 1.17 6.83s3.05 1.17 6.82 1.17m3.92-.4V3.12'/%3E%3C/g%3E%3C/svg%3E");
+  background-color: currentColor;
+  -webkit-mask-image: var(--svg);
+  mask-image: var(--svg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* ===========================================================================
+   Acomodo de la barra al plegarla y desplegarla
+   ===========================================================================
+   La barra cambia de ancho de golpe —animar `width` reflowaba la tabla de
+   turnos en cada fotograma: medido, 11 fotogramas de hasta 133 ms—, y para
+   que el cambio no se sienta seco se anima SU CONTENIDO, no la columna de la
+   página: son 288 px que repintar en vez de una tabla de trece filas.
+
+   Es un `animation` CSS con `transform` y `opacity`, las dos propiedades que
+   el compositor resuelve sin recalcular el layout. Duración corta (220 ms):
+   el gesto se lee, no se espera.
+   =========================================================================== */
+
+[data-animar='si'][data-plegado='si'] .barra-animada {
+  animation: barra-acomodo-izquierda 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-animar='si'][data-plegado='no'] .barra-animada {
+  animation: barra-acomodo-derecha 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Al plegar, la barra se estrecha: su contenido entra desde la izquierda.
+ * Al desplegar, al revés.
+ */
+@keyframes barra-acomodo-izquierda {
+  from {
+    transform: translateX(-8px);
+    opacity: 0.55;
+  }
+}
+
+@keyframes barra-acomodo-derecha {
+  from {
+    transform: translateX(8px);
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-animar='si'][data-plegado='si'] .barra-animada,
+  [data-animar='si'][data-plegado='no'] .barra-animada {
+    animation: none;
+  }
 }

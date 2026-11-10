@@ -182,12 +182,35 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     [recargar],
   )
 
+  /**
+   * Cerrar la sesión.
+   *
+   * El estado se limpia ANTES de hablar con el servidor: la pantalla de acceso
+   * tiene que aparecer en el mismo gesto. Antes se esperaba a
+   * `signOut()` y, si el servidor de autenticación tarda (o no contesta, como
+   * pasa en el arnés local, que no implementa `/auth/v1/logout`), la consola se
+   * quedaba congelada con el botón pulsado.
+   *
+   * `scope: 'local'` cierra la sesión en este navegador sin pedirle permiso al
+   * servidor: borra el token guardado y ya está. Es lo que hace falta aquí —no
+   * hay sesiones compartidas entre equipos— y quita la ida y vuelta de red del
+   * camino crítico.
+   */
   const salir = useCallback(async () => {
-    await supabase.auth.signOut()
     setOperador(null)
     setSesion(null)
     setEsAdministrador(false)
     setPuedeOperar(false)
+
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      /*
+       * Si ni siquiera el borrado local funciona, la sesión del estado ya
+       * está cerrada y el usuario está fuera de la consola: no hay nada que
+       * hacer aquí, y un error rojo al salir sería ruido.
+       */
+    }
   }, [])
 
   const valor = useMemo<ContextoAuth>(

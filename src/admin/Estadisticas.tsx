@@ -49,9 +49,14 @@ export default function Estadisticas() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tarjeta titulo="Generados" valor={totales.generados} />
-        <Tarjeta titulo="Atendidos" valor={totales.atendidos} tono="ok" />
+        <Tarjeta titulo="Atendidos" valor={totales.atendidos} tono="azul" />
         <Tarjeta titulo="Cancelados" valor={totales.cancelados} tono="peligro" />
-        <Tarjeta titulo="Omitidos" valor={totales.omitidos} tono="alerta" />
+        {/*
+          Omitidos en el negro del texto, no en ámbar: omitir es una salida
+          normal de la jornada (el ciudadano no se presentó), no una alarma
+          que haya que mirar. El ámbar se queda para lo que pide atención.
+        */}
+        <Tarjeta titulo="Omitidos" valor={totales.omitidos} />
       </div>
 
       <section className="tarjeta overflow-hidden">
@@ -90,9 +95,9 @@ export default function Estadisticas() {
                       </span>
                     </td>
                     <td className="px-4 py-2.5">{f.generados ?? 0}</td>
-                    <td className="px-4 py-2.5 text-verde-600">{f.atendidos ?? 0}</td>
+                    <td className="px-4 py-2.5 text-azul-600">{f.atendidos ?? 0}</td>
                     <td className="px-4 py-2.5 text-rojo-600">{f.cancelados ?? 0}</td>
-                    <td className="px-4 py-2.5 text-ambar-600">{f.omitidos ?? 0}</td>
+                    <td className="px-4 py-2.5 text-navy-900">{f.omitidos ?? 0}</td>
                     <td className="px-4 py-2.5 text-gris-700">
                       {f.tiempo_promedio_atencion != null
                         ? `${Math.round(f.tiempo_promedio_atencion)} min`
@@ -112,13 +117,15 @@ export default function Estadisticas() {
 function Tarjeta({ titulo, valor, tono = 'neutro' }: {
   titulo: string
   valor: number
-  tono?: 'neutro' | 'ok' | 'alerta' | 'peligro'
+  tono?: 'neutro' | 'ok' | 'alerta' | 'peligro' | 'azul'
 }) {
   const colores = {
     neutro: 'text-navy-900',
     ok: 'text-verde-600',
     alerta: 'text-ambar-600',
     peligro: 'text-rojo-600',
+    /* Atendidos: azul, el color de la acción y de lo que el sistema produce. */
+    azul: 'text-azul-600',
   }
 
   /*
@@ -128,8 +135,9 @@ function Tarjeta({ titulo, valor, tono = 'neutro' }: {
    * pantallas no se separen con el tiempo.
    *
    * El velo aquí es siempre el gris: estas tarjetas no tienen una variante
-   * destacada en azul, y las cifras de color (verde, ámbar, rojo) van sobre
-   * blanco para conservar el contraste.
+   * destacada, y las cifras de color (azul, rojo) van sobre blanco para
+   * conservar el contraste. «Omitidos» va en el negro del texto: no es una
+   * alarma.
    */
   return (
     <div

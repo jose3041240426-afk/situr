@@ -315,9 +315,17 @@ export default function Historial() {
         </div>
       )}
 
-      {/* Paginador */}
+      {/*
+        Paginador.
+
+        Va dentro de una tarjeta blanca y no suelto sobre el fondo: la página
+        entera son tarjetas, y un paginador flotando en el degradado parecía
+        parte del fondo y no un control. Además, el «Mostrando 1–10 de 14» es
+        texto y necesita un fondo real debajo para que el contraste se pueda
+        medir (mismo motivo que el del resto de `.tarjeta`).
+      */}
       {total > POR_PAGINA && (
-        <div className="flex items-center justify-between gap-4 pt-2">
+        <div className="tarjeta flex flex-wrap items-center justify-between gap-4 px-5 py-4">
           <p className="text-xs text-gris-500" role="status" aria-live="polite">
             Mostrando {(pagina - 1) * POR_PAGINA + 1}–
             {Math.min(pagina * POR_PAGINA, total)} de {total}
