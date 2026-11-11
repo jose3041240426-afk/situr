@@ -26,6 +26,7 @@ async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url, `https://${req.headers.get('host') ?? 'localhost'}`)
   const supabaseUrl = process.env.SUPABASE_URL
   const anonKey = process.env.SUPABASE_ANON_KEY
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !anonKey) {
     return new Response(
@@ -84,6 +85,40 @@ async function handler(req: Request): Promise<Response> {
   })
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 400 })
+  }
+
+  /*
+   * Si el turno ya estaba llamado cuando el ciudadano se suscribió, el cron
+   * no lo va a ofrecer (ultima_activacion queda NULL y la regla de CALLED
+   * exige ultima_activacion < llamado_en, que es verdad, pero el cron pasa
+   * cada 5 minutos). Para no hacer esperar al ciudadano, se envía en el
+   * acto: el propio servidor llama a /api/push con el secreto del cron, que
+   * es lo que autoriza el envío.
+   */
+  if (serviceKey) {
+    try {
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+      const { data: turno } = await admin
+        .from('turnos')
+        .select('id, estado')
+        .eq('token_publico', token)
+        .maybeSingle()
+      if (turno?.estado === 'CALLED') {
+        const secreto = process.env.CRON_SECRET
+        if (secreto) {
+          fetch(
+            new URL(`/api/push?turno_id=${encodeURIComponent(turno.id)}`, `https://${req.headers.get('host') ?? 'localhost'}`),
+            { method: 'POST', headers: { Authorization: `Bearer ${secreto}` } },
+          ).catch(() => undefined)
+        }
+      }
+    } catch (e) {
+      // No interrumpe el alta: la suscripción ya está guardada y el cron
+      // la recogerá en su siguiente vuelta.
+      console.error('[situr/suscripcion] aviso inmediato no pudo enviarse:', e instanceof Error ? e.message : e)
+    }
   }
 
   return new Response(JSON.stringify(data), {
