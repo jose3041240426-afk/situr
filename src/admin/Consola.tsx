@@ -626,7 +626,15 @@ async function llamar() {
         void fetch(`/api/push?turno_id=${encodeURIComponent(r.turno_id)}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${tokenOperador}` },
-        }).catch(() => undefined)
+        }).then(async (res) => {
+          if (!res.ok) {
+            const texto = await res.text().catch(() => '')
+            console.error('[situr] push al llamar falló:', res.status, texto)
+          } else {
+            const d = await res.json().catch(() => ({}))
+            console.info('[situr] push al llamar:', d)
+          }
+        }).catch((e) => console.error('[situr] push al llamar (red):', e))
       }
       await cargar()
     } catch (e) {
