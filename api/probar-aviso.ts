@@ -67,11 +67,13 @@ async function handler(req: Request): Promise<Response> {
       { status: 404, headers: { 'content-type': 'application/json' } },
     )
   }
+  // La suscripción puede estar desactivada porque el turno terminó: se
+  // reactiva para la prueba, que solo quiere saber si el canal funciona.
   if (!subs.activa) {
-    return new Response(
-      JSON.stringify({ ok: false, motivo: 'La suscripción está desactivada.' }),
-      { status: 410, headers: { 'content-type': 'application/json' } },
-    )
+    await supabase
+      .from('suscripciones_push')
+      .update({ activa: true })
+      .eq('token_publico', token)
   }
 
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)

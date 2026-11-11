@@ -108,12 +108,26 @@ async function handler(req: Request): Promise<Response> {
     if (turno) {
       const { data: sub } = await supabase
         .from('suscripciones_push')
-        .select('endpoint, clave_p256dh, clave_auth')
+        .select('endpoint, clave_p256dh, clave_auth, activa')
         .eq('token_publico', (await supabase.from('turnos').select('token_publico').eq('id', turnoId).single()).data?.token_publico ?? '')
         .eq('activa', true)
         .maybeSingle()
 
       if (sub) {
+      // La suscripción puede estar inactiva porque el turno se omitió por
+      // timeout (5 min) y el disparador la desactivó. Si el ciudadano volvió
+      // a abrir el portal, o el operador vuelve a llamar, se reactiva: el
+      // aviso de «llamado» es más importante que el de «se omitió».
+      if (!(sub as { activa?: boolean }).activa) {
+        const { data: t2 } = await supabase
+          .from('turnos').select('token_publico').eq('id', turnoId).single()
+        if (t2?.token_publico) {
+          await supabase
+            .from('suscripciones_push')
+            .update({ activa: true, ultima_activacion: null })
+            .eq('token_publico', t2.token_publico)
+        }
+      }
         cola = [
           {
             turno_id: turno.id,
