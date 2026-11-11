@@ -99,35 +99,37 @@ async function handler(req: Request): Promise<Response> {
   let cola: FilaCola[] = []
 
   if (turnoId) {
+    /*
+     * Aviso inmediato de un turno concreto.
+     *
+     * Se trae el turno con su token en una sola consulta y se busca la
+     * suscripción SIN filtrar por `activa`: si el turno se omitió por
+     * timeout, el disparador la desactivó, y filtrar aquí haría que este
+     * bloque no la encontrara nunca (era el fallo: el aviso «de llamada» no
+     * se mandaba jamás después de un timeout). Se reactiva y se envía.
+     */
     const { data: turno } = await supabase
       .from('turnos')
-      .select('id, codigo, folio, modulo_id, modulos(codigo)')
+      .select('id, codigo, folio, token_publico, modulo_id, modulos(codigo)')
       .eq('id', turnoId)
       .maybeSingle()
 
-    if (turno) {
+    if (turno?.token_publico) {
       const { data: sub } = await supabase
         .from('suscripciones_push')
         .select('endpoint, clave_p256dh, clave_auth, activa')
-        .eq('token_publico', (await supabase.from('turnos').select('token_publico').eq('id', turnoId).single()).data?.token_publico ?? '')
-        .eq('activa', true)
+        .eq('token_publico', turno.token_publico)
         .maybeSingle()
 
       if (sub) {
-      // La suscripción puede estar inactiva porque el turno se omitió por
-      // timeout (5 min) y el disparador la desactivó. Si el ciudadano volvió
-      // a abrir el portal, o el operador vuelve a llamar, se reactiva: el
-      // aviso de «llamado» es más importante que el de «se omitió».
-      if (!(sub as { activa?: boolean }).activa) {
-        const { data: t2 } = await supabase
-          .from('turnos').select('token_publico').eq('id', turnoId).single()
-        if (t2?.token_publico) {
+        if (!sub.activa) {
           await supabase
             .from('suscripciones_push')
             .update({ activa: true, ultima_activacion: null })
-            .eq('token_publico', t2.token_publico)
+            .eq('token_publico', turno.token_publico)
         }
-      }
+
+        const modulo = (turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? null
         cola = [
           {
             turno_id: turno.id,
@@ -136,9 +138,9 @@ async function handler(req: Request): Promise<Response> {
             clave_auth: sub.clave_auth,
             codigo_turno: turno.codigo,
             folio: turno.folio,
-            modulo_codigo: (turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? null,
+            modulo_codigo: modulo,
             tipo_aviso: 'LLAMADO',
-            mensaje: `Su turno ${turno.codigo} fue llamado. Acuda a ${(turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? 'su módulo'}.`,
+            mensaje: `Su turno ${turno.codigo} fue llamado. Acuda a ${modulo ?? 'su módulo'}.`,
           },
         ]
       }
