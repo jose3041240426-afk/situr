@@ -234,6 +234,34 @@ export default function TurnoCiudadano() {
   }, [token])
 
   /*
+   * RE-SINCRONIZAR LA SUSCRIPCIÓN.
+   *
+   * Caso real: el ciudadano acepta el aviso, la suscripción queda en la base…
+   * y días después borra los datos del sitio (o el navegador reinstala el
+   * Service Worker). La base sigue creyendo que hay un móvil suscrito, pero
+   * ese navegador ya no tiene ninguna suscripción: el servidor envía y no
+   * llega nada.
+   *
+   * Al abrir el portal se comprueba; si el ciudadano ya había aceptado
+   * (`preferencia_aviso_minutos` no es null) y el navegador no tiene
+   * suscripción, se vuelve a crear y se actualiza la base. No se pide permiso
+   * de nuevo: ya lo dio. Es restaurar su elección, no pedir consentimiento.
+   */
+  useEffect(() => {
+    if (!turno) return
+    if (turno.preferencia_aviso_minutos === null) return
+    if (!pushSoportado() || estadoPermiso() !== 'granted') return
+    void (async () => {
+      const registro = await navigator.serviceWorker.getRegistration('/')
+      const sub = registro ? await registro.pushManager.getSubscription() : null
+      if (!sub) {
+        const ok = await suscribirAvisos(token)
+        if (ok) console.info('[situr] suscripción del móvil restaurada')
+      }
+    })()
+  }, [turno?.preferencia_aviso_minutos, token])
+
+  /*
    * Si el sistema operativo bloqueó la notificación, el push igual llegó al
    * Service Worker: aquí se muestra cuándo, para que el ciudadano sepa que
    * el problema no es la app.
@@ -349,6 +377,21 @@ export default function TurnoCiudadano() {
     setProbandoAviso(true)
     setResultadoPrueba(null)
     try {
+      /*
+       * Antes de probar, se asegura de que ESTE navegador tiene suscripción.
+       * Si la base tiene una vieja (de otro dispositivo o de antes de borrar
+       * los datos), la prueba iría a un endpoint muerto y diría «enviado»
+       * sin que suene nada. Re-suscribirse la deja al día.
+       */
+      const registro = await navigator.serviceWorker.getRegistration('/')
+      const sub = registro ? await registro.pushManager.getSubscription() : null
+      if (!sub) {
+        const ok = await suscribirAvisos(token)
+        if (!ok) {
+          setResultadoPrueba('No se pudo suscribir este móvil. Revise el permiso de notificaciones.')
+          return
+        }
+      }
       const r = await fetch(`/api/probar-aviso?token=${encodeURIComponent(token)}`)
       const d = await r.json()
       setResultadoPrueba(d.ok
