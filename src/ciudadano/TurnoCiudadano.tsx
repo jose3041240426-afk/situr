@@ -229,6 +229,32 @@ export default function TurnoCiudadano() {
     }
   }, [turno])
 
+  /*
+   * EL AVISO DEL SERVICE WORKER, CON LA PESTAÑA ABIERTA.
+   *
+   * Cuando el push llega, el Service Worker hace dos cosas: guarda el recibo
+   * y avisa a las ventanas abiertas (`postMessage` con «push-recibido»). La
+   * segunda cosa es el respaldo cuando el sistema operativo no muestra la
+   * notificación —permiso bloqueado, canal silenciado, ahorro de batería—:
+   * el ciudadano sigue viendo el aviso en pantalla.
+   *
+   * Antes esa señal no la escuchaba nadie: el Service Worker la mandaba y se
+   * perdía, así que con la pestaña abierta y las notificaciones del sistema
+   * bloqueadas el ciudadano no veía nada en absoluto.
+   */
+  useEffect(() => {
+    if (!pushSoportado()) return
+    const alRecibir = (evento: MessageEvent) => {
+      const dato = evento.data
+      if (!dato || typeof dato !== 'object' || dato.tipo !== 'push-recibido') return
+      const carga = (dato.carga ?? {}) as { title?: string; body?: string }
+      const texto = carga.body || carga.title
+      if (texto) setAvisoEnPantalla(texto)
+    }
+    navigator.serviceWorker.addEventListener('message', alRecibir)
+    return () => navigator.serviceWorker.removeEventListener('message', alRecibir)
+  }, [])
+
   useEffect(() => {
     void recordarTokenEnElServiceWorker(token)
   }, [token])
@@ -257,7 +283,23 @@ export default function TurnoCiudadano() {
       if (!sub) {
         const ok = await suscribirAvisos(token)
         if (ok) console.info('[situr] suscripción del móvil restaurada')
+        return
       }
+      /*
+       * El navegador tiene suscripción, pero eso no quiere decir que el
+       * servidor la tenga. Cuando el proveedor de push responde 404 o 410
+       * (el endpoint murió), la fila de `suscripciones_push` se borra; el
+       * navegador, en cambio, sigue guardando su suscripción y
+       * `getSubscription()` la devuelve. Como antes solo se re-alta cuando el
+       * navegador NO tenía suscripción, ese caso se quedaba sin avisos para
+       * siempre: el servidor no tenía a quién avisar.
+       *
+       * El alta es idempotente (UNIQUE en `token_publico`, y el endpoint se
+       * actualiza), así que se puede repetir sin miedo en cada apertura del
+       * portal: si la fila existe, se refresca; si falta, se vuelve a crear.
+       */
+      const ok = await suscribirAvisos(token)
+      if (ok) console.info('[situr] suscripción del móvil sincronizada con el servidor')
     })()
   }, [turno?.preferencia_aviso_minutos, token])
 
