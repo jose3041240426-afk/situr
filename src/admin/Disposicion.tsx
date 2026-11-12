@@ -444,15 +444,15 @@ export default function Disposicion({
             el rostro, y el texto se leería cortado.
           */}
           {operador && (
+            /*
+              El nombre accesible tiene que CONTENER el texto visible
+              (WCAG 2.5.3). Con `aria-label="Mi perfil"` y el nombre del
+              operador a la vista, el lector de pantalla anunciaba «Mi
+              perfil» y el operador veía «Prueba»: el control y lo que dice
+              no coincidían.
+            */
             <NavLink
               to="/admin/perfil"
-              /*
-                El nombre accesible tiene que CONTENER el texto visible
-                (WCAG 2.5.3). Con `aria-label="Mi perfil"` y el nombre del
-                operador a la vista, el lector de pantalla anunciaba «Mi
-                perfil» y el operador veía «Prueba»: el control y lo que
-                dice no coincidían.
-              */}
               aria-label={`Mi perfil de ${operador.nombres}`}
               title="Mi perfil"
               className="ml-auto flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
