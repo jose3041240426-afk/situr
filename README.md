@@ -520,7 +520,7 @@ comportamiento, todos con su valor por defecto
 
 | Clave | Qué gobierna | Valor |
 |---|---|---|
-| `POSICION_AVISO_PUSH` | Posición en la cola a partir de la cual se avisa por push | 3 |
+| `POSICION_AVISO_PUSH` | Cuántas personas de la cola reciben aviso de cercanía como máximo | 2 |
 | `MINUTOS_AVISO_PUSH` | Minutos de espera a partir de los cuales se avisa | 10 |
 | `MINUTOS_TIMEOUT_LLAMADA` | Tiempo que un turno llamado espera antes de quedar libre | 5 |
 | `MAXIMO_TURNOS_DIARIOS` | Tope de turnos por trámite y día | 999 |

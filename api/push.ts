@@ -36,6 +36,9 @@ interface FilaCola {
   modulo_codigo: string | null
   tipo_aviso: string
   mensaje: string
+  /** Identifica esta entrega concreta. El Service Worker la usa como `tag`. */
+  marca: string
+  titulo: string
 }
 
 async function handler(req: Request): Promise<Response> {
@@ -153,6 +156,14 @@ async function handler(req: Request): Promise<Response> {
             modulo_codigo: modulo,
             tipo_aviso: 'LLAMADO',
             mensaje: `Su turno ${turno.codigo} fue llamado. Acuda a ${modulo ?? 'su módulo'}.`,
+            /*
+             * La marca de esta entrega. Es la hora de la llamada, de modo
+             * que cada llamada repetida produce una marca distinta y, con
+             * ella, una notificación nueva: si el usuario descartó el aviso
+             * anterior, el navegador ya no lo esconde.
+             */
+            marca: `llamado-${turno.folio}-${turno.llamado_en ? Math.floor(new Date(turno.llamado_en).getTime() / 1000) : Date.now()}`,
+            titulo: 'SITUR · Su turno fue llamado',
           },
         ]
       }
@@ -182,11 +193,19 @@ async function handler(req: Request): Promise<Response> {
           keys: { p256dh: fila.clave_p256dh, auth: fila.clave_auth },
         },
         JSON.stringify({
-          title: 'SITUR · Su turno',
+          title: fila.titulo || 'SITUR · Su turno',
           body: fila.mensaje,
           codigo: fila.codigo_turno,
           folio: fila.folio,
           modulo: fila.modulo_codigo,
+          /*
+           * La marca viaja en el aviso para que el Service Worker pueda
+           * ponerla como `tag` de la notificación. Sin ella, el `tag` sería
+           * el folio del turno, y en Android y Chrome eso hace que una
+           * notificación descartada eclipse a las siguientes del mismo
+           * turno: el aviso se envía y no aparece.
+           */
+          marca: fila.marca,
         }),
         /*
          * TTL y urgencia (RFC 8030).

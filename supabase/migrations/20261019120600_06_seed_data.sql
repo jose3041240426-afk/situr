@@ -120,9 +120,9 @@ INSERT INTO configuracion (clave, nombre, valor, tipo, descripcion) VALUES
     -- trámites con mucha cola; el de minutos, sobre trámites tranquilos donde
     -- la posición nunca bajaría de 3 pero el turno está a dos minutos.
     ('POSICION_AVISO_PUSH',
-     'Posición en la que se avisa por push',
-     '3', 'ENTERO',
-     'Si la posición del turno en su trámite baja de este valor, se envía el aviso de turno cercano (RF-028).'),
+     'Cuántas personas de la cola reciben aviso de cercanía',
+     '2', 'ENTERO',
+     'Máximo de posiciones de la cola que reciben el aviso de cercanía (RF-028). Con una atención de cinco minutos son el primero y el segundo: a partir del tercero la espera es de quince minutos o más y el aviso sería una señal falsa. El aviso lo decide además el tiempo que falta (MINUTOS_AVISO_PUSH).'),
 
     ('MINUTOS_AVISO_PUSH',
      'Minutos de espera en los que se avisa por push',

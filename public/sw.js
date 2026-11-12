@@ -29,7 +29,7 @@
  */
 
 const DB_SITUR = 'situr'
-const VERSION_SW = '2026-11-10-3'
+const VERSION_SW = '2026-11-12-1'
 const ALMACEN = 'tokens'
 const CLAVE_TOKEN = 'actual'
 
@@ -195,6 +195,27 @@ self.addEventListener('push', (event) => {
   const cuerpo = carga.body || 'Su turno está próximo.'
   const folio = carga.codigo || ''
 
+  /*
+   * EL `tag` DE LA NOTIFICACIÓN.
+   *
+   * El `tag` sirve para que una notificación REPLACE a la anterior del
+   * mismo turno, en vez de acumularse. Pero en Android y Chrome tiene un
+   * efecto secundario: cuando el usuario DESCARTA la notificación, el
+   * navegador la recuerda y no vuelve a mostrar ninguna otra con ese
+   * mismo `tag`. El aviso se envía, el proveedor de push lo acepta y el
+   * mensaje no aparece.
+   *
+   * Por eso el `tag` lleva la MARCA de la entrega, que cambia cuando
+   * cambia el hecho que la justifica: cada llamada repetida tiene su propia
+   * marca y, con ella, su propia notificación. Solo si el aviso no trae
+   * marca se recurre al folio, que es el comportamiento de antes.
+   */
+  const tag = carga.marca
+    ? `situr-${carga.marca}`
+    : folio
+      ? `situr-${folio}`
+      : 'situr-turno'
+
   event.waitUntil(
     (async () => {
       await guardarRecibo(carga).catch(() => undefined)
@@ -203,7 +224,7 @@ self.addEventListener('push', (event) => {
           body: cuerpo,
           icon: '/icono-192.png',
           badge: '/icono-192.png',
-          tag: folio ? `situr-${folio}` : 'situr-turno',
+          tag,
           renotify: true,
           data: { folio },
           vibrate: [120, 60, 120],
@@ -213,7 +234,7 @@ self.addEventListener('push', (event) => {
         try {
           await self.registration.showNotification(titulo, {
             body: cuerpo,
-            tag: folio ? `situr-${folio}` : 'situr-turno',
+            tag,
             data: { folio },
           })
         } catch (e2) {
