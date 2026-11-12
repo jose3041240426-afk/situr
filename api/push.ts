@@ -4,14 +4,18 @@ import webpush from 'web-push'
 /**
  * SITUR — Emisor de notificaciones push (RF-028, DRS §6).
  *
- * Es la **única** pieza que envía Web Push. Se llama de dos maneras:
+ * Es la **única** pieza que envía Web Push. Se llama de tres maneras:
  *
- *   1. **Por el cron** (cada 5 minutos, GitHub Actions): recorre la cola de
- *      avisos y manda los que tocan (`suscripciones_por_notificar`).
+ *   1. **Por pg_cron**: la base de datos la invoca una vez por minuto con
+ *      `pg_net` (migración 025). Es la vía principal: GitHub Actions
+ *      retrasaba sus cron programados entre 5 y 8 horas, y la ventana de
+ *      aviso (turno en estado CALLED) dura solo los minutos que tarda el
+ *      operador en iniciar la atención.
  *   2. **Al llamar un turno**: la consola manda `?turno_id=...` con el token
  *      del operador, y se envía el aviso **en el acto**, sin esperar al cron.
- *      Es lo que hace que el ciudadano se entere en segundos y no en cinco
- *      minutos.
+ *      Es lo que hace que el ciudadano se entere en segundos.
+ *   3. **Por el cron de GitHub Actions**: queda como respaldo mientras el
+ *      aviso de pg_cron no esté en marcha en el entorno definitivo.
  *
  * No es lógica de negocio de turnos: la **autoridad es PostgreSQL**, que dice
  * a quién avisar y con qué texto. Aquí solo se entrega el mensaje.
@@ -54,12 +58,22 @@ async function handler(req: Request): Promise<Response> {
     )
   }
 
-  // Autorización: cron (secreto) o operador (JWT de Supabase).
+  // Autorización: cron de GitHub (secreto), pg_cron (token de la base)
+  // u operador (JWT de Supabase).
   const secreto = process.env.CRON_SECRET
-  const esCron = Boolean(secreto && req.headers.get('authorization') === `Bearer ${secreto}`)
+  const cabecera = req.headers.get('authorization')
+  const esCron = Boolean(secreto && cabecera === `Bearer ${secreto}`)
+
+  // La base de datos también puede invocar el emisor: es lo que hace
+  // pg_cron con la extensión pg_net, una vez por minuto. El token vive en
+  // Supabase Vault y su copia en la variable SITUR_PUSH_TOKEN de Vercel,
+  // así que no está escrito en ningún repositorio.
+  const tokenBase = process.env.SITUR_PUSH_TOKEN
+  const esBase = Boolean(tokenBase && cabecera === `Bearer ${tokenBase}`)
+
   let esOperador = false
 
-  if (!esCron && turnoId && anonKey) {
+  if (!esCron && !esBase && turnoId && anonKey) {
     // Verifica el JWT del operador contra Supabase y su rol.
     const cliente = createClient(supabaseUrl, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -81,8 +95,8 @@ async function handler(req: Request): Promise<Response> {
     }
   }
 
-  if (!esCron && !esOperador) {
-    if (!secreto && process.env.NODE_ENV !== 'production') {
+  if (!esCron && !esBase && !esOperador) {
+    if (!secreto && !tokenBase && process.env.NODE_ENV !== 'production') {
       // Desarrollo local: se permite probar.
     } else {
       return new Response('No autorizado', { status: 401 })
