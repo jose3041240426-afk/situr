@@ -433,7 +433,8 @@ con `SITUR_ANFITRION`, porque para el teléfono `127.0.0.1` es el teléfono.
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | servidor | Las mismas, para `api/suscripcion` |
 | `SUPABASE_SERVICE_ROLE_KEY` | **solo servidor** | La cola de avisos de push |
 | `VAPID_PRIVATE_KEY` | **solo servidor** | Firma de los avisos |
-| `CRON_SECRET` | **solo servidor** | Autoriza al cron a llamar a `/api/push` |
+| `CRON_SECRET` | **solo servidor** | Autoriza al cron de respaldo a llamar a `/api/push` |
+| `SITUR_PUSH_TOKEN` | **solo servidor** | Autoriza a `pg_cron` a llamar a `/api/push` (copia del secreto `situr_push_token` de Supabase Vault) |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | servidor | Límite de tasa del Edge Middleware |
 
 > La `service_role` **jamás** debe llegar al navegador: se salta la RLS.
@@ -688,7 +689,7 @@ cambia (DRS §5.1).
 | `/api/suscripcion` | `POST` / `DELETE` | Alta y baja de la suscripción push | 10/min por IP + token |
 | `/api/consideraciones` | `POST` | La oposición del titular | — |
 | `/api/ultimas-llamadas` | `GET` | La pantalla pública | 120/min por prefijo de red |
-| `/api/push` | `POST` | El emisor de avisos (lo llama el cron) | Solo con `CRON_SECRET` |
+| `/api/push` | `POST` | El emisor de avisos (lo llama `pg_cron` y la consola) | Con `SITUR_PUSH_TOKEN`, `CRON_SECRET` o el JWT del operador |
 
 ---
 
@@ -781,30 +782,37 @@ que es un tercero.
 
 ### El cron
 
-El aviso lo envía `POST /api/push`, que exige `CRON_SECRET`. **Con el plan
-gratuito de Vercel no hay cron cada minuto** (Hobby solo admite uno diario, y
-uno diario mandaría avisos a medianoche), así que el programador es un flujo
-de GitHub Actions:
+El aviso lo envía `POST /api/push`, que acepta tres formas de llamarse:
 
-```yaml
-# .github/workflows/avisos.yml
-on:
-  schedule:
-    - cron: '*/5 * * * *'
+| Quién llama | Con qué se autoriza | Para qué |
+|---|---|---|
+| `pg_cron` (PostgreSQL) | `SITUR_PUSH_TOKEN` | El aviso de cercanía, una vez por minuto |
+| La consola, al pulsar «Llamar» | El JWT del operador | El aviso de llamado, en el acto |
+
+**El programador es `pg_cron`, dentro de la base de datos.** La migración 025
+habilita `pg_net` y programa el trabajo `situr-avisos-push` cada minuto:
+
+```sql
+SELECT cron.schedule('situr-avisos-push', '* * * * *',
+                      $$SELECT situr_llamar_emisor_de_avisos();$$);
 ```
 
-Se configura una sola vez: **Settings → Secrets and variables → Actions →
-`CRON_SECRET`** con el valor de `secretos.env`. El flujo también se puede
-lanzar a mano desde la pestaña **Actions**.
+La base llama por HTTP al emisor con el token que lee de **Supabase Vault**
+(secreto `situr_push_token`), cuya copia vive en la variable de entorno
+`SITUR_PUSH_TOKEN` de Vercel. El token no está en el repositorio.
 
-Cinco minutos es lo mínimo que permite GitHub; para un aviso «15 minutos
-antes» sobra. Si se quiere al minuto, se apunta un cron externo
-(cron-job.org) al mismo endpoint con el mismo `Bearer`, o se sube a Vercel
-Pro y se pone el cron en `* * * * *`.
+**Por qué no GitHub Actions**: su cron declaraba `*/5 * * * *`, pero los
+intervalos reales medidos entre ejecuciones fueron de **4,8 a 7,8 horas**.
+GitHub no garantiza la hora de los cron programados, y la ventana de aviso
+—el turno en estado `CALLED`— dura solo los minutos que tarda el operador en
+iniciar la atención. Cuando el cron llegaba, el turno ya estaba en `SERVING`,
+y para `SERVING` no hay regla de aviso: el ciudadano se quedaba sin saber
+que lo habían llamado.
 
 **Configurar `CRON_SECRET`**: sin él, `/api/push` se rechaza en producción, y es
 lo correcto, porque mejor no enviar avisos que dejarlos abiertos a internet
-(DRS §10).
+(DRS §10). Solo lo usa el cron de respaldo: la consola se autoriza con su
+propio JWT y `pg_cron` con `SITUR_PUSH_TOKEN`.
 
 ---
 
@@ -844,7 +852,7 @@ app/
 ├── api/
 │   ├── consideraciones.ts   La oposición del titular (RF-033, LFPDPPP art. 21)
 │   ├── login.ts             El acceso del operador
-│   ├── push.ts              El emisor de Web Push (solo el cron)
+│   ├── push.ts              El emisor de Web Push (lo llaman pg_cron y la consola)
 │   ├── suscripcion.ts       Alta/baja de suscripciones push
 │   ├── turno.ts             La consulta pública del turno
 │   └── ultimas-llamadas.ts  La pantalla pública (RF-020)
@@ -919,10 +927,11 @@ pruebas/levantar.sh situr_app   # migra la base, levanta PostgREST, auth y proxy
 
 ## 11. Qué queda fuera de la máquina
 
-- **Los secretos**: la clave privada de VAPID, el `CRON_SECRET`, la
-  `service_role` de Supabase y el token de Upstash. Se generan con
-  `scripts/generar-secretos.mjs` y viven en `secretos.env` (permisos 600,
-  fuera del repositorio).
+- **Los secretos**: la clave privada de VAPID, el `CRON_SECRET`, el
+  `SITUR_PUSH_TOKEN`, la `service_role` de Supabase y el token de Upstash. Se
+  generan con `scripts/generar-secretos.mjs` y viven en `secretos.env`
+  (permisos 600, fuera del repositorio). El `SITUR_PUSH_TOKEN` vive además
+  en Supabase Vault, que es donde lo lee `pg_cron`.
 - **La suite de 151 aserciones y `verificar-todo.sh`**: están en la carpeta
   hermana `migracion/` del proyecto completo.
 - **El DRS, el tutorial y el volcado**: igual, en el proyecto completo.

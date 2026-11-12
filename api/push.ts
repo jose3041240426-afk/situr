@@ -4,7 +4,7 @@ import webpush from 'web-push'
 /**
  * SITUR — Emisor de notificaciones push (RF-028, DRS §6).
  *
- * Es la **única** pieza que envía Web Push. Se llama de tres maneras:
+ * Es la **única** pieza que envía Web Push. Se llama de dos maneras:
  *
  *   1. **Por pg_cron**: la base de datos la invoca una vez por minuto con
  *      `pg_net` (migración 025). Es la vía principal: GitHub Actions
@@ -14,8 +14,6 @@ import webpush from 'web-push'
  *   2. **Al llamar un turno**: la consola manda `?turno_id=...` con el token
  *      del operador, y se envía el aviso **en el acto**, sin esperar al cron.
  *      Es lo que hace que el ciudadano se entere en segundos.
- *   3. **Por el cron de GitHub Actions**: queda como respaldo mientras el
- *      aviso de pg_cron no esté en marcha en el entorno definitivo.
  *
  * No es lógica de negocio de turnos: la **autoridad es PostgreSQL**, que dice
  * a quién avisar y con qué texto. Aquí solo se entrega el mensaje.
