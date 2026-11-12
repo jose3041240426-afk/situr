@@ -289,7 +289,7 @@ export default function Perfil() {
                   : 'Sin inscribir. La cuenta se puede entrar solo con la contraseña.'}
               </p>
               <div className="mt-3">
-                <GestionMfa hayFactor={hayFactor} />
+                <GestionMfa hayFactor={hayFactor} onCambio={() => setHayFactor(true)} />
               </div>
             </div>
             <div>

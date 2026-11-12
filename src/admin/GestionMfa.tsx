@@ -32,7 +32,14 @@ import { Modal } from '../components/ui'
  * desde aquí, el operador quedaría a medias y tendría que volver a escribir
  * el código de verificación.
  */
-export default function GestionMfa({ hayFactor }: { hayFactor: boolean }) {
+export default function GestionMfa({
+  hayFactor,
+  onCambio,
+}: {
+  hayFactor: boolean
+  /** Se llama cuando el segundo factor queda verificado. */
+  onCambio?: () => void
+}) {
   const { operador, recargar } = useAuth()
   const [abierto, setAbierto] = useState(false)
   /** `clave`: se pide la contraseña. `inscripcion`: se muestra el QR. */
@@ -166,7 +173,7 @@ export default function GestionMfa({ hayFactor }: { hayFactor: boolean }) {
               textoBoton="Generar el código"
               onListo={() => {
                 cerrar()
-                void recargar()
+                void recargar().then(() => onCambio?.())
               }}
               onCancelar={cerrar}
               textoCancelar="Cerrar"
