@@ -385,7 +385,7 @@ export function OtpInput({
       : 'text-gris-500'
 
   return (
-    <div className={`inline-flex flex-col ${className}`}>
+    <div className={`relative inline-flex flex-col ${className}`}>
       <motion.div
         role="group"
         aria-label={label}
@@ -488,28 +488,39 @@ export function OtpInput({
       </motion.div>
 
       {hasStatus && (
-        <>
-          <div
-            aria-hidden
-            className="mt-2 grid h-4 text-[11.5px] leading-[16px]"
-          >
-            <AnimatePresence initial={false} mode="wait">
-              <motion.span
-                key={status}
-                initial={reduced ? { opacity: 0 } : { opacity: 0, y: 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduced ? { opacity: 0 } : { opacity: 0, y: -3 }}
-                transition={swap}
-                className={`col-start-1 row-start-1 ${messageTone}`}
-              >
-                {message}
-              </motion.span>
-            </AnimatePresence>
-          </div>
-          <span id={statusId} role="status" className="sr-only">
-            {message}
-          </span>
-        </>
+        /*
+         * EL MENSAJE NO PARTICIPA DEL ANCHO.
+         *
+         * El contenedor es `inline-flex`: se ajusta al contenido más ancho.
+         * Si el mensaje («El código no es correcto…») es más largo que las
+         * seis celdas, estiraba el contenedor y TODO el grupo se quedaba
+         * descentrado: las celdas ya no quedan en el centro.
+         *
+         * Por eso el mensaje va en posición absoluta, anclado a los bordes
+         * del contenedor (que son los de las celdas) y colocado debajo.
+         */
+        <div
+          aria-hidden
+          className="absolute left-0 right-0 top-full mt-2 grid min-h-4 text-[11.5px] leading-[16px]"
+        >
+          <AnimatePresence initial={false} mode="wait">
+            <motion.span
+              key={status}
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? { opacity: 0 } : { opacity: 0, y: -3 }}
+              transition={swap}
+              className={`col-start-1 row-start-1 text-center ${messageTone}`}
+            >
+              {message}
+            </motion.span>
+          </AnimatePresence>
+        </div>
+      )}
+      {hasStatus && (
+        <span id={statusId} role="status" className="sr-only">
+          {message}
+        </span>
       )}
     </div>
   )

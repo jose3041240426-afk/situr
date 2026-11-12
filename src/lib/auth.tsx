@@ -304,7 +304,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
         code: codigo.trim(),
       })
       if (errVerifica) {
-        const mensaje = 'El código no es correcto. Revise el de su aplicación y vuelva a intentarlo.'
+        const mensaje = 'El código no es correcto. Revise el de su aplicación.'
         setError(mensaje)
         throw new Error(mensaje)
       }
