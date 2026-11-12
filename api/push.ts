@@ -198,12 +198,13 @@ async function handler(req: Request): Promise<Response> {
          * veía en las pruebas: cerrando Chrome por completo, el aviso no
          * llegaba hasta que se volvía a abrir la aplicación.
          *
-         * Un TTL corto dice que el aviso caduca si no se puede entregar
-         * enseguida (para un turno que ya fue llamado, un aviso tardío no
-         * sirve de nada) y la urgencia «alta» pide entregarlo en cuanto
-         * haya red, sin esperar a una ventana de mantenimiento.
+         * El TTL se acota a diez minutos porque es la ventana en la que el
+         * aviso todavía sirve: un turno llamado se omite a los cinco minutos
+         * (MINUTOS_TIMEOUT_LLAMADA), así que más tarde el aviso ya estaría
+         * obsoleto. Y la urgencia «alta» pide entregarlo en cuanto haya red,
+         * sin esperar a una ventana de mantenimiento.
          */
-        { TTL: 120, urgency: 'high' },
+        { TTL: 600, urgency: 'high' },
       )
 
       const { error: errMarca } = await supabase.rpc('marcar_aviso_push_enviado', {
