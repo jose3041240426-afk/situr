@@ -52,11 +52,60 @@ function vapidEnBytes(base64: string): Uint8Array {
 export async function registrarServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!pushSoportado()) return null
   try {
-    return await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    /*
+     * `updateViaCache: 'none'` obliga a que el navegador descargue el
+     * Service Worker del servidor en cada registro, en vez de servirlo desde
+     * su propia caché HTTP. Sin esto, un móvil puede quedarse con una
+     * versión antigua del Service Worker —incluida una que no sepa mostrar
+     * el aviso— y los push se descartan en silencio: el servidor los manda,
+     * el proveedor los acepta y en la pantalla no aparece nada.
+     */
+    return await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
   } catch (e) {
     console.error('[situr] no se pudo registrar el Service Worker:', e)
     return null
   }
+}
+
+/**
+ * Pide al navegador que revise si hay una versión nueva del Service Worker.
+ *
+ * El Service Worker solo se actualiza cuando se registra uno nuevo, y el
+ * registro solo ocurre al abrir el portal. Si el ciudadano no vuelve a abrir
+ * la aplicación, el Service Worker que tiene instalado puede quedarse
+ * viejo para siempre. Esto fuerza la revisión en cada apertura.
+ */
+export async function forzarActualizacionDelServiceWorker(): Promise<void> {
+  if (!pushSoportado()) return
+  try {
+    const registro = await navigator.serviceWorker.getRegistration('/')
+    if (registro) await registro.update()
+  } catch (e) {
+    console.error('[situr] no se pudo actualizar el Service Worker:', e)
+  }
+}
+
+/**
+ * Mantiene vivo al Service Worker mientras el portal está abierto.
+ *
+ * Chrome da de baja un Service Worker que lleva un rato sin actividad, y un
+ * Service Worker dado de baja no puede recibir push: el navegador lo
+ * desregistra y el proveedor de push ya no tiene a quién entregar. Mientras
+ * la aplicación está en pantalla no tiene sentido que el Service Worker se
+ * apague, así que se le pide una revisión cada veinte segundos.
+ */
+export function mantenerVivoElServiceWorker(): () => void {
+  if (!pushSoportado()) return () => undefined
+  const temporizador = setInterval(() => {
+    void navigator.serviceWorker
+      .getRegistration('/')
+      .then((registro) => registro?.update())
+      .catch(() => undefined)
+  }, 20000)
+  return () => clearInterval(temporizador)
 }
 
 /**

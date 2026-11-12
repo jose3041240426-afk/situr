@@ -188,6 +188,22 @@ async function handler(req: Request): Promise<Response> {
           folio: fila.folio,
           modulo: fila.modulo_codigo,
         }),
+        /*
+         * TTL y urgencia (RFC 8030).
+         *
+         * El valor por defecto de `web-push` es un TTL de cuatro semanas y
+         * una urgencia «normal». Con esos valores el proveedor de push
+         * (Google) puede **aplazar la entrega**: guarda el aviso y lo
+         * entrega la próxima vez que el navegador arranca. Eso es lo que se
+         * veía en las pruebas: cerrando Chrome por completo, el aviso no
+         * llegaba hasta que se volvía a abrir la aplicación.
+         *
+         * Un TTL corto dice que el aviso caduca si no se puede entregar
+         * enseguida (para un turno que ya fue llamado, un aviso tardío no
+         * sirve de nada) y la urgencia «alta» pide entregarlo en cuanto
+         * haya red, sin esperar a una ventana de mantenimiento.
+         */
+        { TTL: 120, urgency: 'high' },
       )
 
       const { error: errMarca } = await supabase.rpc('marcar_aviso_push_enviado', {

@@ -19,6 +19,8 @@ import {
   registrarServiceWorker,
   suscribirAvisos,
   recordarTokenEnElServiceWorker,
+  forzarActualizacionDelServiceWorker,
+  mantenerVivoElServiceWorker,
 } from '../lib/push'
 
 /**
@@ -210,6 +212,13 @@ export default function TurnoCiudadano() {
   // para que la suscripción sea instantánea cuando el ciudadano acepte.
   useEffect(() => {
     void registrarServiceWorker()
+    // Se pide además la revisión de versión: si el Service Worker del
+    // navegador está viejo, que lo sepa al abrir el portal y no cuando el
+    // ciudadano acepte el aviso.
+    void forzarActualizacionDelServiceWorker()
+    // Y se le mantiene vivo mientras el portal esté en pantalla, para que
+    // Chrome no lo dé de baja y siga pudiendo recibir los push.
+    return mantenerVivoElServiceWorker()
   }, [])
 
   /*
