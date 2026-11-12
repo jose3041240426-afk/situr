@@ -34,6 +34,7 @@ import {
   generarTurno,
   generarTurnosMasivos,
   programarAvisoSiguiente,
+  cancelarAvisoSiguiente,
   opcionesAviso,
   maximoEnAtencion,
   iniciarAtencion,
@@ -515,6 +516,29 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     )
   }
 
+  /**
+   * Quita el aviso programado de un turno de la cola.
+   *
+   * Es lo que le faltaba al operador: se podía programar un aviso, pero
+   * no se podía quitar. Con el aviso puesto, programar un aviso nuevo
+   * daba error y el operador quedaba sin salida.
+   */
+  async function cancelarAviso(f: FilaCola) {
+    await ejecutar(
+      async () => {
+        await cancelarAvisoSiguiente(f.turno_id)
+        setCola((actual) =>
+          actual.map((x) =>
+            x.turno_id === f.turno_id
+              ? { ...x, aviso_programado_en: null, tiene_aviso_programado: false }
+              : x,
+          ),
+        )
+      },
+      `${f.codigo_turno}: aviso programado cancelado.`,
+    )
+  }
+
   async function abrir() {
     await ejecutar(() => abrirPeriodo(hoy), `Periodo ${hoy} abierto.`)
   }
@@ -576,7 +600,57 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     }
   }
 
-async function llamar() {
+  /**
+   * Avisa al ciudadano de que su turno fue llamado, en el acto.
+   *
+   * El aviso no espera al cron: la base lo dispara cada minuto, y un
+   * minuto es demasiado para alguien que está en la ventanilla sin saber
+   * si le toca. Se manda desde aquí, con el token del operador.
+   *
+   * Se llama en las DOS situaciones en las que el turno pasa a llamado:
+   * cuando se llama a un turno nuevo y cuando se repite la llamada a uno
+   * que ya estaba llamado. Antes solo se avisaba en la primera, así que
+   * el aviso se turnaba: el operador pulsaba «Llamar», el ciudadano
+   * recibía el push, y al pulsar «Repetir llamada» no le llegaba nada
+   * hasta que pasaba el cron.
+   *
+   * Si falla (sin red, sin suscripción, token caducado) no se interrumpe
+   * la operación: el cron es el respaldo y volverá a intentarlo.
+   */
+  async function avisarTurnoLlamado(turnoId: string | undefined): Promise<void> {
+    if (!turnoId) return
+    /*
+      El aviso se manda con un token FRESCO: el de `sesion` puede tener una
+      hora de antigüedad y el endpoint lo rechazaría con 401 sin que el
+      operador se enterara (el `.catch` se traga el error). Se pide una
+      sesión nueva aquí, que el cliente de Supabase renueva solo si hace
+      falta; si ya no hay sesión, no se manda y el cron es el respaldo.
+    */
+    try {
+      const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+      const tokenOperador = sesionFresca?.access_token ?? sesion?.access_token
+      if (!tokenOperador) {
+        console.info('[situr] no hay sesión para avisar; el cron lo intentará')
+        return
+      }
+      await fetch(`/api/push?turno_id=${encodeURIComponent(turnoId)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenOperador}` },
+      }).then(async (res) => {
+        if (!res.ok) {
+          const texto = await res.text().catch(() => '')
+          console.error('[situr] push al llamar falló:', res.status, texto)
+        } else {
+          const d = await res.json().catch(() => ({}))
+          console.info('[situr] push al llamar:', d)
+        }
+      }).catch((e) => console.error('[situr] push al llamar (red):', e))
+    } catch (e) {
+      console.error('[situr] push al llamar (excepción):', e)
+    }
+  }
+
+  async function llamar() {
     setOcupado(true)
     setAviso(null)
     try {
@@ -613,29 +687,7 @@ async function llamar() {
         Si falla (sin red, sin suscripción, token caducado) no se interrumpe
         la llamada: el cron es el respaldo y volverá a intentarlo.
       */
-      /*
-        El aviso se manda con un token FRESCO: el de `sesion` puede tener
-        una hora de antigüedad y el endpoint lo rechazaría con 401 sin que
-        el operador se enterara (el `.catch` se traga el error). Se pide una
-        sesión nueva aquí, que el cliente de Supabase renueva solo si hace
-        falta; si ya no hay sesión, no se manda y el cron es el respaldo.
-      */
-      const { data: { session: sesionFresca } } = await supabase.auth.getSession()
-      const tokenOperador = sesionFresca?.access_token ?? sesion?.access_token
-      if (tokenOperador) {
-        void fetch(`/api/push?turno_id=${encodeURIComponent(r.turno_id)}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${tokenOperador}` },
-        }).then(async (res) => {
-          if (!res.ok) {
-            const texto = await res.text().catch(() => '')
-            console.error('[situr] push al llamar falló:', res.status, texto)
-          } else {
-            const d = await res.json().catch(() => ({}))
-            console.info('[situr] push al llamar:', d)
-          }
-        }).catch((e) => console.error('[situr] push al llamar (red):', e))
-      }
+      await avisarTurnoLlamado(r.turno_id)
       await cargar()
     } catch (e) {
       setAviso({
@@ -1219,10 +1271,21 @@ async function llamar() {
 <button
                           type="button"
                           onClick={() =>
-                            void conTurno(
-                              () => repetirLlamada(t.turno_id),
-                              'Llamada repetida.',
-                            )
+                            void (async () => {
+                              const ok = await ejecutar(
+                                () => repetirLlamada(t.turno_id),
+                                'Llamada repetida.',
+                              )
+                              /*
+                                La llamada repetida también avisa, igual que
+                                la primera. Si no, el ciudadano se enteraba
+                                de que le están llamando otra vez: el aviso
+                                se quedaba esperando al cron, un minuto
+                                después, y con suerte.
+                              */
+                              if (ok) await avisarTurnoLlamado(t.turno_id)
+                              if (ok) setTurnoLlamado(null)
+                            })()
                           }
                           disabled={ocupado}
                           className="boton-secundario px-2.5 py-1.5"
@@ -1781,6 +1844,30 @@ async function llamar() {
                         </button>
 
                         {/*
+                          CANCELAR EL AVISO PROGRAMADO.
+
+                          El aviso que el operador programa a los que siguen
+                          en la cola se puede quitar: cambió de opinión con
+                          los minutos, o la cola cambió y ya no tiene
+                          sentido avisar a ese turno. Antes no había forma
+                          de hacerlo desde la consola, y eso dejaba al
+                          operador atrapado: el botón de «Preparar al
+                          siguiente» daba error y no había salida.
+                        */}
+                        {f.tiene_aviso_programado && (
+                          <button
+                            type="button"
+                            onClick={() => void cancelarAviso(f)}
+                            disabled={ocupado}
+                            className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
+                            title={`Quitar el aviso programado de ${f.codigo_turno}`}
+                            aria-label={`Cancelar el aviso programado del turno ${f.codigo_turno}`}
+                          >
+                            Quitar aviso
+                          </button>
+                        )}
+
+                        {/*
                           Un turno emitido por error (trámite equivocado)
                           no se podía cancelar: había que llamarlo y
                           cancelarlo, dejando un rastro absurdo. La base
@@ -2326,6 +2413,19 @@ async function llamar() {
         Se avisará a tantos turnos como lugares de atención ocupados haya
         ahora, con un mínimo de uno. El aviso no reserva la ventanilla: solo
         dice «su turno está por llegar», que es cierto para todos.
+        {/*
+          Si algún turno de la cola ya tiene aviso, elegir otra cantidad de
+          minutos lo REPROGRAMA: no se pisa el aviso de otra ventanilla, pero
+          el propio sí se cambia. Antes esto daba error y el operador se
+          quedaba atrapado, sin forma de quitar el aviso.
+        */}
+        {cola.some((x) => x.tiene_aviso_programado) && (
+          <span className="mt-1 block">
+            Los turnos que ya tienen aviso se reprograman con los minutos
+            que elijas. Para quitarlo del todo, usa «Quitar aviso» en su
+            fila de la cola.
+          </span>
+        )}
       </p>
     </div>
   </Modal>

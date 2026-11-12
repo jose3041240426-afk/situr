@@ -114,6 +114,13 @@ export interface FilaCola {
    * (migración 020). `null` = el papel sigue en el montón.
    */
   reclamado_en: string | null
+  /**
+   * Cuándo se le avisa a este turno de la cola (migración 030). `null` = no
+   * tiene aviso programado.
+   */
+  aviso_programado_en: string | null
+  /** Si este turno de la cola ya tiene aviso programado (migración 030). */
+  tiene_aviso_programado: boolean
 }
 
 /** `vista_turnos_actuales` — los que están en CALLED o SERVING. */
