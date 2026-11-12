@@ -61,6 +61,7 @@ import type {
   Modulo,
   PeriodoOperativo,
   PropuestaSiguiente,
+  RespuestaProgramarAviso,
   Tramite,
 } from '../lib/tipos'
 import { useAuth } from '../lib/auth'
@@ -470,20 +471,28 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
 
   // ------------------------------------------------------------------ acciones
 
+  /**
+   * Ejecuta una operación y avisa del resultado.
+   *
+   * Devuelve `true` si salió bien y `false` si falló. Cuando la operación
+   * devuelve datos de interés (los turnos a los que se programó un aviso,
+   * por ejemplo), van también en la segunda parte: hay casos en los que el
+   * aviso se pide después, turno por turno.
+   */
   async function ejecutar(fn: () => Promise<unknown>, exito: string) {
     setOcupado(true)
     setAviso(null)
     try {
-      await fn()
+      const resultado = await fn()
       setAviso({ tono: 'ok', texto: exito })
       await cargar()
-      return true
+      return { ok: true, resultado }
     } catch (e) {
       setAviso({
         tono: 'peligro',
         texto: e instanceof ErrorSitur ? e.message : 'La operación no se pudo completar.',
       })
-      return false
+      return { ok: false, resultado: undefined }
     } finally {
       setOcupado(false)
     }
@@ -545,7 +554,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
 
   async function cerrar() {
     if (!periodoAbierto) return
-    const ok = await ejecutar(
+    const { ok } = await ejecutar(
       () => cerrarPeriodo(periodoAbierto.id),
       `Periodo ${formatearFecha(periodoAbierto.clave)} cerrado. Los turnos en espera se omitieron.`,
     )
@@ -601,23 +610,28 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   }
 
   /**
-   * Avisa al ciudadano de que su turno fue llamado, en el acto.
+   * Pide que se avise a un turno AHORA, sin esperar al cron.
    *
-   * El aviso no espera al cron: la base lo dispara cada minuto, y un
+   * El aviso no espera a la base: la base lo dispara cada minuto, y un
    * minuto es demasiado para alguien que está en la ventanilla sin saber
-   * si le toca. Se manda desde aquí, con el token del operador.
+   * si le toca. Se pide desde aquí, con el token del operador.
    *
-   * Se llama en las DOS situaciones en las que el turno pasa a llamado:
-   * cuando se llama a un turno nuevo y cuando se repite la llamada a uno
-   * que ya estaba llamado. Antes solo se avisaba en la primera, así que
-   * el aviso se turnaba: el operador pulsaba «Llamar», el ciudadano
-   * recibía el push, y al pulsar «Repetir llamada» no le llegaba nada
-   * hasta que pasaba el cron.
+   * Se llama en las tres situaciones en las que el ciudadano necesita saber
+   * algo ya:
    *
-   * Si falla (sin red, sin suscripción, token caducado) no se interrumpe
-   * la operación: el cron es el respaldo y volverá a intentarlo.
+   *   · se llama a un turno nuevo;
+   *   · se repite la llamada a uno que ya estaba llamado;
+   *   · se programa el aviso de los que siguen en la cola, para que no
+   *     esperen a que se llame al siguiente.
+   *
+   * Antes el aviso se mandaba solo en la primera, y el turno repetido se
+   * quedaba esperando al cron: el aviso se turnaba, y quien no lo recibía
+   * se enteraba un minuto después, o nunca.
+   *
+   * Si falla (sin red, sin suscripción, token caducado) no se interrumpe la
+   * operación: el cron es el respaldo y volverá a intentarlo.
    */
-  async function avisarTurnoLlamado(turnoId: string | undefined): Promise<void> {
+  async function avisarTurnoAhora(turnoId: string | undefined): Promise<void> {
     if (!turnoId) return
     /*
       El aviso se manda con un token FRESCO: el de `sesion` puede tener una
@@ -687,7 +701,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         Si falla (sin red, sin suscripción, token caducado) no se interrumpe
         la llamada: el cron es el respaldo y volverá a intentarlo.
       */
-      await avisarTurnoLlamado(r.turno_id)
+      await avisarTurnoAhora(r.turno_id)
       await cargar()
     } catch (e) {
       setAviso({
@@ -700,7 +714,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   }
 
   async function conTurno(fn: () => Promise<unknown>, exito: string) {
-    const ok = await ejecutar(fn, exito)
+    const { ok } = await ejecutar(fn, exito)
     if (ok) setTurnoLlamado(null)
   }
 
@@ -1272,7 +1286,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           type="button"
                           onClick={() =>
                             void (async () => {
-                              const ok = await ejecutar(
+                              const { ok } = await ejecutar(
                                 () => repetirLlamada(t.turno_id),
                                 'Llamada repetida.',
                               )
@@ -1283,7 +1297,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                                 se quedaba esperando al cron, un minuto
                                 después, y con suerte.
                               */
-                              if (ok) await avisarTurnoLlamado(t.turno_id)
+                              if (ok) await avisarTurnoAhora(t.turno_id)
                               if (ok) setTurnoLlamado(null)
                             })()
                           }
@@ -2395,11 +2409,26 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             key={m}
             type="button"
             onClick={async () => {
-              const ok = await ejecutar(
+              const { ok, resultado } = await ejecutar(
                 () => programarAvisoSiguiente(m, null),
-                `Aviso programado: los próximos turnos de la cola recibirán la notificación en ${m} minutos.`,
+                `Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos ${m} minutos.`,
               )
-              if (ok) setAvisando(null)
+              /*
+                El aviso no espera al cron. La base lo dispara cada minuto,
+                y el operador acaba de decidir que estos turnos deben saber
+                YA que su turno llega en unos minutos. Así que se pide el
+                envío uno por uno, en el acto.
+
+                El mensaje lo pone la base, que es quien sabe la posición
+                de cada turno en la cola y cuántos minutos le faltan.
+              */
+              if (ok && resultado) {
+                const turnos = resultado as RespuestaProgramarAviso
+                for (const t of turnos.turnos ?? []) {
+                  await avisarTurnoAhora(t.turno_id)
+                }
+              }
+              setAvisando(null)
             }}
             disabled={ocupado}
             className="boton-secundario boton-aviso-minutos px-4 py-2 text-sm"

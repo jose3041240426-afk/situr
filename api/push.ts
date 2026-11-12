@@ -113,69 +113,60 @@ async function handler(req: Request): Promise<Response> {
   // La cola: por turno (inmediato) o la cola completa (cron).
   let cola: FilaCola[] = []
 
+  /*
+   * UNA SOLA FUENTE DE VERDAD.
+   *
+   * Las dos vías —la inmediata (la consola al llamar a un turno) y la del
+   * cron (la cola de la base)— llaman a la MISMA función de la base. Antes
+   * cada una montaba el aviso por su cuenta, y por eso podían discrepar:
+   * una decía una cosa y la otra otra, y la marca que viajaba en el push
+   * podía no ser la que la base guardaba.
+   *
+   * Con `p_turno_id` la función devuelve ESE turno y lo entrega sí o sí,
+   * aunque ya se le haya avisado antes: es lo que quiere la consola cuando
+   * el operador llama a un turno. Sin él, devuelve la cola pendiente.
+   */
+
+  /*
+   * La suscripción se desactiva cuando el turno llega a un estado terminal
+   * (migración 24). Si el operador vuelve a llamar a un turno que se había
+   * omitido por timeout, el aviso tiene que salir igual: se reactiva antes
+   * de consultar la cola, que solo ofrece los turnos con suscripción viva.
+   */
   if (turnoId) {
-    /*
-     * Aviso inmediato de un turno concreto.
-     *
-     * Se trae el turno con su token en una sola consulta y se busca la
-     * suscripción SIN filtrar por `activa`: si el turno se omitió por
-     * timeout, el disparador la desactivó, y filtrar aquí haría que este
-     * bloque no la encontrara nunca (era el fallo: el aviso «de llamada» no
-     * se mandaba jamás después de un timeout). Se reactiva y se envía.
-     */
     const { data: turno } = await supabase
       .from('turnos')
-      .select('id, codigo, folio, token_publico, modulo_id, llamado_en, modulos(codigo)')
+      .select('token_publico')
       .eq('id', turnoId)
       .maybeSingle()
 
     if (turno?.token_publico) {
       const { data: sub } = await supabase
         .from('suscripciones_push')
-        .select('endpoint, clave_p256dh, clave_auth, activa')
+        .select('activa, token_publico')
         .eq('token_publico', turno.token_publico)
         .maybeSingle()
 
-      if (sub) {
-        if (!sub.activa) {
-          await supabase
-            .from('suscripciones_push')
-            .update({ activa: true, ultima_activacion: null })
-            .eq('token_publico', turno.token_publico)
-        }
-
-        const modulo = (turno as { modulos?: { codigo?: string } }).modulos?.codigo ?? null
-        cola = [
-          {
-            turno_id: turno.id,
-            endpoint: sub.endpoint,
-            clave_p256dh: sub.clave_p256dh,
-            clave_auth: sub.clave_auth,
-            codigo_turno: turno.codigo,
-            folio: turno.folio,
-            modulo_codigo: modulo,
-            tipo_aviso: 'LLAMADO',
-            mensaje: `Su turno ${turno.codigo} fue llamado. Acuda a ${modulo ?? 'su módulo'}.`,
-            /*
-             * La marca de esta entrega. Es la hora de la llamada, de modo
-             * que cada llamada repetida produce una marca distinta y, con
-             * ella, una notificación nueva: si el usuario descartó el aviso
-             * anterior, el navegador ya no lo esconde.
-             */
-            marca: `llamado-${turno.folio}-${turno.llamado_en ? Math.floor(new Date(turno.llamado_en).getTime() / 1000) : Date.now()}`,
-            titulo: 'SITUR · Su turno fue llamado',
-          },
-        ]
+      if (sub && !sub.activa) {
+        await supabase
+          .from('suscripciones_push')
+          .update({ activa: true })
+          .eq('token_publico', sub.token_publico)
       }
     }
-  } else {
-    const { data, error } = await supabase.rpc('suscripciones_por_notificar')
-    if (error) {
-      console.error('[situr/push] la cola falló:', error.message)
-      return new Response(JSON.stringify({ error: error.message }), { status: 500 })
-    }
-    cola = (data ?? []) as FilaCola[]
   }
+
+  const { data: filas, error: errorCola } = await supabase.rpc(
+    'suscripciones_por_notificar',
+    { p_turno_id: turnoId },
+  )
+
+  if (errorCola) {
+    console.error('[situr/push] la cola falló:', errorCola.message)
+    return new Response(JSON.stringify({ error: errorCola.message }), { status: 500 })
+  }
+
+  cola = (filas ?? []) as FilaCola[]
 
   if (cola.length === 0) {
     return new Response(JSON.stringify({ enviados: 0, motivo: 'cola vacía' }), { status: 200 })
@@ -226,8 +217,16 @@ async function handler(req: Request): Promise<Response> {
         { TTL: 600, urgency: 'high' },
       )
 
+      /*
+       * Se marca la entrega con la MISMA marca que se envió. Si la base
+       * recalculara la marca por su cuenta, podría obtener otra (por
+       * ejemplo, si el turno cambiaba entre la consulta y el envío), y
+       * entonces la cola creería que ese aviso nunca se entregó y lo
+       * volvería a ofrecer: el ciudadano recibiría el aviso dos veces.
+       */
       const { error: errMarca } = await supabase.rpc('marcar_aviso_push_enviado', {
         p_turno_id: fila.turno_id,
+        p_marca: fila.marca,
       })
       if (errMarca) {
         console.error('[situr/push] no se pudo marcar la entrega:', errMarca.message)
