@@ -46,6 +46,8 @@ interface ContextoAuth {
   mfaRequerido: boolean
   /** Factor contra el que hay que verificar el código. */
   factorMfa: string | null
+  /** Ya se sabe si hace falta el segundo factor. */
+  verificacionResuelta: boolean
   error: string | null
   entrar: (email: string, password: string) => Promise<ResultadoAcceso>
   verificarMfa: (factorId: string, codigo: string) => Promise<void>
@@ -94,6 +96,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   const [puedeOperar, setPuedeOperar] = useState(false)
   const [mfaRequerido, setMfaRequerido] = useState(false)
   const [factorMfa, setFactorMfa] = useState<string | null>(null)
+  const [verificacionResuelta, setVerificacionResuelta] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -187,16 +190,26 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
      * abre la sesión de un factor y deja el segundo pendiente.
      */
     const aal = leerNivelAal(data.session?.access_token)
+    let verificadoId: string | null = null
     if (f.mfa_habilitado && aal === 'aal1') {
       const { data: factores } = await supabase.auth.mfa.listFactors()
       const verificado = factores?.totp?.find((x) => x.status === 'verified')
-      setMfaRequerido(Boolean(verificado))
-      setFactorMfa(verificado?.id ?? null)
-    } else {
-      setMfaRequerido(false)
-      setFactorMfa(null)
+      verificadoId = verificado?.id ?? null
     }
+    setMfaRequerido(verificadoId !== null)
+    setFactorMfa(verificadoId)
 
+    /*
+     * `verificacionResuelta` dice que ya se sabe si falta el código.
+     *
+     * Sin esta guarda, la pantalla de acceso saltaba a la consola antes de
+     * tiempo: `setOperador()` provoca un render, y en ese render todavía no
+     * se sabe que hace falta el segundo factor, así que la navegación se
+     * disparaba y el operador entraba sin escribir el código. Los tres
+     * estados de abajo se fijan juntos, en un mismo render, y la guarda
+     * frena la navegación hasta que están los tres.
+     */
+    setVerificacionResuelta(true)
     setCargando(false)
   }, [])
 
@@ -322,6 +335,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     setPuedeOperar(false)
     setMfaRequerido(false)
     setFactorMfa(null)
+    setVerificacionResuelta(false)
 
     try {
       await supabase.auth.signOut({ scope: 'local' })
@@ -347,6 +361,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       // Y en cada acceso posterior hay que superar el segundo factor.
       mfaRequerido,
       factorMfa,
+      verificacionResuelta,
       error,
       entrar,
       verificarMfa,
@@ -361,6 +376,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       puedeOperar,
       mfaRequerido,
       factorMfa,
+      verificacionResuelta,
       error,
       entrar,
       verificarMfa,

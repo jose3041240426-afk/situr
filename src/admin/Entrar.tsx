@@ -28,6 +28,7 @@ export default function Entrar() {
     mfaPendiente,
     mfaRequerido,
     factorMfa,
+    verificacionResuelta,
     cargando,
     entrar,
     verificarMfa,
@@ -37,11 +38,19 @@ export default function Entrar() {
 
   const [error, setError] = useState<string | null>(null)
 
+  /*
+   * A la consola solo se pasa cuando YA se sabe que no falta el segundo
+   * factor. Sin esa espera, la navegación se disparaba en el primer render
+   * en que el operador ya estaba cargado, y ese render es anterior al que
+   * calcula si hace falta el código: el operador entraba a la consola sin
+   * escribirlo.
+   */
   useEffect(() => {
+    if (!verificacionResuelta) return
     if (sesion && operador && !mfaPendiente && !mfaRequerido) {
       navegar('/admin/turnos', { replace: true })
     }
-  }, [sesion, operador, mfaPendiente, mfaRequerido, navegar])
+  }, [sesion, operador, mfaPendiente, mfaRequerido, verificacionResuelta, navegar])
 
   if (cargando) {
     return (
