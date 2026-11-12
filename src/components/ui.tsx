@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { ETIQUETA_ESTADO, ETIQUETA_PRIORIDAD } from '../lib/tipos'
 import type { EstadoTurno, PrioridadTurno } from '../lib/tipos'
@@ -188,9 +189,28 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
     }
   }, [cerrar])
 
-  return (
+  /*
+   * EL DIÁLOGO SE MONTA EN EL `body`, NO DONDE SE LLAMA.
+   *
+   * El velo usa `position: fixed`, que debería colocarlo sobre la ventana.
+   * Pero un `fixed` se posiciona respecto al **ancestro con transformación**
+   * más cercano, no respecto al viewport: cualquier ancestro con `transform`,
+   * `filter`, `backdrop-filter` o `will-change` se convierte en el marco de
+   * ese posicionamiento.
+   *
+   * Y había uno: la animación de entrada de las pantallas
+   * (`.entrada-escalonada`) deja un `transform` en las tarjetas, de modo que
+   * un diálogo abierto desde dentro de una se quedaba **encerrado en la
+   * tarjeta**: no cubría la ventana, y la parte de abajo (el botón de
+   * confirmar, las celdas del código) quedaba fuera de la vista y sin
+   * posibilidad de desplazarse hasta ella.
+   *
+   * El portal lo resuelve: el diálogo cuelga del `body`, que no tiene
+   * transformación, y el `fixed` vuelve a significar «sobre la ventana».
+   */
+  const contenido = (
     <div
-      className={`modal-velo ${saliendo ? 'modal-saliendo' : ''} fixed inset-0 z-50 flex min-h-full items-end justify-center overflow-y-auto bg-navy-900/40 p-0 backdrop-blur-[3px] sm:items-center sm:p-4`}
+      className={`modal-velo ${saliendo ? 'modal-saliendo' : ''} fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-navy-900/40 p-0 backdrop-blur-[3px] sm:items-center sm:p-4`}
       onClick={cerrar}
       role="presentation"
     >
@@ -226,6 +246,9 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(contenido, document.body)
 }
 
 /** Campo de texto con etiqueta. */
