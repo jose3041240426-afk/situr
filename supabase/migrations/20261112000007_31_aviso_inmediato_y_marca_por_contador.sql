@@ -164,9 +164,7 @@ AS $$
             WHEN d.tipo_aviso = 'LLAMADO'
                 THEN 'Su turno ' || d.codigo || ' fue llamado. Acudase a ' || COALESCE(d.modulo_codigo, 'su modulo') || '.'
             WHEN d.tipo_aviso = 'PROGRAMADO'
-                THEN 'Su turno ' || d.codigo || ' llegará aproximadamente a las '
-                     || to_char(d.aviso_programado_en, 'HH24:MI')
-                     || '. Faltan unos ' || d.minutos_que_faltan::TEXT || ' minutos: vaya preparándose.'
+                THEN 'Faltan unos ' || d.minutos_que_faltan::TEXT || ' minutos para su turno ' || d.codigo || '. Vaya preparándose.'
             WHEN COALESCE(d.posicion_global, 999999) <= 1
                 THEN 'Su turno ' || d.codigo || ' es el siguiente. Acérquese a la ventanilla.'
             ELSE 'Usted es el siguiente en pasar. Prepárese: su turno ' || d.codigo || ' se acerca.'
@@ -176,7 +174,7 @@ AS $$
             WHEN d.tipo_aviso = 'LLAMADO'
                 THEN 'SITUR · Su turno fue llamado'
             WHEN d.tipo_aviso = 'PROGRAMADO'
-                THEN 'SITUR · Su turno se acerca'
+                THEN 'SITUR · Vaya preparándose'
             WHEN COALESCE(d.posicion_global, 999999) <= 1
                 THEN 'SITUR · Es su turno'
             ELSE 'SITUR · Usted sigue'
