@@ -338,7 +338,7 @@ function AccesoVerificar({ factorId, onVerificar, onVolver }: PropsVerificar) {
           onComplete={onCompletar}
           errorMessage={error ?? 'El código no es correcto.'}
           successMessage="Código accepted."
-          hint="Six digits, from your authenticator app."
+          hint="El que muestra su aplicación autenticadora."
           label="Código de verificación"
         />
       </div>
