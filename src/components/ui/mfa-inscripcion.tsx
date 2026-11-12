@@ -164,7 +164,17 @@ export function MfaInscripcion({
 
           <div className="space-y-2">
             <p className="text-sm font-medium text-navy-900">Código de 6 dígitos</p>
-            <div className="flex justify-center">
+            {/*
+              `pb-7` reserva el sitio del mensaje.
+
+              El texto de estado del campo de código («El código no es
+              correcto…», «Código aceptado.») va en posición absoluta debajo
+              de las celdas, para no estirar el grupo ni descentrarlo. Como no
+              ocupa espacio, dentro de un diálogo se salía por debajo y
+              quedaba cortado. Con este margen, el mensaje entra en el
+              diálogo y se lee entero.
+            */}
+            <div className="flex justify-center pb-7">
               <OtpInput
                 length={6}
                 mode="numeric"
@@ -174,7 +184,6 @@ export function MfaInscripcion({
                 onComplete={confirmar}
                 errorMessage={error ?? 'El código no es correcto.'}
                 successMessage="Código aceptado."
-                hint="El que muestra su aplicación autenticadora."
                 label="Código de verificación"
               />
             </div>
