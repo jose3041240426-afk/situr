@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../../lib/auth'
 import { OtpInput, type OtpStatus } from './otp-input'
 import { Aviso } from '../ui'
 import { inscribirFactor, listarFactores, quitarFactor, verificarFactor } from '../../lib/mfa'
@@ -38,6 +39,7 @@ export function MfaInscripcion({
   onCancelar,
   textoCancelar,
 }: PropsMfaInscripcion) {
+  const { sesion } = useAuth()
   const [qr, setQr] = useState<string | null>(null)
   const [secreto, setSecreto] = useState<string | null>(null)
   const [factorId, setFactorId] = useState<string | null>(null)
@@ -54,10 +56,18 @@ export function MfaInscripcion({
        * pendiente de una inscripción anterior —alguien cerró el diálogo a
        * medias—, la inscripción nueva falla con «maximum number of factors».
        *
-       * Se quitan antes los que no estén verificados. Los verificados NO se
-       * tocan aquí: quitarlos es otra operación, la que hace `GestionMfa`
-       * cuando lo que se quiere es cambiar el factor.
+       * El navegador no puede listar sus propios factores sin MFA activo (la
+       * sesión es de un solo factor y GoTrue los omite), así que se limpian
+       * desde el servidor, que usa la clave de servicio.
        */
+      if (sesion?.access_token) {
+        await fetch('/api/mfa-limpiar', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: sesion.access_token }),
+        })
+      }
+
       const factores = await listarFactores()
       for (const f of factores) {
         if (!f.verificado) await quitarFactor(f.id)
