@@ -34,6 +34,18 @@ interface ContextoAuth {
   esAdministrador: boolean
   puedeOperar: boolean
   mfaPendiente: boolean
+  /**
+   * El operador tiene MFA inscrito y la sesión actual es de UN solo factor
+   * (`aal1`): falta el código de verificación.
+   *
+   * Supabase no avisa de esto en el intercambio de contraseña —entrega la
+   * sesión tal cual—, así que hay que mirar el nivel de la sesión y los
+   * factores del usuario. Sin esta comprobación, un operador con MFA
+   * entraba a la consola sin el segundo factor.
+   */
+  mfaRequerido: boolean
+  /** Factor contra el que hay que verificar el código. */
+  factorMfa: string | null
   error: string | null
   entrar: (email: string, password: string) => Promise<ResultadoAcceso>
   verificarMfa: (factorId: string, codigo: string) => Promise<void>
@@ -56,11 +68,32 @@ export interface ResultadoAcceso {
 
 const Contexto = createContext<ContextoAuth | null>(null)
 
+/**
+ * Lee el nivel de garantía del token (`aal`) sin pedirlo al servidor.
+ *
+ * El JWT lleva laclaim `aal`: `aal1` es solo la contraseña, `aal2` es
+ * contraseña más un factor verificado. Se lee a mano porque son tres líneas
+ * y una llamada de red por cada recarga de la sesión es de más.
+ */
+function leerNivelAal(token: string | undefined): string | null {
+  if (!token) return null
+  try {
+    const carga = token.split('.')[1]
+    if (!carga) return null
+    const json = atob(carga.replace(/-/g, '+').replace(/_/g, '/'))
+    return (JSON.parse(json) as { aal?: string }).aal ?? null
+  } catch {
+    return null
+  }
+}
+
 export function ProveedorAuth({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Session | null>(null)
   const [operador, setOperador] = useState<Operador | null>(null)
   const [esAdministrador, setEsAdministrador] = useState(false)
   const [puedeOperar, setPuedeOperar] = useState(false)
+  const [mfaRequerido, setMfaRequerido] = useState(false)
+  const [factorMfa, setFactorMfa] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -141,6 +174,29 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     ])
     setEsAdministrador(esAdmin === true)
     setPuedeOperar(puedeOp === true)
+
+    /*
+     * ¿FALTA EL SEGUNDO FACTOR?
+     *
+     * `aal` es el nivel de garantía del token: `aal1` es solo la contraseña,
+     * `aal2` es contraseña más un factor. Se lee del propio token, sin
+     * pedirlo al servidor, así que no cuesta una llamada.
+     *
+     * Si el operador tiene MFA inscrito y la sesión es `aal1`, falta el
+     * código. Es el caso normal después de escribir la contraseña: Supabase
+     * abre la sesión de un factor y deja el segundo pendiente.
+     */
+    const aal = leerNivelAal(data.session?.access_token)
+    if (f.mfa_habilitado && aal === 'aal1') {
+      const { data: factores } = await supabase.auth.mfa.listFactors()
+      const verificado = factores?.totp?.find((x) => x.status === 'verified')
+      setMfaRequerido(Boolean(verificado))
+      setFactorMfa(verificado?.id ?? null)
+    } else {
+      setMfaRequerido(false)
+      setFactorMfa(null)
+    }
+
     setCargando(false)
   }, [])
 
@@ -170,35 +226,6 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
         refresh_token?: string
         error?: string
         msg?: string
-        error_code?: string
-        factor_id?: string
-      }
-
-      /*
-       * MFA REQUERIDO (RF-026).
-       *
-       * Cuando la cuenta ya tiene el segundo factor inscrito, Supabase NO
-       * abre la sesión: responde 422 con `error_code: "mfa_required"` y
-       * devuelve el factor contra el que hay que verificar, más un token
-       * de nivel `aal1` (contraseña comprobada, segundo factor pendiente).
-       *
-       * Ese token provisional se abre como sesión para poder pedir el reto
-       * (`mfa.challenge`). Cuando el operador escriba el código, la sesión
-       * sube a `aal2` y el acceso queda completo.
-       */
-      if (cuerpo.error_code === 'mfa_required' && cuerpo.factor_id) {
-        if (cuerpo.access_token && cuerpo.refresh_token) {
-          const { error: errSesion } = await supabase.auth.setSession({
-            access_token: cuerpo.access_token,
-            refresh_token: cuerpo.refresh_token,
-          })
-          if (errSesion) {
-            const mensaje = 'No se pudo preparar la verificación. Vuelva a intentarlo.'
-            setError(mensaje)
-            throw new Error(mensaje)
-          }
-        }
-        return { requiereMfa: true, factorId: cuerpo.factor_id }
       }
 
       if (!respuesta.ok || !cuerpo.access_token || !cuerpo.refresh_token) {
@@ -221,6 +248,27 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       }
 
       await recargar()
+
+      /*
+       * MFA REQUERIDO (RF-026).
+       *
+       * Supabase NO devuelve `mfa_required` en el intercambio de contraseña:
+       * entrega una sesión de UN solo factor (`aal: aal1`), con la contraseña
+       * comprobada y el segundo factor pendiente. Por eso no hay que esperar
+       * una señal del servidor: hay que MIRAR si el usuario tiene un factor
+       * verificado y, si lo tiene, pedirle el código.
+       *
+       * `listFactors()` devuelve los factores del usuario con su estado; solo
+       * se consideran los verificados, que son los que sirven de segundo
+       * factor de verdad.
+       */
+      const { data: factores } = await supabase.auth.mfa.listFactors()
+      const verificado = factores?.totp?.find((f) => f.status === 'verified')
+
+      if (verificado) {
+        return { requiereMfa: true, factorId: verificado.id }
+      }
+
       return { requiereMfa: false, factorId: null }
     },
     [recargar],
@@ -229,26 +277,17 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   /**
    * Verifica el código del segundo factor (RF-026).
    *
-   * El reto se pide aquí y no antes: Supabase solo genera un reto por
-   * factor cada treinta segundos o así, y pedirlo de antemano lo caducaría
-   * mientras el operador escribe el código.
+   * `challengeAndVerify` pide el reto y comprueba el código en una sola
+   * llamada. El reto NO se pide antes: Supabase lo caduca a los treinta
+   * segundos, así que pedirlo de antemano lo invalidaría mientras el
+   * operador escribe el código.
    */
   const verificarMfa = useCallback(
     async (factorId: string, codigo: string) => {
       setError(null)
 
-      const { data: reto, error: errReto } = await supabase.auth.mfa.challenge({
+      const { error: errVerifica } = await supabase.auth.mfa.challengeAndVerify({
         factorId,
-      })
-      if (errReto || !reto) {
-        const mensaje = 'No se pudo pedir el reto de verificación. Inténtelo de nuevo.'
-        setError(mensaje)
-        throw new Error(mensaje)
-      }
-
-      const { error: errVerifica } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: reto.id,
         code: codigo.trim(),
       })
       if (errVerifica) {
@@ -281,6 +320,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     setSesion(null)
     setEsAdministrador(false)
     setPuedeOperar(false)
+    setMfaRequerido(false)
+    setFactorMfa(null)
 
     try {
       await supabase.auth.signOut({ scope: 'local' })
@@ -303,6 +344,9 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       puedeOperar,
       // RF-026: la inscripción de MFA es obligatoria en el primer acceso.
       mfaPendiente: Boolean(operador?.activo) && !operador?.mfaHabilitado,
+      // Y en cada acceso posterior hay que superar el segundo factor.
+      mfaRequerido,
+      factorMfa,
       error,
       entrar,
       verificarMfa,
@@ -315,6 +359,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       cargando,
       esAdministrador,
       puedeOperar,
+      mfaRequerido,
+      factorMfa,
       error,
       entrar,
       verificarMfa,

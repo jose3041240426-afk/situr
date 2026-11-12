@@ -26,6 +26,8 @@ export default function Entrar() {
     sesion,
     operador,
     mfaPendiente,
+    mfaRequerido,
+    factorMfa,
     cargando,
     entrar,
     verificarMfa,
@@ -36,10 +38,10 @@ export default function Entrar() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (sesion && operador && !mfaPendiente) {
+    if (sesion && operador && !mfaPendiente && !mfaRequerido) {
       navegar('/admin/turnos', { replace: true })
     }
-  }, [sesion, operador, mfaPendiente, navegar])
+  }, [sesion, operador, mfaPendiente, mfaRequerido, navegar])
 
   if (cargando) {
     return (
@@ -47,6 +49,18 @@ export default function Entrar() {
         <p className="text-sm text-gris-200">Cargando…</p>
       </div>
     )
+  }
+
+  /*
+   * El segundo factor (RF-026). Hay dos casos y son pantallas distintas:
+   *
+   *   · mfaRequerido: el factor ya está inscrito y verificado, pero la
+   *     sesión es de un solo factor. Falta el CÓDIGO. Es lo que pasa en
+   *     cada acceso.
+   *   · mfaPendiente: la cuenta todavía no tiene MFA. Falta INSCRIBIRLO.
+   */
+  if (sesion && operador && mfaRequerido && factorMfa) {
+    return <VerificacionMFA factorId={factorMfa} />
   }
 
   // El factor ya está inscrito pero la cuenta aún no puede operar: hay que
@@ -82,6 +96,79 @@ export default function Entrar() {
           }}
           onVerificar={verificarMfa}
         />
+      </div>
+    </main>
+  )
+}
+
+/**
+ * Verificación del segundo factor (RF-026).
+ *
+ * Es el caso de cada acceso: la contraseña ya se comprobó y la sesión está
+ * abierta con un solo factor. Falta el código de seis dígitos de la
+ * aplicación autenticadora.
+ */
+function VerificacionMFA({ factorId }: { factorId: string }) {
+  const { salir, verificarMfa } = useAuth()
+  const [estado, setEstado] = useState<OtpStatus>('idle')
+  const [error, setError] = useState<string | null>(null)
+  const [verificando, setVerificando] = useState(false)
+
+  async function confirmar(codigo: string) {
+    setVerificando(true)
+    setError(null)
+    try {
+      await verificarMfa(factorId, codigo)
+      setEstado('success')
+    } catch (e) {
+      setEstado('error')
+      setError(e instanceof Error ? e.message : 'El código no es correcto.')
+    } finally {
+      setVerificando(false)
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
+      <div className="tarjeta w-full max-w-md p-6 text-center">
+        <h1 className="text-lg font-bold text-navy-800">Verificación en dos pasos</h1>
+        <p className="mt-1 text-sm text-gris-700">
+          Escriba el código de seis dígitos que muestra su aplicación autenticadora. Sin
+          él, la consola no se abre (RF-026).
+        </p>
+
+        {error && (
+          <div className="mt-4">
+            <Aviso tono="peligro">{error}</Aviso>
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-center">
+          <OtpInput
+            length={6}
+            mode="numeric"
+            autoFocus
+            disabled={verificando}
+            status={estado}
+            onComplete={confirmar}
+            errorMessage={error ?? 'El código no es correcto.'}
+            successMessage="Código aceptado."
+            hint="El que muestra su aplicación autenticadora."
+            label="Código de verificación"
+          />
+        </div>
+
+        {verificando && (
+          <p className="mt-4 text-sm text-gris-500">Verificando…</p>
+        )}
+
+        <button
+          type="button"
+          onClick={salir}
+          className="mt-6 w-full text-center text-xs text-gris-500 hover:text-gris-700"
+        >
+          Cerrar sesión
+        </button>
       </div>
     </main>
   )
