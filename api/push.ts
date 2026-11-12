@@ -125,7 +125,7 @@ async function handler(req: Request): Promise<Response> {
      */
     const { data: turno } = await supabase
       .from('turnos')
-      .select('id, codigo, folio, token_publico, modulo_id, modulos(codigo)')
+      .select('id, codigo, folio, token_publico, modulo_id, llamado_en, modulos(codigo)')
       .eq('id', turnoId)
       .maybeSingle()
 
