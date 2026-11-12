@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useAuth, leerNivelAal } from '../lib/auth'
 import { nombreCompleto } from '../lib/operador'
+import { listarFactores } from '../lib/mfa'
 import { Avatar } from '../components/ui/avatar'
 import { Aviso, Chip } from '../components/ui'
+import GestionMfa from './GestionMfa'
 
 /**
  * SITUR — Perfil del operador.
@@ -87,6 +90,29 @@ function Dato({
 
 export default function Perfil() {
   const { operador, sesion, esAdministrador } = useAuth()
+  /*
+   * El estado real del segundo factor.
+   *
+   * `usuarios.mfa_habilitado` dice lo que la base tiene apuntado, pero la
+   * verdad de los factores está en Supabase Auth: puede que alguien haya
+   * borrado el factor desde fuera y la ficha siga diciendo que lo hay. Para
+   * decidir si el botón es «configurar» o «cambiar», se pregunta a la fuente.
+   */
+  const [hayFactor, setHayFactor] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    void listarFactores()
+      .then((factores) => {
+        if (vivo) setHayFactor(factores.some((f) => f.verificado))
+      })
+      .catch(() => {
+        /* si no se puede leer, se deja el valor de la ficha */
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   if (!operador) {
     return (
@@ -262,6 +288,9 @@ export default function Perfil() {
                   ? 'Verificado. En cada entrada hay que escribir el código de seis dígitos de la aplicación autenticadora.'
                   : 'Sin inscribir. La cuenta se puede entrar solo con la contraseña.'}
               </p>
+              <div className="mt-3">
+                <GestionMfa hayFactor={hayFactor} />
+              </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -290,9 +319,9 @@ export default function Perfil() {
           <Aviso tono="alerta">
             <p className="font-bold">Esta cuenta todavía no tiene segundo factor</p>
             <p className="mt-1 font-normal">
-              El acceso se valida solo con la contraseña. Para inscribir el
-              segundo factor, cierre sesión y vuelva a entrar: el sistema le
-              pedirá configurar la aplicación autenticadora.
+              El acceso se valida solo con la contraseña. Puede inscribirlo
+              ahora con el botón «Configurar el segundo factor», de arriba: es
+              el mismo proceso que el del primer acceso.
             </p>
           </Aviso>
         </div>

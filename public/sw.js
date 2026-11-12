@@ -222,8 +222,16 @@ self.addEventListener('push', (event) => {
       try {
         await self.registration.showNotification(titulo, {
           body: cuerpo,
+          /*
+           * El icono de la notificación es el ESCUDO del municipio: es lo
+           * que el ciudadano ve en la barra del teléfono y en el centro de
+           * notificaciones, y lo que lo identifica como SITUR y no como un
+           * aviso suelto.
+           */
           icon: '/icono-192.png',
-          badge: '/icono-192.png',
+          /* El badge es el mismo escudo en blanco: el sistema lo pinta
+             monocromo sobre el fondo de la barra. */
+          badge: '/escudo-badge.png',
           tag,
           renotify: true,
           data: { folio },

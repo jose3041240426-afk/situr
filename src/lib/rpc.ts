@@ -838,3 +838,31 @@ export async function listarHistorialPaginado(
   const r = data as { total: number; turnos: TurnoHistorialPaginado[] }
   return { total: r.total ?? 0, turnos: r.turnos ?? [] }
 }
+
+/**
+ * SITUR — Revalidación de la contraseña.
+ *
+ * La usa el perfil antes de dejar cambiar el segundo factor: comprobar la
+ * contraseña otra vez es lo que separa «el operador está en su cuenta» de
+ * «alguien se sentó en un equipo de ventanilla con la sesión abierta».
+ *
+ * Va contra `/api/verificar-clave`, no contra Supabase desde el navegador:
+ * la comprobación se hace en el servidor y no se abre ninguna sesión nueva
+ * en el navegador, así que la sesión del operador no se degrada a un solo
+ * factor a medio camino.
+ *
+ * Devuelve `true` si la contraseña es correcta y `false` si no lo es. Un
+ * fallo de la ruta (no de la contraseña) se lanza como error.
+ */
+export async function revalidarClave(correo: string, password: string): Promise<boolean> {
+  const r = await fetch('/api/verificar-clave', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: correo, password }),
+  })
+  if (r.status === 401) return false
+  if (!r.ok) {
+    throw new Error('No se pudo comprobar la contraseña. Inténtelo de nuevo.')
+  }
+  return true
+}

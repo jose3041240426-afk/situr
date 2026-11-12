@@ -595,16 +595,26 @@ function IconoEstadisticas() {
   )
 }
 /*
- * La ficha de la cuenta. Es un carné: el marco es la tarjeta y el círculo es
- * el rostro, con las dos líneas de los datos.
+ * La ficha de la cuenta: una persona rellena.
+ *
+ * Va con relleno y no con trazo como los demás, que son de línea: se ve la
+ * diferencia a simple vista y el icono se lee mejor en el tamaño pequeño del
+ * menú.
  */
 function IconoPerfil() {
   return (
-    <svg {...svg}>
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <circle cx="8.5" cy="10" r="2.2" />
-      <path d="M5 16.5c.6-1.6 1.9-2.4 3.5-2.4s2.9.8 3.5 2.4" />
-      <path d="M15 9.5h4M15 13h4" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+    >
+      <path d="M0 0h16v16H0z" fill="none" />
+      <path
+        fill="currentColor"
+        d="M10 10a4 4 0 0 1 4 4v1H2v-1a4 4 0 0 1 4-4zM9 1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V4a3 3 0 0 1 3-3z"
+      />
     </svg>
   )
 }

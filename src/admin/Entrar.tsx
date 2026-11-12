@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { supabase } from '../lib/supabase'
-import { marcarMfaHabilitado } from '../lib/rpc'
-import { Aviso } from '../components/ui'
 import Acceso from '../components/ui/auth-form-1'
+import { MfaInscripcion } from '../components/ui/mfa-inscripcion'
 import { OtpInput, type OtpStatus } from '../components/ui/otp-input'
 
 /**
@@ -186,69 +184,13 @@ function VerificacionMFA({ factorId }: { factorId: string }) {
  * Inscripción de MFA (RF-026): sin MFA configurado no se habilitan las
  * funciones privilegiadas. Supabase enrola con TOTP; el código se confirma
  * desde la app autenticadora del operador.
+ *
+ * El proceso vive en `components/ui/mfa-inscripcion.tsx`, que se usa también
+ * en la ficha de perfil: así el primer acceso y el cambio posterior son
+ * exactamente el mismo camino, con los mismos mensajes.
  */
 function InscripcionMFA() {
   const { operador, salir, recargar } = useAuth()
-  const [qr, setQr] = useState<string | null>(null)
-  const [secreto, setSecreto] = useState<string | null>(null)
-  const [factorId, setFactorId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [estado, setEstado] = useState<OtpStatus>('idle')
-  const [verificando, setVerificando] = useState(false)
-  const [listo, setListo] = useState(false)
-
-  async function enrollar() {
-    setError(null)
-    const { data, error: err } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName: 'SITUR',
-    })
-    if (err || !data) {
-      setError(err?.message ?? 'No se pudo iniciar la inscripción.')
-      return
-    }
-    setQr(data.totp.qr_code)
-    setSecreto(data.totp.secret)
-    setFactorId(data.id)
-  }
-
-  async function confirmar(codigo: string) {
-    if (!factorId) return
-    setError(null)
-    setVerificando(true)
-    const { error: err } = await supabase.auth.mfa.challengeAndVerify({
-      factorId,
-      code: codigo.trim(),
-    })
-    setVerificando(false)
-    if (err) {
-      setEstado('error')
-      setError(err.message)
-      return
-    }
-
-    /*
-     * El factor ya está verificado en Auth; ahora se apunta en la ficha del
-     * operador, que es lo que mira la consola para dejarle operar. Si esta
-     * llamada falla, se dice: el MFA existe pero el permiso no, y quedarse en
-     * «MFA configurado» sería mentir.
-     */
-    try {
-      await marcarMfaHabilitado()
-    } catch (e) {
-      setEstado('error')
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'El segundo factor quedó inscrito, pero no se pudo habilitar la cuenta.',
-      )
-      return
-    }
-
-    setEstado('success')
-    setListo(true)
-    await recargar()
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
@@ -263,68 +205,14 @@ function InscripcionMFA() {
             habilitadas.
           </p>
 
-          {listo ? (
-            <div className="mt-5 space-y-4">
-              <Aviso tono="ok">MFA configurado. Ya puede operar.</Aviso>
-              <a href="/admin/turnos" className="boton-primario w-full">
-                Ir a la consola
-              </a>
-            </div>
-          ) : (
-            <div className="mt-5 space-y-4">
-              {error && <Aviso tono="peligro">{error}</Aviso>}
-
-              {!qr ? (
-                <button type="button" onClick={enrollar} className="boton-primario w-full">
-                  Configurar ahora
-                </button>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-gris-100 bg-gris-50 p-4 text-center">
-                    {qr && (
-                      <img
-                        src={qr}
-                        alt="Código QR para la aplicación autenticadora"
-                        className="mx-auto h-48 w-48"
-                      />
-                    )}
-                  </div>
-                  {secreto && (
-                    <p className="break-all rounded-lg bg-gris-50 px-3 py-2 font-mono text-xs text-azul-600">
-                      {secreto}
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-navy-900">
-                      Código de 6 dígitos
-                    </p>
-                    <div className="flex justify-center">
-                      <OtpInput
-                        length={6}
-                        mode="numeric"
-                        autoFocus
-                        disabled={verificando}
-                        status={estado}
-                        onComplete={confirmar}
-                        errorMessage={error ?? 'El código no es correcto.'}
-                        successMessage="Código aceptado."
-                        hint="El que muestra su aplicación autenticadora."
-                        label="Código de verificación"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={salir}
-                className="w-full text-center text-xs text-gris-500 hover:text-gris-700"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          )}
+          <div className="mt-5">
+            <MfaInscripcion
+              textoBoton="Configurar ahora"
+              onListo={() => void recargar()}
+              onCancelar={salir}
+              textoCancelar="Cerrar sesión"
+            />
+          </div>
         </div>
       </div>
     </div>
