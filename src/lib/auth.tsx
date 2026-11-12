@@ -175,8 +175,14 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       mfa_habilitado: boolean
       creado_en: string
       actualizado_en: string
-      apellido_paterno: string | null
-      apellido_materno: string | null
+      /*
+       * Los apellidos vienen del catálogo `apellidos` por una clave
+       * foránea, así que PostgREST los devuelve como OBJETO
+       * (`{apellido: '…'}`), no como texto. Sin sacar el campo, el nombre
+       * completo salía como «Prueba [object Object]».
+       */
+      apellido_paterno: { apellido: string } | null
+      apellido_materno: { apellido: string } | null
       rol: { clave: string; nombre: string; descripcion: string | null } | null
       modulo: { codigo: string; denominacion: string } | null
     }
@@ -184,8 +190,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     setOperador({
       id: f.id,
       nombres: f.nombres,
-      apellidoPaterno: f.apellido_paterno,
-      apellidoMaterno: f.apellido_materno,
+      apellidoPaterno: f.apellido_paterno?.apellido ?? null,
+      apellidoMaterno: f.apellido_materno?.apellido ?? null,
       email: f.email,
       numero_empleado: f.numero_empleado,
       rol: f.rol?.clave ?? 'ADMINISTRADOR',
