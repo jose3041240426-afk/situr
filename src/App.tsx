@@ -26,6 +26,7 @@ const GestionUsuarios = lazy(() => import('./admin/GestionUsuarios'))
 const Catalogos = lazy(() => import('./admin/Catalogos'))
 const Historial = lazy(() => import('./admin/Historial'))
 const Estadisticas = lazy(() => import('./admin/Estadisticas'))
+const Perfil = lazy(() => import('./admin/Perfil'))
 const TurnoCiudadano = lazy(() => import('./ciudadano/TurnoCiudadano'))
 const PantallaPublica = lazy(() => import('./ciudadano/PantallaPublica'))
 
@@ -139,6 +140,7 @@ export default function App() {
             />
             <Route path="/admin/historial" element={<Historial />} />
             <Route path="/admin/estadisticas" element={<Estadisticas />} />
+            <Route path="/admin/perfil" element={<Perfil />} />
           </Route>
 
           <Route path="/turno/:token" element={<TurnoCiudadano />} />

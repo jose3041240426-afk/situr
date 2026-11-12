@@ -52,13 +52,42 @@ export function apiEnDesarrollo(
           }
 
           try {
-            const modulo = (await import(archivo)) as {
-              default?: (peticion: Request) => Promise<Response>
+            /*
+             * El manejador se busca por el MÉTODO HTTP.
+             *
+             * Las funciones de `api/` exportan `export const POST = handler`
+             * (y `GET`, `PUT`…), porque es así como las invoca Vercel: el
+             * runtime no usa el valor de un `export default`. El plugin
+             * buscaba solo `default`, que ninguna de ellas exporta, así que
+             * toda llamada a `/api/*` en desarrollo devolvía 500 y el acceso
+             * no se podía probar en local.
+             *
+             * Ahora se busca en este orden:
+             *   1. el nombre del método (`POST`, `GET`, `PUT`, `PATCH`, `DELETE`)
+             *   2. `default`, para una función que exporte una sola cosa
+             */
+            const modulo = (await import(archivo)) as Record<
+              string,
+              unknown
+            >
+            const metodo = (req.method ?? 'GET').toUpperCase()
+            const porNombre = modulo[metodo]
+            const porDefecto = modulo.default
+            const crudo =
+              typeof porNombre === 'function'
+                ? porNombre
+                : typeof porDefecto === 'function'
+                  ? porDefecto
+                  : null
+
+            if (!crudo) {
+              throw new Error(
+                `api/${nombre}.ts no exporta ${metodo} ni una función por defecto`,
+              )
             }
-            const manejador = modulo.default
-            if (typeof manejador !== 'function') {
-              throw new Error(`api/${nombre}.ts no exporta una función por defecto`)
-            }
+            const manejador = crudo as (
+              peticion: Request,
+            ) => Promise<Response>
 
             const peticion = await nodeAPeticion(req)
             const respuesta = await manejador(peticion)

@@ -2,7 +2,9 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { nombreCompleto } from '../lib/operador'
 import { Modal } from '../components/ui'
+import { Avatar } from '../components/ui/avatar'
 import EsqueletoPantalla from './Esqueletos'
 
 /**
@@ -27,6 +29,12 @@ const SECCIONES = [
   { a: '/admin/catalogos', txt: 'Catálogos', icono: IconoCatalogos, soloAdmin: true },
   { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial, soloAdmin: false },
   { a: '/admin/estadisticas', txt: 'Estadísticas', icono: IconoEstadisticas, soloAdmin: false },
+  /*
+   * «Mi perfil» va el último y NO lleva `soloAdmin`: la ficha de la cuenta
+   * es de todo operador, y hasta de uno que no pueda operar. Es la pantalla
+   * que dice quién eres y qué rango tienes.
+   */
+  { a: '/admin/perfil', txt: 'Mi perfil', icono: IconoPerfil, soloAdmin: false },
 ]
 
 /**
@@ -423,6 +431,35 @@ export default function Disposicion({
             </svg>
           </button>
           <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
+
+          {/*
+            EL ROSTRO DE LA CUENTA, en la cabecera.
+
+            Es el avatar que sustituye a la foto de perfil: se dibuja en el
+            navegador a partir del nombre, así que no hay imagen que cargar ni
+            que pueda fallar. Va a la derecha porque ahí es donde se mira para
+            saber con qué cuenta se está operando, y lleva a la ficha.
+
+            El nombre va oculto en móvil: con la pantalla estrecha solo cabe
+            el rostro, y el texto se leería cortado.
+          */}
+          {operador && (
+            <NavLink
+              to="/admin/perfil"
+              aria-label="Mi perfil"
+              title="Mi perfil"
+              className="ml-auto flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
+            >
+              <Avatar
+                nombre={nombreCompleto(operador)}
+                tamano="sm"
+                etiqueta={`Avatar de ${nombreCompleto(operador)}`}
+              />
+              <span className="hidden max-w-40 truncate text-sm font-semibold text-white lg:block">
+                {operador.nombres}
+              </span>
+            </NavLink>
+          )}
         </header>
         {/*
           El `Suspense` va AQUÍ DENTRO y no envolviendo todo el layout.
@@ -547,6 +584,20 @@ function IconoEstadisticas() {
     <svg {...svg}>
       <path d="M3 3v18h18" />
       <path d="M7 16v-4M12 16V8M17 16v-6" />
+    </svg>
+  )
+}
+/*
+ * La ficha de la cuenta. Es un carné: el marco es la tarjeta y el círculo es
+ * el rostro, con las dos líneas de los datos.
+ */
+function IconoPerfil() {
+  return (
+    <svg {...svg}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <circle cx="8.5" cy="10" r="2.2" />
+      <path d="M5 16.5c.6-1.6 1.9-2.4 3.5-2.4s2.9.8 3.5 2.4" />
+      <path d="M15 9.5h4M15 13h4" />
     </svg>
   )
 }

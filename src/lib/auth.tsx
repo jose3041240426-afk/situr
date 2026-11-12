@@ -18,12 +18,26 @@ import { supabase } from './supabase'
 export interface Operador {
   id: string
   nombres: string
+  /** Los apellidos vienen del catálogo `apellidos`, no de un campo de texto. */
+  apellidoPaterno: string | null
+  apellidoMaterno: string | null
   email: string
   numero_empleado: string
+  /** La clave del rol: ADMINISTRADOR, SUPERVISOR o AGENTE. */
   rol: string
+  /** El nombre legible del rol («Administrador», «Agente de ventanilla»). */
+  rolNombre: string
+  /** Qué puede hacer ese rol, en una frase. */
+  rolDescripcion: string | null
   modulo: string | null
+  /** El nombre de la ventanilla donde opera. */
+  moduloNombre: string | null
   activo: boolean
   mfaHabilitado: boolean
+  /** Cuándo se dio de alta la cuenta. */
+  creadoEn: string
+  /** Cuándo se tocó por última vez. */
+  actualizadoEn: string
 }
 
 interface ContextoAuth {
@@ -77,7 +91,7 @@ const Contexto = createContext<ContextoAuth | null>(null)
  * contraseña más un factor verificado. Se lee a mano porque son tres líneas
  * y una llamada de red por cada recarga de la sesión es de más.
  */
-function leerNivelAal(token: string | undefined): string | null {
+export function leerNivelAal(token: string | undefined): string | null {
   if (!token) return null
   try {
     const carga = token.split('.')[1]
@@ -135,8 +149,11 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       .from('usuarios')
       .select(
         'id, nombres, email, numero_empleado, activo, mfa_habilitado, ' +
-          'rol:roles!fk_usuarios_roles(clave), ' +
-          'modulo:modulos!fk_usuarios_modulos(codigo)',
+          'creado_en, actualizado_en, ' +
+          'apellido_paterno:apellidos!fk_usuarios_apellido_paterno(apellido), ' +
+          'apellido_materno:apellidos!fk_usuarios_apellido_materno(apellido), ' +
+          'rol:roles!fk_usuarios_roles(clave, nombre, descripcion), ' +
+          'modulo:modulos!fk_usuarios_modulos(codigo, denominacion)',
       )
       .eq('id', opId)
       .single()
@@ -156,19 +173,30 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       numero_empleado: string
       activo: boolean
       mfa_habilitado: boolean
-      rol: { clave: string } | null
-      modulo: { codigo: string } | null
+      creado_en: string
+      actualizado_en: string
+      apellido_paterno: string | null
+      apellido_materno: string | null
+      rol: { clave: string; nombre: string; descripcion: string | null } | null
+      modulo: { codigo: string; denominacion: string } | null
     }
 
     setOperador({
       id: f.id,
       nombres: f.nombres,
+      apellidoPaterno: f.apellido_paterno,
+      apellidoMaterno: f.apellido_materno,
       email: f.email,
       numero_empleado: f.numero_empleado,
       rol: f.rol?.clave ?? 'ADMINISTRADOR',
+      rolNombre: f.rol?.nombre ?? 'Administración',
+      rolDescripcion: f.rol?.descripcion ?? null,
       modulo: f.modulo?.codigo ?? null,
+      moduloNombre: f.modulo?.denominacion ?? null,
       activo: f.activo,
       mfaHabilitado: f.mfa_habilitado,
+      creadoEn: f.creado_en,
+      actualizadoEn: f.actualizado_en,
     })
 
     const [{ data: esAdmin }, { data: puedeOp }] = await Promise.all([

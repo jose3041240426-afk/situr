@@ -26,12 +26,68 @@ function Titulo() {
   return <div className="esqueleto-bloque h-4 w-40 rounded" />
 }
 
+/* --------------------------------------------------------------- Perfil -- */
+/*
+ * La ficha de la cuenta: una cabecera con el rostro a la izquierda y el
+ * nombre a la derecha, y debajo las tarjetas de datos. El círculo del
+ * avatar se imita con un bloque redondo del mismo tamaño (`size-32`).
+ */
+function EsqueletoPerfil() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Cargando la ficha de la cuenta…</span>
+
+      <section className="tarjeta overflow-hidden" aria-hidden="true">
+        <div className="flex flex-col items-center gap-4 px-5 py-6 sm:flex-row sm:items-center sm:gap-5">
+          <div className="esqueleto-bloque size-32 rounded-[22.5%]" />
+          <div className="w-full min-w-0 flex-1">
+            <div className="esqueleto-bloque h-8 w-64 rounded" />
+            <div className="esqueleto-bloque mt-2 h-4 w-40 rounded" />
+            <div className="mt-3 flex gap-2">
+              <div className="esqueleto-bloque h-6 w-28 rounded-full" />
+              <div className="esqueleto-bloque h-6 w-40 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2" aria-hidden="true">
+        <section className="tarjeta overflow-hidden">
+          <div className="border-b border-gris-100 px-4 py-3">
+            <Titulo />
+          </div>
+          <div className="space-y-3 px-4 py-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-4">
+                <div className="esqueleto-bloque h-3 w-24 rounded" />
+                <div className="esqueleto-bloque h-4 w-40 rounded" />
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="tarjeta overflow-hidden">
+          <div className="border-b border-gris-100 px-4 py-3">
+            <Titulo />
+          </div>
+          <div className="space-y-3 px-4 py-4">
+            <div className="esqueleto-bloque h-6 w-48 rounded" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="esqueleto-bloque h-4 w-56 rounded" />
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 export default function EsqueletoPantalla({ ruta }: { ruta: string }) {
   if (ruta.startsWith('/admin/turnos')) return <EsqueletoTurnos />
   if (ruta.startsWith('/admin/usuarios')) return <EsqueletoUsuarios />
   if (ruta.startsWith('/admin/catalogos')) return <EsqueletoCatalogos />
   if (ruta.startsWith('/admin/historial')) return <EsqueletoHistorial />
   if (ruta.startsWith('/admin/estadisticas')) return <EsqueletoEstadisticas />
+  if (ruta.startsWith('/admin/perfil')) return <EsqueletoPerfil />
   return <EsqueletoGenerico />
 }
 
