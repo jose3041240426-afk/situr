@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath, URL } from 'node:url'
 import { apiEnDesarrollo } from './vite/api-en-desarrollo'
 import { leerSecretos } from './vite/secretos'
 
@@ -59,6 +60,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss(), apiEnDesarrollo('api', variablesServidor)],
+    resolve: {
+      /*
+       * El alias `@/` que usa TypeScript (`@/*` -> `./src/*` en
+       * `tsconfig.app.json`). Vite necesita su propio equivalente: sin él,
+       * los componentes de shadcn —que importan `@/components/ui/button` y
+       * `@/lib/utils`— no se resuelven al compilar.
+       */
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     build: {
       outDir: 'dist',
       sourcemap: true,

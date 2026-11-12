@@ -35,9 +35,23 @@ interface ContextoAuth {
   puedeOperar: boolean
   mfaPendiente: boolean
   error: string | null
-  entrar: (email: string, password: string) => Promise<void>
+  entrar: (email: string, password: string) => Promise<ResultadoAcceso>
+  verificarMfa: (factorId: string, codigo: string) => Promise<void>
   salir: () => Promise<void>
   recargar: () => Promise<void>
+}
+
+/**
+ * Resultado de un intento de acceso.
+ *
+ * `requiereMfa` dice si la contraseña era correcta pero falta el segundo
+ * factor: es el caso normal de un operador que ya tiene MFA inscrito, y el
+ * que la pantalla de acceso tiene que resolver con el código de seis
+ * dígitos.
+ */
+export interface ResultadoAcceso {
+  requiereMfa: boolean
+  factorId: string | null
 }
 
 const Contexto = createContext<ContextoAuth | null>(null)
@@ -139,7 +153,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   }, [recargar])
 
   const entrar = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string): Promise<ResultadoAcceso> => {
       setError(null)
 
       // El intento va contra `/api/login` y no directamente contra Supabase:
@@ -156,6 +170,35 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
         refresh_token?: string
         error?: string
         msg?: string
+        error_code?: string
+        factor_id?: string
+      }
+
+      /*
+       * MFA REQUERIDO (RF-026).
+       *
+       * Cuando la cuenta ya tiene el segundo factor inscrito, Supabase NO
+       * abre la sesión: responde 422 con `error_code: "mfa_required"` y
+       * devuelve el factor contra el que hay que verificar, más un token
+       * de nivel `aal1` (contraseña comprobada, segundo factor pendiente).
+       *
+       * Ese token provisional se abre como sesión para poder pedir el reto
+       * (`mfa.challenge`). Cuando el operador escriba el código, la sesión
+       * sube a `aal2` y el acceso queda completo.
+       */
+      if (cuerpo.error_code === 'mfa_required' && cuerpo.factor_id) {
+        if (cuerpo.access_token && cuerpo.refresh_token) {
+          const { error: errSesion } = await supabase.auth.setSession({
+            access_token: cuerpo.access_token,
+            refresh_token: cuerpo.refresh_token,
+          })
+          if (errSesion) {
+            const mensaje = 'No se pudo preparar la verificación. Vuelva a intentarlo.'
+            setError(mensaje)
+            throw new Error(mensaje)
+          }
+        }
+        return { requiereMfa: true, factorId: cuerpo.factor_id }
       }
 
       if (!respuesta.ok || !cuerpo.access_token || !cuerpo.refresh_token) {
@@ -175,6 +218,43 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       if (errSesion) {
         setError('No se pudo abrir la sesión. Vuelva a intentarlo.')
         throw errSesion
+      }
+
+      await recargar()
+      return { requiereMfa: false, factorId: null }
+    },
+    [recargar],
+  )
+
+  /**
+   * Verifica el código del segundo factor (RF-026).
+   *
+   * El reto se pide aquí y no antes: Supabase solo genera un reto por
+   * factor cada treinta segundos o así, y pedirlo de antemano lo caducaría
+   * mientras el operador escribe el código.
+   */
+  const verificarMfa = useCallback(
+    async (factorId: string, codigo: string) => {
+      setError(null)
+
+      const { data: reto, error: errReto } = await supabase.auth.mfa.challenge({
+        factorId,
+      })
+      if (errReto || !reto) {
+        const mensaje = 'No se pudo pedir el reto de verificación. Inténtelo de nuevo.'
+        setError(mensaje)
+        throw new Error(mensaje)
+      }
+
+      const { error: errVerifica } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: reto.id,
+        code: codigo.trim(),
+      })
+      if (errVerifica) {
+        const mensaje = 'El código no es correcto. Revise el de su aplicación y vuelva a intentarlo.'
+        setError(mensaje)
+        throw new Error(mensaje)
       }
 
       await recargar()
@@ -225,10 +305,22 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       mfaPendiente: Boolean(operador?.activo) && !operador?.mfaHabilitado,
       error,
       entrar,
+      verificarMfa,
       salir,
       recargar,
     }),
-    [sesion, operador, cargando, esAdministrador, puedeOperar, error, entrar, salir, recargar],
+    [
+      sesion,
+      operador,
+      cargando,
+      esAdministrador,
+      puedeOperar,
+      error,
+      entrar,
+      verificarMfa,
+      salir,
+      recargar,
+    ],
   )
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>

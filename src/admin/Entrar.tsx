@@ -3,24 +3,37 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { marcarMfaHabilitado } from '../lib/rpc'
-import { Aviso, Campo } from '../components/ui'
+import { Aviso } from '../components/ui'
+import Acceso from '../components/ui/auth-form-1'
+import { OtpInput, type OtpStatus } from '../components/ui/otp-input'
 
 /**
  * SITUR — Acceso del operador.
  *
  * RF-001: solo usuarios administrativos registrados.
  * RF-026: la inscripción de MFA es obligatoria en el primer acceso. Si la
- * cuenta ya tiene MFA, Supabase pide el segundo factor al entrar; si no lo
- * tiene, la pantalla de aquí ofrece inscribirlo antes de dejarle operar.
+ * cuenta ya tiene MFA, se pide el segundo factor en cada entrada, con el
+ * código de seis dígitos de la aplicación autenticadora.
+ *
+ * La pantalla de acceso es el componente `components/ui/auth-form-1`, que se
+ * escribió para este proyecto: sin alta de cuentas (el acceso es
+ * restringido a personal autorizado), sin «continuar con Google» (el DRS §10
+ * exige que todo intento pase por el Middleware) y sin recuperación de
+ * contraseña por correo.
  */
 export default function Entrar() {
-  const { sesion, operador, mfaPendiente, cargando, entrar, error: errorAuth } = useAuth()
+  const {
+    sesion,
+    operador,
+    mfaPendiente,
+    cargando,
+    entrar,
+    verificarMfa,
+    error: errorAuth,
+  } = useAuth()
   const navegar = useNavigate()
 
-  const [correo, setCorreo] = useState('')
-  const [clave, setClave] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
     if (sesion && operador && !mfaPendiente) {
@@ -28,27 +41,16 @@ export default function Entrar() {
     }
   }, [sesion, operador, mfaPendiente, navegar])
 
-  async function enviar(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setEnviando(true)
-    try {
-      await entrar(correo.trim(), clave)
-    } catch {
-      // el error ya quedó en el contexto
-    } finally {
-      setEnviando(false)
-    }
-  }
-
   if (cargando) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-navy-900">
         <p className="text-sm text-gris-200">Cargando…</p>
       </div>
     )
   }
 
+  // El factor ya está inscrito pero la cuenta aún no puede operar: hay que
+  // inscribirlo. La pantalla siguiente lo pide.
   if (sesion && operador && mfaPendiente) {
     return <InscripcionMFA />
   }
@@ -57,50 +59,29 @@ export default function Entrar() {
     // `main` como landmark: sin él, el contenido del login no está dentro de
     // ninguna región (WCAG 1.3.1) y un lector de pantalla no puede saltar
     // al contenido.
-    <main className="flex min-h-screen items-center justify-center bg-navy-800 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-black text-white">SITUR</h1>
-          <p className="mt-1 text-sm text-gris-200">
+    <main className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/logo-durango.png"
+            alt="Emblema del Municipio de Durango"
+            className="h-20 w-auto"
+          />
+          <p className="mt-3 text-sm text-gris-200">
             Sistema de Gestión y Seguimiento de Turnos
           </p>
           <p className="text-xs text-gris-200">Dirección de Catastro · Durango</p>
         </div>
 
-        <form onSubmit={enviar} className="tarjeta space-y-4 p-6">
-          <Campo etiqueta="Correo institucional">
-            <input
-              type="email"
-              required
-              autoComplete="username"
-              className="campo"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              placeholder="nombre@catastro.durango.gob.mx"
-            />
-          </Campo>
-
-          <Campo etiqueta="Contraseña">
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="campo"
-              value={clave}
-              onChange={(e) => setClave(e.target.value)}
-            />
-          </Campo>
-
-          {(error ?? errorAuth) && <Aviso tono="peligro">{error ?? errorAuth}</Aviso>}
-
-          <button type="submit" disabled={enviando} className="boton-primario w-full">
-            {enviando ? 'Entrando…' : 'Entrar'}
-          </button>
-
-          <p className="text-center text-xs text-gris-700">
-            Acceso restringido a personal autorizado (RF-001).
-          </p>
-        </form>
+        <Acceso
+          errorExterno={error ?? errorAuth}
+          onIniciar={async (correo, clave) => {
+            setError(null)
+            const resultado = await entrar(correo, clave)
+            return resultado
+          }}
+          onVerificar={verificarMfa}
+        />
       </div>
     </main>
   )
@@ -116,8 +97,9 @@ function InscripcionMFA() {
   const [qr, setQr] = useState<string | null>(null)
   const [secreto, setSecreto] = useState<string | null>(null)
   const [factorId, setFactorId] = useState<string | null>(null)
-  const [codigo, setCodigo] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [estado, setEstado] = useState<OtpStatus>('idle')
+  const [verificando, setVerificando] = useState(false)
   const [listo, setListo] = useState(false)
 
   async function enrollar() {
@@ -135,15 +117,17 @@ function InscripcionMFA() {
     setFactorId(data.id)
   }
 
-  async function confirmar(e: React.FormEvent) {
-    e.preventDefault()
+  async function confirmar(codigo: string) {
     if (!factorId) return
     setError(null)
+    setVerificando(true)
     const { error: err } = await supabase.auth.mfa.challengeAndVerify({
       factorId,
       code: codigo.trim(),
     })
+    setVerificando(false)
     if (err) {
+      setEstado('error')
       setError(err.message)
       return
     }
@@ -157,6 +141,7 @@ function InscripcionMFA() {
     try {
       await marcarMfaHabilitado()
     } catch (e) {
+      setEstado('error')
       setError(
         e instanceof Error
           ? e.message
@@ -165,12 +150,13 @@ function InscripcionMFA() {
       return
     }
 
+    setEstado('success')
     setListo(true)
     await recargar()
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-navy-800 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
       <div className="w-full max-w-md">
         <div className="tarjeta p-6">
           <h1 className="text-lg font-bold text-navy-800">
@@ -198,7 +184,7 @@ function InscripcionMFA() {
                   Configurar ahora
                 </button>
               ) : (
-                <form onSubmit={confirmar} className="space-y-4">
+                <div className="space-y-4">
                   <div className="rounded-lg border border-gris-100 bg-gris-50 p-4 text-center">
                     {qr && (
                       <img
@@ -213,24 +199,33 @@ function InscripcionMFA() {
                       {secreto}
                     </p>
                   )}
-                  <Campo etiqueta="Código de 6 dígitos" ayuda="El que muestra su aplicación autenticadora.">
-                    <input
-                      inputMode="numeric"
-                      required
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      className="campo text-center text-lg tracking-[0.3em]"
-                      value={codigo}
-                      onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-                    />
-                  </Campo>
-                  <button type="submit" className="boton-primario w-full">
-                    Verificar y continuar
-                  </button>
-                </form>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-navy-900">
+                      Código de 6 dígitos
+                    </p>
+                    <div className="flex justify-center">
+                      <OtpInput
+                        length={6}
+                        mode="numeric"
+                        autoFocus
+                        disabled={verificando}
+                        status={estado}
+                        onComplete={confirmar}
+                        errorMessage={error ?? 'El código no es correcto.'}
+                        successMessage="Código aceptado."
+                        hint="El que muestra su aplicación autenticadora."
+                        label="Código de verificación"
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
 
-              <button type="button" onClick={salir} className="w-full text-center text-xs text-gris-200 hover:text-gris-100">
+              <button
+                type="button"
+                onClick={salir}
+                className="w-full text-center text-xs text-gris-500 hover:text-gris-700"
+              >
                 Cerrar sesión
               </button>
             </div>
