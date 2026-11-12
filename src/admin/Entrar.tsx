@@ -146,11 +146,10 @@ function VerificacionMFA({ factorId }: { factorId: string }) {
           él, la consola no se abre (RF-026).
         </p>
 
-        {error && (
-          <div className="mt-4">
-            <Aviso tono="peligro">{error}</Aviso>
-          </div>
-        )}
+        {/*
+          El mensaje NO se pone aquí: el campo de código ya lo muestra
+          debajo de las celdas, y ponerlo también lo duplicaba.
+        */}
 
         <div className="mt-6 flex justify-center">
           <OtpInput
@@ -174,7 +173,7 @@ function VerificacionMFA({ factorId }: { factorId: string }) {
         <button
           type="button"
           onClick={salir}
-          className="mt-6 w-full text-center text-xs text-gris-500 hover:text-gris-700"
+          className="mt-12 w-full text-center text-xs text-gris-500 hover:text-gris-700"
         >
           Cerrar sesión
         </button>

@@ -213,7 +213,7 @@ function AccesoIniciar({ onContinuar, errorExterno }: PropsInicio) {
         </p>
       </div>
 
-      <ErrorAcceso mensaje={formState.error ?? errorExterno ?? null} />
+      <ErrorAcceso mensaje={errorExterno ?? null} />
 
       <form onSubmit={handleSubmit(onSubmit)} data-slot="auth-form" className="space-y-5">
         <div className="space-y-2">
