@@ -136,9 +136,6 @@ export default function Perfil() {
               ) : (
                 <Chip tono="alerta">Segundo factor pendiente</Chip>
               )}
-              {operador.moduloNombre && (
-                <Chip tono="neutro">{operador.moduloNombre}</Chip>
-              )}
             </div>
           </div>
         </div>
