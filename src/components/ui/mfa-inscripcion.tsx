@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { OtpInput, type OtpStatus } from './otp-input'
 import { Aviso } from '../ui'
-import { inscribirFactor, verificarFactor } from '../../lib/mfa'
+import { inscribirFactor, listarFactores, quitarFactor, verificarFactor } from '../../lib/mfa'
 import { marcarMfaHabilitado } from '../../lib/rpc'
 
 /**
@@ -49,6 +49,20 @@ export function MfaInscripcion({
   async function enrollar() {
     setError(null)
     try {
+      /*
+       * GoTrue solo admite UN factor sin verificar a la vez. Si quedó uno
+       * pendiente de una inscripción anterior —alguien cerró el diálogo a
+       * medias—, la inscripción nueva falla con «maximum number of factors».
+       *
+       * Se quitan antes los que no estén verificados. Los verificados NO se
+       * tocan aquí: quitarlos es otra operación, la que hace `GestionMfa`
+       * cuando lo que se quiere es cambiar el factor.
+       */
+      const factores = await listarFactores()
+      for (const f of factores) {
+        if (!f.verificado) await quitarFactor(f.id)
+      }
+
       const alta = await inscribirFactor()
       setQr(alta.qr)
       setSecreto(alta.secreto)
