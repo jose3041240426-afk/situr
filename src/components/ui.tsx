@@ -190,13 +190,20 @@ export function Modal({ titulo, onCerrar, children, ancho = 'max-w-lg' }: {
 
   return (
     <div
-      className={`modal-velo ${saliendo ? 'modal-saliendo' : ''} fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-navy-900/40 p-0 backdrop-blur-[3px] sm:items-center sm:p-4`}
+      className={`modal-velo ${saliendo ? 'modal-saliendo' : ''} fixed inset-0 z-50 flex min-h-full items-end justify-center overflow-y-auto bg-navy-900/40 p-0 backdrop-blur-[3px] sm:items-center sm:p-4`}
       onClick={cerrar}
       role="presentation"
     >
+      {/*
+        `my-auto` en la caja: con `align-items: center` y un diálogo más
+        alto que la ventana, el contenido de abajo quedaba fuera del
+        alcance —el scroll del velo no llegaba— y el botón de confirmar se
+        volvía inalcanzable. Con el margen automático, el diálogo se centra
+        si cabe y, si no, el velo se desplaza y todo es alcanzable.
+      */}
       <div
         ref={refDialog}
-        className={`modal-caja w-full ${ancho} rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
+        className={`modal-caja my-auto w-full ${ancho} rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
