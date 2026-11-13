@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import BloqueExpandible from '../components/BloqueExpandible'
 import BotonChispa from '../components/BotonChispa'
 import BotonEmitir from '../components/BotonEmitir'
+import BotonRepartir from '../components/BotonRepartir'
 import CodigoQR from '../components/CodigoQR'
 import { Aviso, ChipEstado, Esqueleto } from '../components/ui'
 import {
@@ -8,11 +10,12 @@ import {
   cerrarPeriodo,
   formatearFecha,
   generarTurno,
+  generarTurnosMasivos,
   listarTramites,
   listarTurnosActuales,
   obtenerPeriodoAbierto,
 } from '../lib/rpc'
-import type { FilaActual, PeriodoOperativo, Tramite } from '../lib/tipos'
+import type { FilaActual, LoteTurnos, PeriodoOperativo, Tramite } from '../lib/tipos'
 import { useAuth } from '../lib/auth'
 
 /**
@@ -125,6 +128,215 @@ function ChipRecepcion({ texto, tono }: { texto: string; tono: 'verde' | 'azul' 
   )
 }
 
+/**
+ * Emisión masiva adaptada al estilo de RECEPCIÓN.
+ *
+ * Reutiliza la misma lógica que Consola.tsx pero con los componentes
+ * y estilos de recepción (select nativo, tarjetas, etc.).
+ */
+function EmisionMasivaRecepcion({
+  tramites,
+  lotes,
+  onCambiar,
+  onEmitir,
+  ocupado,
+  periodoAbierto,
+}: {
+  tramites: Tramite[]
+  lotes: LoteTurnos[]
+  onCambiar: (l: LoteTurnos[]) => void
+  onEmitir: () => void
+  ocupado: boolean
+  periodoAbierto: PeriodoOperativo | null
+}) {
+  const [total, setTotal] = useState('100')
+  const [repartos, setRepartos] = useState(0)
+
+  const filas = lotes.length > 0
+    ? lotes
+    : tramites.slice(0, 2).map((t) => ({ tramite: t.clave, cantidad: 0 }))
+  const suma = filas.reduce((n, l) => n + (Number(l.cantidad) || 0), 0)
+
+  function cambiarCantidad(clave: string, cantidad: number) {
+    const base = filas.map((l) => (l.tramite === clave ? { ...l, cantidad } : l))
+    onCambiar(base)
+  }
+
+  function repartir(totalTexto: string) {
+    const n = Math.max(0, Math.floor(Number(totalTexto) || 0))
+    if (filas.length === 0) return
+    const porCabeza = Math.floor(n / filas.length)
+    const sobrante = n - porCabeza * filas.length
+    onCambiar(
+      filas.map((l, i) => ({ ...l, cantidad: porCabeza + (i === 0 ? sobrante : 0) })),
+    )
+    setRepartos((n) => n + 1)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Repartir total */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-xs font-medium text-slate-700">
+            Repartir un total (opcional)
+          </label>
+          <div className="flex gap-1.5">
+            <input
+              type="number"
+              min={1}
+              className="recepcion-select flex-1"
+              placeholder="ej. 100"
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
+            />
+            <BotonRepartir
+              onClick={() => repartir(total)}
+              disabled={!total || Number(total) <= 0 || !periodoAbierto || ocupado}
+              className="shrink-0"
+            >
+              Repartir
+            </BotonRepartir>
+          </div>
+        </div>
+      </div>
+      <p className="text-[11px] leading-snug text-slate-500">
+        Escriba cuántos quiere de cada trámite, o un total y pulse «Repartir»
+        para dividirlo en partes iguales.
+      </p>
+
+      {/* Filas por trámite */}
+      <div className="space-y-2">
+        {filas.map((l) => {
+          const t = tramites.find((x) => x.clave === l.tramite)
+          return (
+            <div
+              key={l.tramite}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+            >
+              <label className="min-w-0 flex-1 truncate text-xs text-slate-700">
+                <span className="font-semibold">{l.tramite}</span>
+                {t ? ` — ${t.denominacion}` : ''}
+              </label>
+              <div className="contador-turnos shrink-0">
+                <button
+                  type="button"
+                  onClick={() => cambiarCantidad(l.tramite, Math.max(0, l.cantidad - 1))}
+                  disabled={l.cantidad <= 0 || !periodoAbierto || ocupado}
+                  aria-label={`Restar uno a ${l.tramite}`}
+                  className="contador-turnos-boton"
+                >
+                  <span className="contador-turnos-signo" aria-hidden="true" />
+                </button>
+                <input
+                  key={`${l.tramite}-${repartos}`}
+                  type="number"
+                  min={0}
+                  aria-label={`Cantidad para ${l.tramite}`}
+                  className={`contador-turnos-valor ${
+                    repartos > 0 && l.cantidad > 0 ? 'cifra-sube' : ''
+                  }`}
+                  value={l.cantidad}
+                  onChange={(e) => cambiarCantidad(l.tramite, Number(e.target.value) || 0)}
+                  disabled={!periodoAbierto || ocupado}
+                />
+                <button
+                  type="button"
+                  onClick={() => cambiarCantidad(l.tramite, l.cantidad + 1)}
+                  disabled={!periodoAbierto || ocupado}
+                  aria-label={`Sumar uno a ${l.tramite}`}
+                  className="contador-turnos-boton"
+                >
+                  <span className="contador-turnos-signo contador-turnos-signo--mas" aria-hidden="true" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => onCambiar(filas.filter((x) => x.tramite !== l.tramite))}
+                disabled={!periodoAbierto || ocupado}
+                aria-label={`Sacar ${l.tramite} del reparto`}
+                className="boton-quitar-reparto shrink-0"
+              >
+                <span className="icono-papelera" aria-hidden="true" />
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Añadir trámites */}
+      <div className="flex flex-col items-center gap-2">
+        {tramites.length > filas.length && (
+          <div className="w-full">
+            <label className="mb-1 block text-xs font-medium text-slate-700">
+              Añadir otro trámite
+            </label>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  onCambiar([...filas, { tramite: e.target.value, cantidad: 0 }])
+                }
+              }}
+              disabled={!periodoAbierto || ocupado}
+              className="recepcion-select w-full"
+            >
+              <option value="">Añadir otro trámite…</option>
+              {tramites
+                .filter((t) => !filas.some((l) => l.tramite === t.clave))
+                .map((t) => (
+                  <option key={t.id} value={t.clave}>
+                    {t.clave} — {t.denominacion}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+        {tramites.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              tramites.length > filas.length
+                ? onCambiar(
+                    tramites.map((t) => {
+                      const ya = filas.find((l) => l.tramite === t.clave)
+                      return { tramite: t.clave, cantidad: ya ? ya.cantidad : 0 }
+                    }),
+                  )
+                : onCambiar([])
+            }
+            disabled={!periodoAbierto || ocupado}
+            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
+              tramites.length > filas.length
+                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-red-50 text-red-600 hover:bg-red-100'
+            } disabled:opacity-50`}
+          >
+            {tramites.length > filas.length ? 'Añadir todos' : 'Quitar todos'}
+          </button>
+        )}
+      </div>
+
+      {/* Total */}
+      <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+        <span className="text-xs text-slate-600">Total a emitir</span>
+        <span className="text-lg font-black text-slate-900">{suma}</span>
+      </div>
+
+      <BotonEmitir
+        onClick={onEmitir}
+        disabled={ocupado || suma <= 0 || !periodoAbierto}
+      >
+        {suma > 0 ? `Emitir ${suma} turnos` : 'Emitir lote'}
+      </BotonEmitir>
+      <p className="text-[11px] leading-snug text-slate-500">
+        Si un trámite del lote falla, no se emite ninguno: el lote es completo o no
+        existe.
+      </p>
+    </div>
+  )
+}
+
 export default function Recepcion() {
   useAuth()
 
@@ -138,6 +350,13 @@ export default function Recepcion() {
   const [ocupado, setOcupado] = useState(false)
   const [mensaje, setMensaje] = useState<{ texto: string; tono: 'ok' | 'peligro' | 'alerta' } | null>(null)
   const [ultimoTurno, setUltimoTurno] = useState<{ codigo: string; token: string } | null>(null)
+
+  // Emisión masiva (lote)
+  const [modoMasivo, setModoMasivo] = useState(false)
+  const [lotes, setLotes] = useState<LoteTurnos[]>([])
+  const [loteEmitido, setLoteEmitido] = useState<
+    { total: number; turnos: Array<{ codigo: string; tramite: string }> } | null
+  >(null)
 
   // ------------------------------------------------------------------ Carga
 
@@ -204,6 +423,26 @@ export default function Recepcion() {
       const resultado = await generarTurno(tramiteId)
       setUltimoTurno({ codigo: resultado.codigo_turno, token: resultado.token_publico })
       setMensaje({ texto: `Turno ${resultado.codigo_turno} emitido correctamente.`, tono: 'ok' })
+      await cargar()
+    } catch (err) {
+      setMensaje({ texto: (err as Error).message, tono: 'peligro' })
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  /** Emite un lote de turnos (migración 009). */
+  async function emitirMasivo() {
+    const pedido = lotes.filter((l) => l.cantidad > 0)
+    if (pedido.length === 0) return
+    setOcupado(true)
+    try {
+      const r = await generarTurnosMasivos(pedido)
+      setLoteEmitido({
+        total: r.total,
+        turnos: r.turnos.map((t) => ({ codigo: t.codigo, tramite: t.tramite })),
+      })
+      setLotes([])
       await cargar()
     } catch (err) {
       setMensaje({ texto: (err as Error).message, tono: 'peligro' })
@@ -281,39 +520,106 @@ export default function Recepcion() {
                 </Aviso>
               )}
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Trámite</label>
-                <div className="relative">
-                  <select
-                    value={tramiteId}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
-                    disabled={!periodoAbierto || ocupado}
-                    className="recepcion-select"
-                  >
-                    <option value="">— Seleccione un trámite —</option>
-                    {tramitesActivos.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.prefijo} — {t.denominacion}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Toggle: Un turno / Varios turnos */}
+              <div
+                className="glass-radio-group"
+                role="radiogroup"
+                aria-label="Modo de emisión"
+              >
+                <input
+                  type="radio"
+                  name="modo-emision-recepcion"
+                  id="modo-un-turno-recepcion"
+                  checked={!modoMasivo}
+                  onChange={() => setModoMasivo(false)}
+                />
+                <label htmlFor="modo-un-turno-recepcion">Un turno</label>
+
+                <input
+                  type="radio"
+                  name="modo-emision-recepcion"
+                  id="modo-varios-turnos-recepcion"
+                  checked={modoMasivo}
+                  onChange={() => setModoMasivo(true)}
+                />
+                <label htmlFor="modo-varios-turnos-recepcion">Varios turnos</label>
+
+                <div className="glass-glider" aria-hidden="true" />
               </div>
 
-              <BotonEmitir
-                onClick={() => void emitir()}
-                disabled={ocupado || !tramiteId || !periodoAbierto}
-              >
-                Emitir turno
-              </BotonEmitir>
+              <BloqueExpandible clave={modoMasivo}>
+                {!modoMasivo ? (
+                  /* Emisión simple: un turno */
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Trámite</label>
+                      <div className="relative">
+                        <select
+                          value={tramiteId}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
+                          disabled={!periodoAbierto || ocupado}
+                          className="recepcion-select"
+                        >
+                          <option value="">— Seleccione un trámite —</option>
+                          {tramitesActivos.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.prefijo} — {t.denominacion}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-              {/* Último turno emitido con QR */}
-              {ultimoTurno && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="mb-2 text-sm font-bold text-slate-900">
-                    Turno {ultimoTurno.codigo}
+                    <BotonEmitir
+                      onClick={() => void emitir()}
+                      disabled={ocupado || !tramiteId || !periodoAbierto}
+                    >
+                      Emitir turno
+                    </BotonEmitir>
+
+                    {/* Último turno emitido con QR */}
+                    {ultimoTurno && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <p className="mb-2 text-sm font-bold text-slate-900">
+                          Turno {ultimoTurno.codigo}
+                        </p>
+                        <CodigoQR valor={ultimoTurno.token} tamano={160} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Emisión masiva: lote */
+                  <EmisionMasivaRecepcion
+                    tramites={tramitesActivos}
+                    lotes={lotes}
+                    onCambiar={setLotes}
+                    onEmitir={() => void emitirMasivo()}
+                    ocupado={ocupado}
+                    periodoAbierto={periodoAbierto}
+                  />
+                )}
+              </BloqueExpandible>
+
+              {/* Resumen del último lote emitido */}
+              {loteEmitido && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="mb-2 text-sm font-bold text-emerald-800">
+                    Lote emitido: {loteEmitido.total} turnos
                   </p>
-                  <CodigoQR valor={ultimoTurno.token} tamano={160} />
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {loteEmitido.turnos.map((t, i) => (
+                      <p key={i} className="text-xs text-emerald-700">
+                        {t.codigo} — {t.tramite}
+                      </p>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLoteEmitido(null)}
+                    className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-800"
+                  >
+                    Cerrar
+                  </button>
                 </div>
               )}
             </div>
