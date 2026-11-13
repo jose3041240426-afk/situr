@@ -72,25 +72,12 @@ function Ticket({
   elegido?: boolean
   onElegir: (t: FilaColaVivo) => void
 }) {
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {})
-    } else {
-      document.documentElement.requestFullscreen().catch(() => {})
-    }
-  }, [])
-
   return (
     <button
       type="button"
       onClick={() => onElegir(t)}
-      onDoubleClick={(e) => {
-        e.stopPropagation()
-        toggleFullscreen()
-      }}
       aria-pressed={elegido}
       aria-label={`Ver el código de ${t.codigo_turno}, ${t.denominacion_tramite}`}
-      title={`Doble clic para pantalla completa`}
       className="relative flex items-center overflow-hidden rounded-3xl text-left transition-transform"
       style={{
         height: 80,
