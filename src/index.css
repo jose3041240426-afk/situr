@@ -4363,12 +4363,21 @@ button.boton-pildora {
 }
 
 /* Tarjeta de sección con estilo moderno */
+/*
+ * Misma estructura de sombra que `.tarjeta` del administrador:
+ * 4 capas con filo de contacto, peso repartido, elevación y brillo interior.
+ */
 .recepcion-tarjeta {
   background: #fff;
   border-radius: 1rem;
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 4px 12px rgba(0, 0, 0, 0.04),
+    /* 1. filo de contacto */
+    0 0 0 1px rgba(23, 43, 68, 0.24),
+    /* 2. peso repartido en los cuatro lados */
+    0 5px 20px rgba(23, 43, 68, 0.28),
+    /* 3. elevación */
+    0 28px 60px -6px rgba(23, 43, 68, 0.45),
+    /* 4. brillo del canto superior */
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
   transition: box-shadow 200ms ease;
@@ -4376,8 +4385,13 @@ button.boton-pildora {
 
 .recepcion-tarjeta:hover {
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.06),
+    /* 1. filo de contacto */
+    0 0 0 1px rgba(23, 43, 68, 0.3),
+    /* 2. peso repartido */
+    0 8px 28px rgba(23, 43, 68, 0.32),
+    /* 3. elevación mayor */
+    0 36px 72px -8px rgba(23, 43, 68, 0.5),
+    /* 4. brillo del canto superior */
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
