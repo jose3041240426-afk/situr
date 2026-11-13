@@ -653,10 +653,10 @@ export default function Recepcion() {
       {/* ======================================== */}
       {/* GRID: Emitir turno + Atención ahora     */}
       {/* ======================================== */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'stretch', minHeight: 'calc(100vh - 280px)', paddingBottom: 40 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, paddingBottom: 40 }}>
 
           {/* TARJETA IZQUIERDA: Emitir turno (span 1 columna) */}
-          <Tarjeta>
+          <Tarjeta style={{ height: '500px', display: 'flex', flexDirection: 'column' }}>
             {/* Header de tarjeta */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -703,6 +703,7 @@ export default function Recepcion() {
               </div>
             )}
 
+            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <BloqueExpandible clave={modoMasivo}>
               {!modoMasivo ? (
                 <div>
@@ -832,6 +833,7 @@ export default function Recepcion() {
                 </button>
               </div>
             )}
+            </div>
 
             {/* Botón emitir al fondo */}
             {!modoMasivo && (
@@ -861,7 +863,7 @@ export default function Recepcion() {
           </Tarjeta>
 
           {/* TARJETA DERECHA: Atención ahora */}
-          <Tarjeta>
+          <Tarjeta style={{ height: '500px', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
