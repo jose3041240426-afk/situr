@@ -4439,7 +4439,7 @@ button.boton-pildora {
   scrollbar-color: #1e293b transparent;
 }
 
-/* Scrollbar personalizado — línea negra delgada y redondeada */
+/* Scrollbar personalizado — línea negra delgada y redondeada (sin flechas) */
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar {
   width: 6px;
 }
@@ -4456,6 +4456,12 @@ button.boton-pildora {
 
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-thumb:hover {
   background: #0f172a;
+}
+
+.recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
 }
 
 /* Periodo abierto — vista con datos grandes */
