@@ -156,12 +156,12 @@ export default function TurnosVivos() {
   const totalEnAtencion = actuales.length
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-navy-900 p-6">
       {/* Header */}
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Turnos en vivo</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-black text-white">Turnos en vivo</h1>
+          <p className="text-sm text-gris-300">
             RECEPCIÓN — Actualización automática cada 5 segundos
           </p>
         </div>
@@ -173,7 +173,7 @@ export default function TurnosVivos() {
           )}
           <a
             href="/admin/recepcion"
-            className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-300 transition-colors"
+            className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
           >
             ← Volver a recepción
           </a>
@@ -182,26 +182,26 @@ export default function TurnosVivos() {
 
       {/* Resumen rápido */}
       <div className="mb-6 grid grid-cols-3 gap-4">
-        <div className="rounded-xl bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
+        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="flex items-center gap-2 text-gris-300">
             <IconoCola />
             <span className="text-xs font-medium">En espera</span>
           </div>
-          <p className="mt-1 text-3xl font-black text-slate-900">{totalEnCola}</p>
+          <p className="mt-1 text-3xl font-black text-white">{totalEnCola}</p>
         </div>
-        <div className="rounded-xl bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
+        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="flex items-center gap-2 text-gris-300">
             <IconoAtencion />
             <span className="text-xs font-medium">En atención</span>
           </div>
-          <p className="mt-1 text-3xl font-black text-slate-900">{totalEnAtencion}</p>
+          <p className="mt-1 text-3xl font-black text-white">{totalEnAtencion}</p>
         </div>
-        <div className="rounded-xl bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
+        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="flex items-center gap-2 text-gris-300">
             <IconoTurno />
             <span className="text-xs font-medium">Último turno</span>
           </div>
-          <p className="mt-1 text-xl font-black text-slate-900 truncate">
+          <p className="mt-1 text-xl font-black text-white truncate">
             {ultimoCodigo || '—'}
           </p>
         </div>
