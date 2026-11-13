@@ -72,13 +72,25 @@ function Ticket({
   elegido?: boolean
   onElegir: (t: FilaColaVivo) => void
 }) {
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }, [])
+
   return (
     <button
       type="button"
       onClick={() => onElegir(t)}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        toggleFullscreen()
+      }}
       aria-pressed={elegido}
       aria-label={`Ver el código de ${t.codigo_turno}, ${t.denominacion_tramite}`}
-      title={`Ver el código de ${t.codigo_turno}`}
+      title={`Doble clic para pantalla completa`}
       className="relative flex items-center overflow-hidden rounded-3xl text-left transition-transform"
       style={{
         height: 80,
@@ -285,18 +297,9 @@ export default function TurnosVivos() {
 
   const hayAlgo = Boolean(enPanel.codigo_turno)
 
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {})
-    } else {
-      document.documentElement.requestFullscreen().catch(() => {})
-    }
-  }, [])
-
   return (
     <div
       className="min-h-screen flex flex-col"
-      onDoubleClick={toggleFullscreen}
       style={{
         background: `radial-gradient(1200px 700px at 88% 8%, rgba(59,130,246,0.30), transparent 60%), radial-gradient(900px 600px at 0% 100%, rgba(37,99,235,0.22), transparent 60%), ${C.bg}`,
         fontFamily: font,
