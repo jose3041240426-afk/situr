@@ -165,8 +165,11 @@ export default function ColaVentanillas() {
   const cola = datos?.cola ?? []
   const ventanillas = datos?.ventanillas ?? []
 
+  // Key para re-disparar la animación escalonada cuando los datos cambian
+  const animKey = `${cola.length}-${ventanillas.map(v => v.turno_count).join('-')}`
+
   return (
-    <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
+    <div key={animKey} className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
         {aviso && (
