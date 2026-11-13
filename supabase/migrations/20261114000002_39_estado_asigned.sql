@@ -354,7 +354,7 @@ BEGIN
             t.estado AS turno_estado,
             tr.denominacion AS turno_denominacion_tramite,
             EXTRACT(EPOCH FROM (now() - t.llamado_en)) / 60 AS minutos_en_ventanilla,
-            u.nombres || ' ' || u.apellidos AS operador_nombres,
+            u.nombres || ' ' || COALESCE(a_pat.apellido, '') || ' ' || COALESCE(a_mat.apellido, '') AS operador_nombres,
             (m.id IS NOT DISTINCT FROM (SELECT modulo_id FROM public.usuarios WHERE id = v_operador)) AS es_mia,
             CASE
                 WHEN t.id IS NULL AND m.estado = 'ACTIVO' THEN true
@@ -365,6 +365,8 @@ BEGIN
             AND t.estado IN ('ASIGNED', 'CALLED', 'SERVING')
         LEFT JOIN public.tramites tr ON tr.id = t.tramite_id
         LEFT JOIN public.usuarios u ON u.id = t.atendido_por
+        LEFT JOIN public.apellidos a_pat ON a_pat.id = u.apellido_paterno_id
+        LEFT JOIN public.apellidos a_mat ON a_mat.id = u.apellido_materno_id
         WHERE m.activo
         ORDER BY m.codigo
     ) v;
