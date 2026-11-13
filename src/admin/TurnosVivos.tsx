@@ -4,6 +4,7 @@ import {
 } from '../lib/rpc'
 import type { FilaCola } from '../lib/tipos'
 import { Esqueleto } from '../components/ui'
+import CodigoQR from '../components/CodigoQR'
 
 /**
  * SITUR — Turnos en vivo (RECEPCIÓN).
@@ -42,23 +43,6 @@ function IconoVacio() {
   )
 }
 
-/**
- * Chip de estado para RECEPCIÓN
- */
-function ChipRecepcion({ texto, tono }: { texto: string; tono: 'verde' | 'azul' | 'gris' | 'amarillo' }) {
-  const clases = {
-    verde: 'bg-emerald-100 text-emerald-700 ring-emerald-600/20',
-    azul: 'bg-blue-100 text-blue-700 ring-blue-600/20',
-    gris: 'bg-slate-100 text-slate-600 ring-slate-500/10',
-    amarillo: 'bg-amber-100 text-amber-700 ring-amber-600/20',
-  }
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${clases[tono]}`}>
-      {tono === 'verde' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-      {texto}
-    </span>
-  )
-}
 
 /**
  * Tarjeta de sección con estilo moderno
@@ -74,16 +58,19 @@ function TarjetaSeccion({
   badge?: React.ReactNode
   children: React.ReactNode
 }) {
+  const sinHeader = !titulo && !icono && !badge
   return (
-    <section className="recepcion-tarjeta">
-      <div className="recepcion-tarjeta-header">
-        <div className="flex items-center gap-2.5">
-          <span className="recepcion-icono">{icono}</span>
-          <h2 className="recepcion-tarjeta-titulo">{titulo}</h2>
+    <section className={`recepcion-tarjeta${sinHeader ? ' recepcion-tarjeta-sin-redondeo-arriba' : ''}`}>
+      {!sinHeader && (
+        <div className="recepcion-tarjeta-header">
+          <div className="flex items-center gap-2.5">
+            <span className="recepcion-icono">{icono}</span>
+            <h2 className="recepcion-tarjeta-titulo">{titulo}</h2>
+          </div>
+          {badge && <div>{badge}</div>}
         </div>
-        {badge && <div>{badge}</div>}
-      </div>
-      <div className="recepcion-tarjeta-cuerpo">
+      )}
+      <div className={sinHeader ? 'recepcion-tarjeta-cuerpo' : 'recepcion-tarjeta-cuerpo'}>
         {children}
       </div>
     </section>
@@ -119,67 +106,130 @@ export default function TurnosVivos() {
         <h1 className="text-2xl font-black text-white">Turnos en vivo</h1>
       </header>
 
-      {/* Resumen rápido */}
-      <div className="mb-6">
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+      {/* Resumen rápido — En espera (ajustado al contenido) */}
+      <div className="mb-4">
+        <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-1.5 flex items-center gap-3 w-fit">
           <div className="flex items-center gap-2 text-gris-300">
             <IconoCola />
             <span className="text-xs font-medium">En espera</span>
           </div>
-          <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnCola}</p>
+          <p className="text-2xl font-black text-white tabular-nums">{totalEnCola}</p>
         </div>
       </div>
 
-      {/* Grid: Cola en mitad izquierda */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* COLA DE ESPERA */}
-        <TarjetaSeccion
-          titulo="Cola de espera"
-          icono={<IconoCola />}
-          badge={
-            <ChipRecepcion texto={`${totalEnCola} turnos`} tono={totalEnCola > 0 ? 'amarillo' : 'gris'} />
-          }
-        >
-          {!listo ? (
-            <Esqueleto filas={5} />
-          ) : cola.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <IconoVacio />
-              <p className="mt-3 text-sm font-medium text-slate-500">
-                No hay turnos en espera.
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Los turnos emitidos aparecerán aquí.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-4" style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'rgba(148,163,184,0.5) rgba(241,245,249,0.5)',
-            }}>
-              {cola.map((t) => (
-                <div
-                  key={t.turno_id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 border-l-4 border-l-amber-400 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
-                >
-                  <div className="min-w-0">
-                    <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {t.clave_tramite} — {t.denominacion_tramite}
-                    </p>
-                  </div>
-                  <div className="ml-4 flex items-center gap-2">
-                    <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-700">
-                      #{t.posicion}
-                    </span>
-                  </div>
+      {/* Layout: izquierda (cola) + derecha (QR centrado en espacio libre) */}
+      <div className="flex gap-4">
+        {/* IZQUIERDA — Cola de espera (dos columnas de 5) */}
+        <div className="flex flex-col">
+          {/* Título superior — cubre ambos contenedores */}
+          <div className="rounded-t-xl bg-white border border-b-0 border-slate-200 px-4 py-2 text-center" style={{ width: '696px' }}>
+            <p className="text-sm font-bold text-slate-700">Turnos a continuación</p>
+          </div>
+          <div className="flex gap-4 mt-3">
+          {/* PRIMERA MITAD — primeros 5 */}
+          <div style={{ width: '340px', flexShrink: 0 }}>
+            <TarjetaSeccion
+              titulo=""
+              icono={null}
+            >
+              {!listo ? (
+                <Esqueleto filas={5} />
+              ) : cola.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <IconoVacio />
+                  <p className="mt-2 text-sm font-medium text-slate-500">
+                    No hay turnos en espera.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Los turnos emitidos aparecerán aquí.
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </TarjetaSeccion>
+              ) : (
+                <div className="space-y-2">
+                  {cola.slice(0, 5).map((t) => (
+                    <div
+                      key={t.turno_id}
+                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50"
+                    >
+                      <div className="min-w-0 px-4 py-3 flex-1">
+                        <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {t.clave_tramite} — {t.denominacion_tramite}
+                        </p>
+                      </div>
+                      <div className="ml-0 flex items-center justify-center h-full px-3 bg-blue-50 rounded-r-lg">
+                        <span className="text-lg font-black text-blue-600 tabular-nums">
+                          {t.posicion}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TarjetaSeccion>
+          </div>
 
+          {/* SEGUNDA MITAD — siguientes 5 */}
+          <div style={{ width: '340px', flexShrink: 0 }}>
+            <TarjetaSeccion
+              titulo=""
+              icono={null}
+            >
+              {!listo ? (
+                <Esqueleto filas={5} />
+              ) : cola.length <= 5 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <IconoVacio />
+                  <p className="mt-2 text-sm font-medium text-slate-500">
+                    Sin turnos adicionales.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Aparecerán cuando haya más de 5.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {cola.slice(5, 10).map((t) => (
+                    <div
+                      key={t.turno_id}
+                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50"
+                    >
+                      <div className="min-w-0 px-4 py-3 flex-1">
+                        <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {t.clave_tramite} — {t.denominacion_tramite}
+                        </p>
+                      </div>
+                      <div className="ml-0 flex items-center justify-center h-full px-3 bg-blue-50 rounded-r-lg">
+                        <span className="text-lg font-black text-blue-600 tabular-nums">
+                          {t.posicion}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TarjetaSeccion>
+          </div>
+          </div>
+        </div>
+
+        {/* DERECHA — espacio libre con QR centrado */}
+        <div className="flex-1 flex flex-col items-center justify-start">
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <CodigoQR valor={`${window.location.origin}/turno/R-006`} tamano={200} />
+          </div>
+          <div className="mt-4 text-center">
+            <p className="text-3xl font-black tracking-wide text-white tabular-nums">R-006</p>
+            <p className="mt-1 text-sm text-gris-300">Registro catastral</p>
+          </div>
+        </div>
       </div>
+
+      {/* Nota informativa */}
+      <p className="mt-4 text-center text-xs font-bold text-gris-300">
+        Si tu turno no aparece, es porque está más abajo en la cola. En un momento será visible aquí.
+      </p>
     </div>
   )
 }

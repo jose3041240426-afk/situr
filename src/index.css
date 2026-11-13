@@ -4426,6 +4426,12 @@ button.boton-pildora {
   padding: 1.25rem;
 }
 
+/* Tarjeta sin redondeo superior (para TurnosVivos bajo título compartido) */
+.recepcion-tarjeta-sin-redondeo-arriba {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 /* Tarjeta con altura fija y scroll interno (para "Emitir turno") */
 .recepcion-tarjeta-fija {
   height: 380px;
