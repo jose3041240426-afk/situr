@@ -421,48 +421,48 @@ export default function ColaVentanillas() {
             </div>
 
             {/* Acciones */}
-            <div className="border-t border-gris-200 bg-gris-50 px-5 py-4 space-y-2">
-              {/* Llamar — solo si está ASIGNED */}
-              {modalTurno.turno_estado === 'ASIGNED' && (
-                <button
-                  onClick={manejarLlamar}
-                  disabled={accionando}
-                  className="boton-primario w-full"
-                >
-                  {accionando ? 'Procesando…' : 'Llamar turno'}
-                </button>
-              )}
+            <div className="border-t border-gris-200 bg-gris-50 px-5 py-4 flex items-center justify-between gap-2">
+              {/* Izquierda: Llamar (ASIGNED) o Iniciar atención (CALLED) */}
+              <div className="flex-1">
+                {modalTurno.turno_estado === 'ASIGNED' && (
+                  <button
+                    onClick={manejarLlamar}
+                    disabled={accionando}
+                    className="boton-primario w-full"
+                  >
+                    {accionando ? 'Procesando…' : 'Llamar turno'}
+                  </button>
+                )}
+                {modalTurno.turno_estado === 'CALLED' && (
+                  <button
+                    onClick={manejarIniciarAtencion}
+                    disabled={accionando}
+                    className="boton-primario w-full"
+                  >
+                    {accionando ? 'Procesando…' : 'Iniciar atención'}
+                  </button>
+                )}
+              </div>
 
-              {/* Iniciar atención — solo si está CALLED */}
-              {modalTurno.turno_estado === 'CALLED' && (
+              {/* Derecha: Finalizar (CALLED/SERVING) y Eliminar (siempre) */}
+              <div className="flex flex-col gap-2">
+                {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
+                  <button
+                    onClick={manejarFinalizar}
+                    disabled={accionando}
+                    className="rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
+                  >
+                    {accionando ? 'Procesando…' : 'Finalizar'}
+                  </button>
+                )}
                 <button
-                  onClick={manejarIniciarAtencion}
+                  onClick={manejarEliminar}
                   disabled={accionando}
-                  className="boton-primario w-full"
+                  className="rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
                 >
-                  {accionando ? 'Procesando…' : 'Iniciar atención'}
+                  {accionando ? 'Procesando…' : 'Eliminar turno'}
                 </button>
-              )}
-
-              {/* Finalizar — si está CALLED o SERVING */}
-              {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
-                <button
-                  onClick={manejarFinalizar}
-                  disabled={accionando}
-                  className="w-full rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
-                >
-                  {accionando ? 'Procesando…' : 'Finalizar'}
-                </button>
-              )}
-
-              {/* Eliminar — siempre disponible */}
-              <button
-                onClick={manejarEliminar}
-                disabled={accionando}
-                className="w-full rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
-              >
-                {accionando ? 'Procesando…' : 'Eliminar turno'}
-              </button>
+              </div>
             </div>
 
           </div>
