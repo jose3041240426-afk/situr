@@ -92,6 +92,54 @@ export interface Configuracion {
 // ---------------------------------------------------------------------------
 
 /** `vista_cola_espera` — la cola con la posición por trámite+periodo (RN-014). */
+export interface FilaColaVentanilla {
+  posicion: number
+  turno_id: string
+  codigo: string
+  prioridad: PrioridadTurno
+  tramite_clave: string
+  tramite_denominacion: string
+  creado_en: string
+}
+
+export type EstadoVentanilla = 'DISPONIBLE' | 'ATENDIENDO' | 'SIN_DISPONIBILIDAD'
+
+export interface Ventanilla {
+  modulo_id: string
+  codigo: string
+  denominacion: string
+  estado: EstadoModulo
+  activo: boolean
+  estado_ventanilla: EstadoVentanilla
+  disponible: boolean
+  ultima_asignacion_en: string | null
+  turno_id: string | null
+  turno_codigo: string | null
+  turno_estado: EstadoTurno | null
+  turno_clave_tramite: string | null
+  turno_denominacion_tramite: string | null
+  turno_llamado_en: string | null
+  turno_inicio_atencion: string | null
+  minutos_en_ventanilla: number | null
+  operador_nombres: string | null
+}
+
+export interface RespuestaEstadoVentanillas {
+  ok: boolean
+  periodo_id: string
+  cola: FilaColaVentanilla[]
+  ventanillas: Ventanilla[]
+}
+
+export interface RespuestaSolicitarTurnoVentanilla {
+  ok: boolean
+  servido: boolean
+  turno_id?: string
+  codigo_turno?: string
+  modulo_codigo?: string
+  en_espera?: number
+  motivo?: string
+}
 export interface FilaCola {
   turno_id: string
   codigo_turno: string

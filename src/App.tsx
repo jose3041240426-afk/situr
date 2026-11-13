@@ -31,6 +31,7 @@ const Perfil = lazy(() => import('./admin/Perfil'))
 const TurnoCiudadano = lazy(() => import('./ciudadano/TurnoCiudadano'))
 const PantallaPublica = lazy(() => import('./ciudadano/PantallaPublica'))
 const TurnosVivos = lazy(() => import('./admin/TurnosVivos'))
+const ColaVentanillas = lazy(() => import('./admin/ColaVentanillas'))
 
 /**
  * SITUR — Enrutado.
@@ -84,6 +85,16 @@ function RedirigirRecepcion({ children }: { children: ReactNode }) {
   const { cargando, esRecepcion } = useAuth()
   if (cargando) return <Cargando />
   return esRecepcion ? <Navigate to="/admin/recepcion" replace /> : <>{children}</>
+}
+
+/**
+ * El rol AGENTE usa la cola global por ventanillas; el ADMINISTRADOR conserva
+ * la consola clásica. Así `/admin/turnos` enruta a cada uno su pantalla sin
+ * crear una ruta nueva.
+ */
+function TurnosPorRol() {
+  const { esAgente } = useAuth()
+  return esAgente ? <ColaVentanillas /> : <Consola />
 }
 
 /**
@@ -159,7 +170,7 @@ export default function App() {
             {/* El resto de rutas: RECEPCIÓN es redirigido a su pantalla */}
             <Route
               path="/admin/turnos"
-              element={<RedirigirRecepcion><Consola /></RedirigirRecepcion>}
+              element={<RedirigirRecepcion><TurnosPorRol /></RedirigirRecepcion>}
             />
             <Route
               path="/admin/usuarios"

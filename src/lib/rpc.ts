@@ -26,6 +26,8 @@ import type {
   TurnoPublico,
   Usuario,
   UltimaLlamada,
+  RespuestaEstadoVentanillas,
+  RespuestaSolicitarTurnoVentanilla,
 } from './tipos'
 
 /**
@@ -998,4 +1000,16 @@ export async function revalidarClave(correo: string, password: string): Promise<
     throw new Error('No se pudo comprobar la contraseña. Inténtelo de nuevo.')
   }
   return true
+}
+
+export async function estadoVentanillas(): Promise<RespuestaEstadoVentanillas> {
+  const { data, error } = await supabase.rpc('estado_ventanillas')
+  if (error) throw traducirError(error)
+  return data as RespuestaEstadoVentanillas
+}
+
+export async function solicitarTurnoVentanilla(moduloId: string): Promise<RespuestaSolicitarTurnoVentanilla> {
+  const { data, error } = await supabase.rpc('solicitar_turno_ventanilla', { p_modulo_id: moduloId })
+  if (error) throw traducirError(error)
+  return data as RespuestaSolicitarTurnoVentanilla
 }

@@ -47,6 +47,7 @@ interface ContextoAuth {
   cargando: boolean
   esAdministrador: boolean
   esRecepcion: boolean
+  esAgente: boolean
   puedeOperar: boolean
   mfaPendiente: boolean
   /**
@@ -398,6 +399,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       cargando,
       esAdministrador,
       esRecepcion,
+      esAgente: operador?.rol === 'AGENTE',
       puedeOperar,
       // RF-026: la inscripción de MFA es obligatoria en el primer acceso.
       mfaPendiente: Boolean(operador?.activo) && !operador?.mfaHabilitado,
