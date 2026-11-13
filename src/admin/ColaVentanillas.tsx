@@ -166,7 +166,7 @@ export default function ColaVentanillas() {
   const ventanillas = datos?.ventanillas ?? []
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
         {aviso && (
@@ -225,7 +225,7 @@ export default function ColaVentanillas() {
             {v.turnos_asignados.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {v.turnos_asignados.map((t: TurnoAsignado) => (
-                  <div key={t.turno_id} className="rounded-xl bg-gris-50 p-3">
+                  <div key={t.turno_id} className="turno-entrada rounded-xl bg-gris-50 p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
@@ -270,8 +270,8 @@ export default function ColaVentanillas() {
 
       {/* Modal de opciones del turno */}
       {modalTurno && modalVentanilla && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="tarjeta w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-bg-entrada">
+          <div className="tarjeta w-full max-w-md p-6 modal-entrada">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gris-900">
                 {modalTurno.turno_codigo} — {modalVentanilla.codigo}
