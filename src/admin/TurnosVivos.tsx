@@ -149,7 +149,7 @@ export default function TurnosVivos() {
                   {cola.slice(0, 5).map((t) => (
                     <div
                       key={t.turno_id}
-                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50"
+                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50 shadow-md"
                     >
                       <div className="min-w-0 px-4 py-3 flex-1">
                         <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
@@ -192,7 +192,7 @@ export default function TurnosVivos() {
                   {cola.slice(5, 10).map((t) => (
                     <div
                       key={t.turno_id}
-                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50"
+                      className="flex items-center justify-between rounded-lg border-[3px] border-blue-500 bg-white px-0 py-0 overflow-hidden transition-colors hover:bg-slate-50 shadow-md"
                     >
                       <div className="min-w-0 px-4 py-3 flex-1">
                         <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
