@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   listarCola,
-  listarTurnosActuales,
   obtenerPeriodoAbierto,
 } from '../lib/rpc'
-import type { FilaCola, FilaActual, PeriodoOperativo } from '../lib/tipos'
-import { ChipEstado, Esqueleto } from '../components/ui'
+import type { FilaCola, PeriodoOperativo } from '../lib/tipos'
+import { Esqueleto } from '../components/ui'
 
 /**
  * SITUR — Turnos en vivo (RECEPCIÓN).
  *
  * Pantalla independiente que se abre en otra pestaña del navegador.
- * Muestra los turnos que van saliendo en tiempo real:
- *   - Cola de espera: turnos esperando ser llamados.
- *   - En atención: turnos actualmente siendo atendidos.
+ * Muestra la cola de espera en tiempo real: los turnos emitidos aparecen
+ * aquí con su código, trámite y posición en la cola.
  *
  * No requiere layout de Disposicion ni menú lateral: es una pantalla
  * limpia y autónoma que el personal de recepción puede dejar abierta
@@ -29,17 +27,6 @@ function IconoCola() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )
-}
-
-/**
- * Icono SVG para atención
- */
-function IconoAtencion() {
-  return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   )
 }
@@ -107,20 +94,17 @@ function TarjetaSeccion({
 export default function TurnosVivos() {
   const [periodo, setPeriodo] = useState<PeriodoOperativo | null>(null)
   const [cola, setCola] = useState<FilaCola[]>([])
-  const [actuales, setActuales] = useState<FilaActual[]>([])
   const [listo, setListo] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
 
   const cargar = useCallback(async () => {
     try {
-      const [p, c, a] = await Promise.all([
+      const [p, c] = await Promise.all([
         obtenerPeriodoAbierto(),
         listarCola(),
-        listarTurnosActuales(),
       ])
       setPeriodo(p)
       setCola(c)
-      setActuales(a)
       setListo(true)
       setActualizado(new Date())
 
@@ -136,7 +120,6 @@ export default function TurnosVivos() {
   }, [cargar])
 
   const totalEnCola = cola.length
-  const totalEnAtencion = actuales.length
 
   return (
     <div className="min-h-screen bg-navy-900 p-6">
@@ -170,7 +153,7 @@ export default function TurnosVivos() {
       </header>
 
       {/* Resumen rápido */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
+      <div className="mb-6">
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
           <div className="flex items-center gap-2 text-gris-300">
             <IconoCola />
@@ -178,17 +161,10 @@ export default function TurnosVivos() {
           </div>
           <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnCola}</p>
         </div>
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <div className="flex items-center gap-2 text-gris-300">
-            <IconoAtencion />
-            <span className="text-xs font-medium">En atención</span>
-          </div>
-          <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnAtencion}</p>
-        </div>
       </div>
 
-      {/* Grid: Cola + Atención */}
-      <div className="grid grid-cols-2 gap-6">
+      {/* Cola de espera */}
+      <div className="w-full">
         {/* COLA DE ESPERA */}
         <TarjetaSeccion
           titulo="Cola de espera"
@@ -236,55 +212,6 @@ export default function TurnosVivos() {
           )}
         </TarjetaSeccion>
 
-        {/* EN ATENCIÓN */}
-        <TarjetaSeccion
-          titulo="En atención"
-          icono={<IconoAtencion />}
-          badge={
-            <ChipRecepcion texto={`${totalEnAtencion} activos`} tono={totalEnAtencion > 0 ? 'verde' : 'gris'} />
-          }
-        >
-          {!listo ? (
-            <Esqueleto filas={5} />
-          ) : actuales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <IconoVacio />
-              <p className="mt-3 text-sm font-medium text-slate-500">
-                No hay turnos en atención.
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Los turnos llamados aparecerán aquí.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-4" style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'rgba(148,163,184,0.5) rgba(241,245,249,0.5)',
-            }}>
-              {actuales.map((t) => (
-                <div
-                  key={t.turno_id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {t.denominacion_tramite}
-                    </p>
-                    {t.denominacion_modulo && (
-                      <p className="text-xs text-slate-400">
-                        {t.denominacion_modulo}
-                      </p>
-                    )}
-                  </div>
-                  <div className="ml-4 flex items-center gap-2">
-                    <ChipEstado estado={t.estado} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </TarjetaSeccion>
       </div>
     </div>
   )
