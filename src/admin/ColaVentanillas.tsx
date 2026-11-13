@@ -156,6 +156,14 @@ export default function ColaVentanillas() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }, [])
+
 
 
   if (cargando) {
@@ -274,7 +282,10 @@ export default function ColaVentanillas() {
       {/* Modal de opciones del turno — información completa */}
       {modalTurno && modalVentanilla && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-bg-entrada">
-          <div className="tarjeta w-full max-w-lg p-0 modal-entrada overflow-hidden">
+          <div
+            className="tarjeta w-full max-w-lg p-0 modal-entrada overflow-hidden"
+            onDoubleClick={toggleFullscreen}
+          >
 
             {/* Header del modal */}
             <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-gris-50">
