@@ -120,6 +120,7 @@ export default function TurnosVivos() {
   const [actuales, setActuales] = useState<FilaActual[]>([])
   const [listo, setListo] = useState(false)
   const [ultimoCodigo, setUltimoCodigo] = useState<string | null>(null)
+  const [actualizado, setActualizado] = useState<Date | null>(null)
 
   const cargar = useCallback(async () => {
     try {
@@ -132,6 +133,7 @@ export default function TurnosVivos() {
       setCola(c)
       setActuales(a)
       setListo(true)
+      setActualizado(new Date())
 
       // Detectar el último turno nuevo (el de mayor folio en la cola)
       if (c.length > 0) {
@@ -161,8 +163,14 @@ export default function TurnosVivos() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-white">Turnos en vivo</h1>
-          <p className="text-sm text-gris-300">
+          <p className="text-sm text-gris-300 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             RECEPCIÓN — Actualización automática cada 5 segundos
+            {actualizado && (
+              <span className="text-gris-400 tabular-nums">
+                · última {actualizado.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -187,14 +195,14 @@ export default function TurnosVivos() {
             <IconoCola />
             <span className="text-xs font-medium">En espera</span>
           </div>
-          <p className="mt-1 text-3xl font-black text-white">{totalEnCola}</p>
+          <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnCola}</p>
         </div>
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
           <div className="flex items-center gap-2 text-gris-300">
             <IconoAtencion />
             <span className="text-xs font-medium">En atención</span>
           </div>
-          <p className="mt-1 text-3xl font-black text-white">{totalEnAtencion}</p>
+          <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnAtencion}</p>
         </div>
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
           <div className="flex items-center gap-2 text-gris-300">
@@ -237,10 +245,10 @@ export default function TurnosVivos() {
               {cola.map((t) => (
                 <div
                   key={t.turno_id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 border-l-4 border-l-amber-400 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
+                    <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
                     <p className="text-xs text-slate-500 truncate">
                       {t.clave_tramite} — {t.denominacion_tramite}
                     </p>
@@ -284,10 +292,10 @@ export default function TurnosVivos() {
               {actuales.map((t) => (
                 <div
                   key={t.turno_id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
+                    <p className="text-lg font-black tracking-wide text-slate-900 tabular-nums">{t.codigo_turno}</p>
                     <p className="text-xs text-slate-500 truncate">
                       {t.denominacion_tramite}
                     </p>
