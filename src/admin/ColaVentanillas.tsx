@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { estadoVentanillas, solicitarTurnoVentanilla, tokenTurnoParaQr, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
-import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla } from '../lib/tipos'
-import CodigoQR from '../components/CodigoQR'
+import { estadoVentanillas, solicitarTurnoVentanilla } from '../lib/rpc'
+import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 
 const ESTADO_COLOR: Record<string, string> = {
   DISPONIBLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -20,7 +19,6 @@ export default function ColaVentanillas() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null) // modulo_id en acción
-  const [qrTurno, setQrTurno] = useState<{ turnoId: string; token: string } | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
@@ -59,31 +57,7 @@ export default function ColaVentanillas() {
     }
   }
 
-  async function verQr(turnoId: string) {
-    try {
-const t = await tokenTurnoParaQr(turnoId)
-      setQrTurno({ turnoId, token: t.token_publico })
-    } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'No se pudo generar el QR.')
-    }
-  }
 
-  async function accionTurno(turnoId: string, accion: 'llamar' | 'iniciar' | 'finalizar' | 'cancelar') {
-    setOcupado(turnoId)
-    try {
-      if (accion === 'llamar') {
-        const r = await llamarTurnoAsignado(turnoId)
-        setAviso(`Turno ${r.codigo} llamado a ${r.modulo_codigo}.`)
-      } else if (accion === 'iniciar') await iniciarAtencion(turnoId)
-      else if (accion === 'finalizar') await finalizarTurno(turnoId)
-      else await cancelarTurno(turnoId, 'Cancelado por el operador.')
-      await cargar()
-    } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'No se pudo realizar la acción.')
-    } finally {
-      setOcupado(null)
-    }
-  }
 
   if (cargando) {
     return <div className="p-6 text-gris-500">Cargando cola…</div>
@@ -149,66 +123,16 @@ const t = await tokenTurnoParaQr(turnoId)
               </span>
             </div>
 
-            {v.turno_codigo ? (
-              <div className="rounded-xl bg-gris-50 p-3">
-                <div className="text-sm text-gris-500">Turno asignado</div>
-                <div className="text-xl font-bold text-gris-900">{v.turno_codigo}</div>
-                {v.turno_denominacion_tramite && (
-                  <div className="text-xs text-gris-600">{v.turno_denominacion_tramite}</div>
-                )}
-                {v.minutos_en_ventanilla !== null && (
-                  <div className="text-xs text-gris-500">
-                    {v.minutos_en_ventanilla} min desde la asignación
+            {v.turnos_asignados.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {v.turnos_asignados.map((t: TurnoAsignado) => (
+                  <div key={t.turno_id} className="rounded-xl bg-gris-50 p-3">
+                    <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
+                    {t.turno_denominacion_tramite && (
+                      <div className="text-xs text-gris-600">{t.turno_denominacion_tramite}</div>
+                    )}
                   </div>
-                )}
-                {v.operador_nombres && (
-                  <div className="text-xs text-gris-500">Operador: {v.operador_nombres}</div>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {v.turno_estado === 'ASIGNED' && (
-                    <button
-                      className="boton-primario text-xs"
-                      disabled={ocupado === v.turno_id! || !v.es_mia}
-                      onClick={() => accionTurno(v.turno_id!, 'llamar')}
-                      title="Llamar turno"
-                    >
-                      Llamar turno
-                    </button>
-                  )}
-                  {v.turno_estado === 'CALLED' && (
-                    <button
-                      className="boton-primario text-xs"
-                      disabled={ocupado === v.turno_id! || !v.es_mia}
-                      onClick={() => accionTurno(v.turno_id!, 'iniciar')}
-                      title="Iniciar atención"
-                    >
-                      Iniciar atención
-                    </button>
-                  )}
-                  {v.turno_estado === 'SERVING' && (
-                    <button
-                      className="boton-ok text-xs"
-                      disabled={ocupado === v.turno_id! || !v.es_mia}
-                      onClick={() => accionTurno(v.turno_id!, 'finalizar')}
-                    >
-                      Finalizar
-                    </button>
-                  )}
-                  <button
-                    className="boton-secundario text-xs"
-                    disabled={ocupado === v.turno_id!}
-                    onClick={() => verQr(v.turno_id!)}
-                  >
-                    Ver QR
-                  </button>
-                  <button
-                    className="boton-peligro text-xs"
-                    disabled={ocupado === v.turno_id! || !v.es_mia}
-                    onClick={() => accionTurno(v.turno_id!, 'cancelar')}
-                  >
-                    Cancelar
-                  </button>
-                </div>
+                ))}
               </div>
             ) : (
               <p className="text-sm text-gris-500">Sin turno asignado.</p>
@@ -216,24 +140,16 @@ const t = await tokenTurnoParaQr(turnoId)
 
             <button
               className="boton-primario w-full transition-transform hover:scale-105"
-              disabled={!v.disponible || !v.es_mia || ocupado === v.modulo_id}
+              disabled={v.turno_count >= 3 || !v.es_mia || ocupado === v.modulo_id}
               onClick={() => solicitar(v.modulo_id)}
+              title={v.turno_count >= 3 ? 'Límite de 3 turnos alcanzado' : undefined}
             >
-              {ocupado === v.modulo_id ? 'Solicitando…' : 'Solicitar siguiente turno'}
+              {ocupado === v.modulo_id ? 'Solicitando…' : v.turno_count >= 3 ? 'Límite alcanzado (3/3)' : 'Solicitar siguiente turno'}
             </button>
           </div>
         ))}
       </section>
 
-      {qrTurno && (
-        <div className="tarjeta flex flex-col items-center gap-3 p-4">
-          <h3 className="text-lg font-semibold">Código QR del turno</h3>
-          <CodigoQR valor={`${window.location.origin}/turno/${qrTurno.token}`} tamano={200} />
-          <button className="boton-secundario text-xs" onClick={() => setQrTurno(null)}>
-            Cerrar
-          </button>
-        </div>
-      )}
     </div>
   )
 }

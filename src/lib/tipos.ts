@@ -105,6 +105,15 @@ export interface FilaColaVentanilla {
 
 export type EstadoVentanilla = 'DISPONIBLE' | 'ATENDIENDO' | 'SIN_DISPONIBILIDAD'
 
+export interface TurnoAsignado {
+  turno_id: string
+  turno_codigo: string
+  turno_estado: EstadoTurno | null
+  turno_denominacion_tramite: string | null
+  minutos_en_ventanilla: number | null
+  operador_nombres: string | null
+}
+
 export interface Ventanilla {
   modulo_id: string
   codigo: string
@@ -114,16 +123,8 @@ export interface Ventanilla {
   estado_ventanilla: EstadoVentanilla
   disponible: boolean
   es_mia: boolean
-  ultima_asignacion_en: string | null
-  turno_id: string | null
-  turno_codigo: string | null
-  turno_estado: EstadoTurno | null
-  turno_clave_tramite: string | null
-  turno_denominacion_tramite: string | null
-  turno_llamado_en: string | null
-  turno_inicio_atencion: string | null
-  minutos_en_ventanilla: number | null
-  operador_nombres: string | null
+  turno_count: number
+  turnos_asignados: TurnoAsignado[]
 }
 
 export interface RespuestaEstadoVentanillas {
