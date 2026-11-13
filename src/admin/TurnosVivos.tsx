@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { colaEnVivo, ultimoTurnoEmitido } from '../lib/rpc'
+import { colaEnVivo, ultimoTurnoEmitido, tokenTurnoParaQr } from '../lib/rpc'
 import type { FilaColaVivo, UltimoTurnoEmitido } from '../lib/rpc'
 import { Esqueleto } from '../components/ui'
 import CodigoQR from '../components/CodigoQR'
@@ -56,23 +56,51 @@ const VISIBLES = 10
  * marcado a mano, el orden real de llamada puede adelantar a alguien: por eso
  * el ticket que va a ser llamado primero lleva el distintivo «SIGUIENTE»
  * aunque no sea el primero de la lista.
+ *
+ * Es un `<button>`: se puede pulsar con el ratón y también con el teclado
+ * (Enter o Espacio), que es como lo usa quien está en la ventanilla con las
+ * manos ocupadas.
  */
-function Ticket({ t, siguiente }: { t: FilaColaVivo; siguiente?: boolean }) {
+function Ticket({
+  t,
+  siguiente,
+  elegido,
+  onElegir,
+}: {
+  t: FilaColaVivo
+  siguiente?: boolean
+  elegido?: boolean
+  onElegir: (t: FilaColaVivo) => void
+}) {
   return (
-    <div
-      className="relative flex items-center overflow-hidden rounded-3xl transition-colors"
+    <button
+      type="button"
+      onClick={() => onElegir(t)}
+      aria-pressed={elegido}
+      aria-label={`Ver el código de ${t.codigo_turno}, ${t.denominacion_tramite}`}
+      title={`Ver el código de ${t.codigo_turno}`}
+      className="relative flex items-center overflow-hidden rounded-3xl text-left transition-transform"
       style={{
         height: 80,
         gap: 16,
         padding: '0 20px 0 16px',
         background: siguiente
           ? `linear-gradient(120deg, ${C.blue600}, ${C.blue700})`
-          : C.glass,
+          : elegido
+            ? 'rgba(96,165,250,0.22)'
+            : C.glass,
         border: siguiente
           ? `2px solid ${C.blue400}`
-          : `1px solid ${C.glassLine}`,
-        boxShadow: siguiente ? '0 0 40px rgba(59,130,246,0.4)' : 'none',
+          : elegido
+            ? `2px solid ${C.blue400}`
+            : `1px solid ${C.glassLine}`,
+        boxShadow: siguiente
+          ? '0 0 40px rgba(59,130,246,0.4)'
+          : elegido
+            ? '0 0 24px rgba(59,130,246,0.28)'
+            : 'none',
         fontFamily: font,
+        cursor: 'pointer',
       }}
     >
       {/* Número de posición por llegada */}
@@ -122,23 +150,28 @@ function Ticket({ t, siguiente }: { t: FilaColaVivo; siguiente?: boolean }) {
         >
           {t.clave_tramite} — {t.denominacion_tramite}
         </div>
+        {/*
+          La hora va debajo del trámite: dice lo que el código no dice (quién
+          llegó antes) sin competir por el espacio con el distintivo.
+        */}
+        <div
+          style={{
+            fontSize: 11,
+            color: siguiente ? C.blue100 : 'rgba(157,184,227,0.65)',
+            marginTop: 2,
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+          title="Hora de emisión del turno"
+        >
+          {horaDe(t.creado_en)}
+        </div>
       </div>
 
-      {/* La hora dice lo que el código no dice: quién llegó antes */}
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: siguiente ? C.blue100 : C.muted,
-          fontVariantNumeric: 'tabular-nums',
-          flexShrink: 0,
-        }}
-        title="Hora de emisión del turno"
-      >
-        {horaDe(t.creado_en)}
-      </div>
-
-      {/* Badge SIGUIENTE en el que va a ser llamado primero */}
+      {/*
+        El distintivo va en la esquina superior derecha. La hora ya no está
+        ahí, así que no se tapan.
+      */}
       {siguiente && (
         <div
           style={{
@@ -158,7 +191,7 @@ function Ticket({ t, siguiente }: { t: FilaColaVivo; siguiente?: boolean }) {
           SIGUIENTE
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
@@ -175,6 +208,17 @@ export default function TurnosVivos() {
   const [total, setTotal] = useState(0)
   const [ultimo, setUltimo] = useState<UltimoTurnoEmitido | null>(null)
   const [listo, setListo] = useState(false)
+
+  /*
+   * El turno que se está mostrando en el panel del QR.
+   *
+   * `null` significa «el último emitido», que es el que se ofrece por
+   * defecto: quien acaba de recibir su papel en la ventanilla escanea ese.
+   * Al pulsar un turno de la lista, pasa a mostrarse ese.
+   */
+  const [elegido, setElegido] = useState<FilaColaVivo | null>(null)
+  const [tokenElegido, setTokenElegido] = useState<string | null>(null)
+  const [pidiendoToken, setPidiendoToken] = useState(false)
 
   const cargar = useCallback(async () => {
     try {
@@ -195,11 +239,51 @@ export default function TurnosVivos() {
   }, [cargar])
 
   /*
+   * Pulsa un turno de la lista: el panel del QR pasa a mostrar ese.
+   *
+   * El token se pide en ese momento y no al cargar la cola: pedir el token de
+   * las diez filas visibles serían diez consultas para algo que solo se usa
+   * cuando alguien pulsa. Aquí es una, y solo cuando pulsa.
+   */
+  const elegirTurno = useCallback(async (t: FilaColaVivo) => {
+    setElegido(t)
+    setPidiendoToken(true)
+    try {
+      const { token_publico } = await tokenTurnoParaQr(t.turno_id)
+      setTokenElegido(token_publico)
+    } catch (err) {
+      console.error('TurnosVivos: no se pudo obtener el token', err)
+      setTokenElegido(null)
+    } finally {
+      setPidiendoToken(false)
+    }
+  }, [])
+
+  /*
    * El que va a ser llamado primero no siempre es el primero que llegó: un
    * turno con prioridad marcada a mano se adelanta (RN-017). La base ya lo
    * calculó (`posicion_global`), así que aquí solo se busca cuál es.
    */
   const idSiguiente = filas.find((f) => f.posicion_global === 1)?.turno_id ?? null
+
+  /*
+   * Lo que se ve en el panel: el turno elegido, o el último emitido si no
+   * se ha elegido ninguno. El QR usa el token del elegido; el código y el
+   * nombre del trámite, los de ese mismo turno.
+   */
+  const enPanel = elegido
+    ? {
+        codigo_turno: elegido.codigo_turno,
+        denominacion_tramite: elegido.denominacion_tramite,
+        token: tokenElegido,
+      }
+    : {
+        codigo_turno: ultimo?.codigo_turno ?? '',
+        denominacion_tramite: ultimo?.denominacion_tramite ?? '',
+        token: ultimo?.token_publico ?? null,
+      }
+
+  const hayAlgo = Boolean(enPanel.codigo_turno)
 
   return (
     <div
@@ -309,7 +393,13 @@ export default function TurnosVivos() {
               }}
             >
               {filas.map((t) => (
-                <Ticket key={t.turno_id} t={t} siguiente={t.turno_id === idSiguiente} />
+                <Ticket
+                  key={t.turno_id}
+                  t={t}
+                  siguiente={t.turno_id === idSiguiente}
+                  elegido={t.turno_id === elegido?.turno_id}
+                  onElegir={elegirTurno}
+                />
               ))}
             </div>
           )}
@@ -332,7 +422,7 @@ export default function TurnosVivos() {
             ESCANEA TU TURNO
           </div>
 
-          {listo && !ultimo ? (
+          {listo && !hayAlgo ? (
             /*
              * Sin turnos emitidos todavía no hay nada que escanear. Se dice con
              * palabras en vez de pintar un QR vacío, que parecería roto.
@@ -363,9 +453,9 @@ export default function TurnosVivos() {
                   '0 24px 60px rgba(0,0,0,0.45), 0 0 0 8px rgba(96,165,250,0.15)',
               }}
             >
-              {ultimo?.token_publico ? (
+              {enPanel.token ? (
                 <CodigoQR
-                  valor={`${window.location.origin}/turno/${ultimo.token_publico}`}
+                  valor={`${window.location.origin}/turno/${enPanel.token}`}
                   tamano={240}
                 />
               ) : (
@@ -388,7 +478,7 @@ export default function TurnosVivos() {
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {ultimo?.codigo_turno ?? '—'}
+            {enPanel.codigo_turno || '—'}
           </div>
           <div
             style={{
@@ -399,8 +489,49 @@ export default function TurnosVivos() {
               maxWidth: 320,
             }}
           >
-            {ultimo?.denominacion_tramite ?? 'Sin turnos emitidos'}
+            {enPanel.denominacion_tramite || 'Sin turnos emitidos'}
           </div>
+
+          {/*
+            Cuando hay un turno elegido, se dice cuál es y se ofrece volver al
+            último emitido. Sin esto, quien Mire la pantalla no sabe si el QR
+            es del último papel o del que alguien tocó hace un momento.
+          */}
+          {elegido && (
+            <div
+              className="flex flex-col items-center gap-2"
+              style={{ marginTop: 2, textAlign: 'center' }}
+            >
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>
+                Mostrando el código de {elegido.codigo_turno}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setElegido(null)
+                  setTokenElegido(null)
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.12)',
+                  border: `1px solid ${C.glassLine}`,
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                }}
+              >
+                Volver al último emitido
+              </button>
+            </div>
+          )}
+
+          {pidiendoToken && (
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>
+              Buscando el código…
+            </div>
+          )}
 
           {/* Leyenda de escaneo */}
           <div
@@ -431,6 +562,23 @@ export default function TurnosVivos() {
               <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10" />
             </svg>
             Escanea el código de tu turno para seguirlo en tu teléfono
+          </div>
+
+          {/*
+            El aviso de que se puede elegir un turno va junto al QR, que es
+            donde está el panel. La lista de la izquierda es la que se toca.
+          */}
+          <div
+            style={{
+              fontSize: 12,
+              color: C.muted,
+              fontWeight: 600,
+              textAlign: 'center',
+              maxWidth: 300,
+              lineHeight: 1.4,
+            }}
+          >
+            Pulsa un turno de la lista para mostrar aquí su código.
           </div>
         </div>
       </div>

@@ -470,6 +470,38 @@ export async function ultimoTurnoEmitido(): Promise<UltimoTurnoEmitido | null> {
 }
 
 /**
+ * El token público de un turno concreto, para pintar SU código QR.
+ *
+ * Va por la RPC `token_turno_para_qr()` y no por una lectura directa a
+ * `turnos` porque esa tabla solo es legible por ADMINISTRADOR y RECEPCIÓN
+ * (RLS): un AGENTE recibiría cero filas y el QR nunca se pintaría. La RPC
+ * comprueba además que quien llama puede operar turnos, y renueva el token
+ * si ya había caducado, para que el QR que se muestra sirva de verdad.
+ */
+export type TokenTurnoQr = {
+  turno_id: string
+  codigo_turno: string
+  folio: number
+  estado: string
+  prioridad: PrioridadTurno
+  token_publico: string
+}
+
+export async function tokenTurnoParaQr(turnoId: string): Promise<TokenTurnoQr> {
+  const { data, error } = await supabase.rpc('token_turno_para_qr', { p_turno_id: turnoId })
+  if (error) throw traducirError(error)
+  const r = (data ?? {}) as Partial<TokenTurnoQr>
+  return {
+    turno_id: r.turno_id ?? turnoId,
+    codigo_turno: r.codigo_turno ?? '',
+    folio: r.folio ?? 0,
+    estado: r.estado ?? '',
+    prioridad: (r.prioridad ?? 'NORMAL') as PrioridadTurno,
+    token_publico: r.token_publico ?? '',
+  }
+}
+
+/**
  * El token público de un turno, para pintar su código QR desde la cola.
  *
  * El QR no se genera al emitir un lote: de un lote salen cientos de folios y
