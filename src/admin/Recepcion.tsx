@@ -3,7 +3,6 @@ import BotonChispa from '../components/BotonChispa'
 import BotonEmitir from '../components/BotonEmitir'
 import CodigoQR from '../components/CodigoQR'
 import { Aviso, ChipEstado, Esqueleto } from '../components/ui'
-import { Avatar } from '../components/ui/avatar'
 import {
   abrirPeriodo,
   cerrarPeriodo,
@@ -32,16 +31,6 @@ import { useAuth } from '../lib/auth'
  * omitir ni acceder a funciones administrativas.
  * El historial y el perfil se acceden desde el menú lateral.
  */
-
-function ahoraReloj(): string {
-  return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-}
-
-function ahoraFecha(): string {
-  const d = new Date()
-  const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  return `${dias[d.getDay()]}, ${d.getDate()}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
-}
 
 /**
  * Icono SVG para Abrir periodo
@@ -137,7 +126,7 @@ function ChipRecepcion({ texto, tono }: { texto: string; tono: 'verde' | 'azul' 
 }
 
 export default function Recepcion() {
-  const { operador } = useAuth()
+  useAuth()
 
   // ------------------------------------------------------------------ Estado
 
@@ -149,8 +138,6 @@ export default function Recepcion() {
   const [ocupado, setOcupado] = useState(false)
   const [mensaje, setMensaje] = useState<{ texto: string; tono: 'ok' | 'peligro' | 'alerta' } | null>(null)
   const [ultimoTurno, setUltimoTurno] = useState<{ codigo: string; token: string } | null>(null)
-  const [reloj, setReloj] = useState(ahoraReloj())
-  const [fechaStr, setFechaStr] = useState(ahoraFecha())
 
   // ------------------------------------------------------------------ Carga
 
@@ -175,15 +162,6 @@ export default function Recepcion() {
     const id = setInterval(cargar, 15_000)
     return () => clearInterval(id)
   }, [cargar])
-
-  // Reloj en tiempo real
-  useEffect(() => {
-    const id = setInterval(() => {
-      setReloj(ahoraReloj())
-      setFechaStr(ahoraFecha())
-    }, 1000)
-    return () => clearInterval(id)
-  }, [])
 
   // ------------------------------------------------------------------ Acciones
 
@@ -240,38 +218,12 @@ export default function Recepcion() {
 
   return (
     <div className="recepcion-layout">
-      {/* ============================================ */}
-      {/* HEADER AZUL CON GRADIENTE                    */}
-      {/* ============================================ */}
-      <header className="recepcion-header">
-        <div className="recepcion-header-content">
-          <div>
-            <p className="recepcion-header-subtitulo">PANEL DE PERSONAL</p>
-            <h1 className="recepcion-header-titulo">Recepción</h1>
-            <p className="recepcion-header-descripcion">
-              Apertura de periodos, emisión de turnos y consulta de atención.
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="recepcion-header-reloj">{reloj}</p>
-            <p className="recepcion-header-fecha">{fechaStr}</p>
-            <div className="mt-1 inline-flex items-center justify-center">
-              <Avatar nombre={operador?.nombres ?? 'Recepción'} tamano="sm" />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ============================================ */}
-      {/* CONTENIDO PRINCIPAL                          */}
-      {/* ============================================ */}
-      <main className="recepcion-main">
-        {/* Mensajes */}
-        {mensaje && (
-          <Aviso tono={mensaje.tono}>
-            <p className="font-bold">{mensaje.texto}</p>
-          </Aviso>
-        )}
+      {/* Mensajes */}
+      {mensaje && (
+        <Aviso tono={mensaje.tono}>
+          <p className="font-bold">{mensaje.texto}</p>
+        </Aviso>
+      )}
 
         {/* ============================================ */}
         {/* GRID: ABRIR / CERRAR PERIODO + EMITIR TURNO  */}
@@ -410,7 +362,6 @@ export default function Recepcion() {
             </div>
           )}
         </TarjetaSeccion>
-      </main>
     </div>
   )
 }

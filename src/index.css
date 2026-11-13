@@ -4337,19 +4337,11 @@ button.boton-pildora {
   min-height: 100vh;
 }
 
-/* Header azul con gradiente */
-.recepcion-header {
+/* Header azul con gradiente — usado por Disposicion.tsx cuando esRecepcion */
+.recepcion-header-gradient {
   background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
   color: #fff;
-  padding: 1.5rem 2rem;
   box-shadow: 0 4px 20px rgba(30, 58, 95, 0.3);
-}
-
-.recepcion-header-content {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 .recepcion-header-subtitulo {
@@ -4561,25 +4553,8 @@ button.boton-pildora {
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
-  .recepcion-header {
-    padding: 1rem 1.25rem;
-  }
-
   .recepcion-header-titulo {
     font-size: 1.5rem;
-  }
-
-  .recepcion-header-content {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .recepcion-header-content > div:last-child {
-    text-align: left;
-  }
-
-  .recepcion-main {
-    padding: 1rem 1rem 1.5rem;
   }
 
   .recepcion-periodo-abierto {
