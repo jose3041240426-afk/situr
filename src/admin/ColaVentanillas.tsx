@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { estadoVentanillas, solicitarTurnoVentanilla, tokenTurnoParaQr, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla } from '../lib/tipos'
-import { ETIQUETA_PRIORIDAD } from '../lib/tipos'
 import CodigoQR from '../components/CodigoQR'
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -114,11 +113,11 @@ const t = await tokenTurnoParaQr(turnoId)
                 key={t.turno_id}
                 className="min-w-[150px] shrink-0 rounded-2xl border border-gris-200 bg-white p-3 shadow-sm"
               >
-                <div className="text-xs text-gris-500">Pos. {t.posicion}</div>
+                <div className="text-xs text-gris-500">Turno {t.posicion}</div>
                 <div className="text-lg font-bold text-gris-900">{t.codigo_turno}</div>
                 <div className="text-xs text-gris-600">{t.tramite_denominacion}</div>
                 <span className="mt-1 inline-block rounded-full bg-gris-100 px-2 py-0.5 text-xs">
-                  {ETIQUETA_PRIORIDAD[t.prioridad] ?? t.prioridad}
+                  {t.tramite_clave}
                 </span>
               </div>
             ))}
