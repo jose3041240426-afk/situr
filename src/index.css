@@ -1591,6 +1591,7 @@ body {
   place-items: center;
   width: 1.15em;
   height: 1.15em;
+  transition: left 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
 .boton-llamar-icono.bi--megaphone-fill {
@@ -1628,22 +1629,13 @@ body {
 }
 
 .boton-llamar:hover:not(:disabled) .boton-llamar-envoltura {
-  animation: boton-llamar-vuelo 0.6s ease-in-out infinite alternate;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .boton-llamar:hover:not(:disabled) .boton-llamar-icono {
-  /*
-   * `translateX` compensa el `left` de la envoltura para que el icono acabe
-   * CENTRADO en el botón, no en el sitio donde estaba el texto. Sin esto, al
-   * desaparecer el texto el icono quedaba pegado a la izquierda.
-   */
-  /*
-   * 1.66em, no 1.81: el icono gira 45°, así que su caja visual crece un 41 %
-   * y el borde derecho se acerca al del botón. Centrar por la caja del
-   * layout dejaba 2.2 px menos de aire a la derecha. Este valor compensa ese
-   * crecimiento; medido, los dos huecos quedan a la par.
-   */
-  transform: translateX(1.73em) rotate(45deg) scale(1.1);
+  transform: rotate(45deg) scale(1.1);
+  animation: boton-llamar-vuelo 0.6s ease-in-out infinite alternate;
 }
 
 .boton-llamar:hover:not(:disabled) .boton-llamar-texto {
