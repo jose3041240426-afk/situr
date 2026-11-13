@@ -80,6 +80,17 @@ function IconoReloj() {
 }
 
 /**
+ * Icono SVG para abrir en otra pestaña
+ */
+function IconoNuevaPestana() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    </svg>
+  )
+}
+
+/**
  * Tarjeta de sección con estilo moderno
  */
 function TarjetaSeccion({
@@ -463,6 +474,16 @@ export default function Recepcion() {
           <p className="font-bold">{mensaje.texto}</p>
         </Aviso>
       )}
+
+      {/* Botón: abrir turnos en vivo en otra pestaña */}
+      <button
+        type="button"
+        onClick={() => window.open('/admin/turnos-vivos', '_blank')}
+        className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+      >
+        <IconoNuevaPestana />
+        Ver turnos en vivo en otra pestaña
+      </button>
 
         {/* ============================================ */}
         {/* GRID: ABRIR / CERRAR PERIODO + EMITIR TURNO  */}

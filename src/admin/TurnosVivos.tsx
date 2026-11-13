@@ -1,0 +1,311 @@
+import { useCallback, useEffect, useState } from 'react'
+import {
+  listarCola,
+  listarTurnosActuales,
+  obtenerPeriodoAbierto,
+} from '../lib/rpc'
+import type { FilaCola, FilaActual, PeriodoOperativo } from '../lib/tipos'
+import { ChipEstado, Esqueleto } from '../components/ui'
+
+/**
+ * SITUR — Turnos en vivo (RECEPCIÓN).
+ *
+ * Pantalla independiente que se abre en otra pestaña del navegador.
+ * Muestra los turnos que van saliendo en tiempo real:
+ *   - Cola de espera: turnos esperando ser llamados.
+ *   - En atención: turnos actualmente siendo atendidos.
+ *
+ * No requiere layout de Disposicion ni menú lateral: es una pantalla
+ * limpia y autónoma que el personal de recepción puede dejar abierta
+ * en un monitor secundario o ventana separada.
+ *
+ * Se actualiza cada 5 segundos automáticamente.
+ */
+
+/**
+ * Icono SVG para cola de espera
+ */
+function IconoCola() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+/**
+ * Icono SVG para atención
+ */
+function IconoAtencion() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+/**
+ * Icono SVG para turno emitido
+ */
+function IconoTurno() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v7m0 0v7m0-7h6m-6 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+/**
+ * Icono SVG para vacío
+ */
+function IconoVacio() {
+  return (
+    <svg className="w-16 h-16 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+/**
+ * Chip de estado para RECEPCIÓN
+ */
+function ChipRecepcion({ texto, tono }: { texto: string; tono: 'verde' | 'azul' | 'gris' | 'amarillo' }) {
+  const clases = {
+    verde: 'bg-emerald-100 text-emerald-700 ring-emerald-600/20',
+    azul: 'bg-blue-100 text-blue-700 ring-blue-600/20',
+    gris: 'bg-slate-100 text-slate-600 ring-slate-500/10',
+    amarillo: 'bg-amber-100 text-amber-700 ring-amber-600/20',
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${clases[tono]}`}>
+      {tono === 'verde' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+      {texto}
+    </span>
+  )
+}
+
+/**
+ * Tarjeta de sección con estilo moderno
+ */
+function TarjetaSeccion({
+  titulo,
+  icono,
+  badge,
+  children,
+}: {
+  titulo: string
+  icono: React.ReactNode
+  badge?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="recepcion-tarjeta">
+      <div className="recepcion-tarjeta-header">
+        <div className="flex items-center gap-2.5">
+          <span className="recepcion-icono">{icono}</span>
+          <h2 className="recepcion-tarjeta-titulo">{titulo}</h2>
+        </div>
+        {badge && <div>{badge}</div>}
+      </div>
+      <div className="recepcion-tarjeta-cuerpo">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+export default function TurnosVivos() {
+  const [periodo, setPeriodo] = useState<PeriodoOperativo | null>(null)
+  const [cola, setCola] = useState<FilaCola[]>([])
+  const [actuales, setActuales] = useState<FilaActual[]>([])
+  const [listo, setListo] = useState(false)
+  const [ultimoCodigo, setUltimoCodigo] = useState<string | null>(null)
+
+  const cargar = useCallback(async () => {
+    try {
+      const [p, c, a] = await Promise.all([
+        obtenerPeriodoAbierto(),
+        listarCola(),
+        listarTurnosActuales(),
+      ])
+      setPeriodo(p)
+      setCola(c)
+      setActuales(a)
+      setListo(true)
+
+      // Detectar el último turno nuevo (el de mayor folio en la cola)
+      if (c.length > 0) {
+        const maxFolio = c.reduce((max, t) => Math.max(max, t.folio), 0)
+        const ultimo = c.find((t) => t.folio === maxFolio)
+        if (ultimo) {
+          setUltimoCodigo(ultimo.codigo_turno)
+        }
+      }
+    } catch (err) {
+      console.error('TurnosVivos: error al cargar', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    void cargar()
+    const id = setInterval(cargar, 5_000)
+    return () => clearInterval(id)
+  }, [cargar])
+
+  const totalEnCola = cola.length
+  const totalEnAtencion = actuales.length
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6">
+      {/* Header */}
+      <header className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Turnos en vivo</h1>
+          <p className="text-sm text-slate-500">
+            RECEPCIÓN — Actualización automática cada 5 segundos
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {periodo ? (
+            <ChipRecepcion texto="Periodo abierto" tono="verde" />
+          ) : (
+            <ChipRecepcion texto="Sin periodo" tono="gris" />
+          )}
+          <a
+            href="/admin/recepcion"
+            className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-300 transition-colors"
+          >
+            ← Volver a recepción
+          </a>
+        </div>
+      </header>
+
+      {/* Resumen rápido */}
+      <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-slate-500">
+            <IconoCola />
+            <span className="text-xs font-medium">En espera</span>
+          </div>
+          <p className="mt-1 text-3xl font-black text-slate-900">{totalEnCola}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-slate-500">
+            <IconoAtencion />
+            <span className="text-xs font-medium">En atención</span>
+          </div>
+          <p className="mt-1 text-3xl font-black text-slate-900">{totalEnAtencion}</p>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-slate-500">
+            <IconoTurno />
+            <span className="text-xs font-medium">Último turno</span>
+          </div>
+          <p className="mt-1 text-xl font-black text-slate-900 truncate">
+            {ultimoCodigo || '—'}
+          </p>
+        </div>
+      </div>
+
+      {/* Grid: Cola + Atención */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* COLA DE ESPERA */}
+        <TarjetaSeccion
+          titulo="Cola de espera"
+          icono={<IconoCola />}
+          badge={
+            <ChipRecepcion texto={`${totalEnCola} turnos`} tono={totalEnCola > 0 ? 'amarillo' : 'gris'} />
+          }
+        >
+          {!listo ? (
+            <Esqueleto filas={5} />
+          ) : cola.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <IconoVacio />
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                No hay turnos en espera.
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Los turnos emitidos aparecerán aquí.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-4" style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(148,163,184,0.5) rgba(241,245,249,0.5)',
+            }}>
+              {cola.map((t) => (
+                <div
+                  key={t.turno_id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {t.clave_tramite} — {t.denominacion_tramite}
+                    </p>
+                  </div>
+                  <div className="ml-4 flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-700">
+                      #{t.posicion}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TarjetaSeccion>
+
+        {/* EN ATENCIÓN */}
+        <TarjetaSeccion
+          titulo="En atención"
+          icono={<IconoAtencion />}
+          badge={
+            <ChipRecepcion texto={`${totalEnAtencion} activos`} tono={totalEnAtencion > 0 ? 'verde' : 'gris'} />
+          }
+        >
+          {!listo ? (
+            <Esqueleto filas={5} />
+          ) : actuales.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <IconoVacio />
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                No hay turnos en atención.
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Los turnos llamados aparecerán aquí.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-4" style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(148,163,184,0.5) rgba(241,245,249,0.5)',
+            }}>
+              {actuales.map((t) => (
+                <div
+                  key={t.turno_id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {t.denominacion_tramite}
+                    </p>
+                    {t.denominacion_modulo && (
+                      <p className="text-xs text-slate-400">
+                        {t.denominacion_modulo}
+                      </p>
+                    )}
+                  </div>
+                  <div className="ml-4 flex items-center gap-2">
+                    <ChipEstado estado={t.estado} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TarjetaSeccion>
+      </div>
+    </div>
+  )
+}

@@ -30,6 +30,7 @@ const Estadisticas = lazy(() => import('./admin/Estadisticas'))
 const Perfil = lazy(() => import('./admin/Perfil'))
 const TurnoCiudadano = lazy(() => import('./ciudadano/TurnoCiudadano'))
 const PantallaPublica = lazy(() => import('./ciudadano/PantallaPublica'))
+const TurnosVivos = lazy(() => import('./admin/TurnosVivos'))
 
 /**
  * SITUR — Enrutado.
@@ -187,6 +188,12 @@ export default function App() {
           <Route path="/turno/:token" element={<TurnoCiudadano />} />
           <Route path="/pantalla" element={<PantallaPublica />} />
 
+          {/* Turnos en vivo: pantalla independiente para RECEPCIÓN (se abre en otra pestaña) */}
+          <Route
+            path="/admin/turnos-vivos"
+            element={<SoloOperador><TurnosVivos /></SoloOperador>}
+          />
+
           <Route path="*" element={<NoEncontrado />} />
         </Routes>
       </Suspense>
@@ -225,6 +232,8 @@ function tituloDeRuta(ruta: string): string | null {
       return 'Acceso'
     case '/admin/recepcion':
       return 'Recepción'
+    case '/admin/turnos-vivos':
+      return 'Turnos en vivo'
     case '/admin/turnos':
       return 'Turnos'
     case '/admin/usuarios':
