@@ -4337,48 +4337,6 @@ button.boton-pildora {
   min-height: 100vh;
 }
 
-/* Header azul con gradiente — usado por Disposicion.tsx cuando esRecepcion */
-.recepcion-header-gradient {
-  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-  color: #fff;
-  box-shadow: 0 4px 20px rgba(30, 58, 95, 0.3);
-}
-
-.recepcion-header-subtitulo {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0;
-}
-
-.recepcion-header-titulo {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin: 0.25rem 0 0.25rem;
-  line-height: 1.1;
-}
-
-.recepcion-header-descripcion {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0;
-}
-
-.recepcion-header-reloj {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-}
-
-.recepcion-header-fecha {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0;
-}
 
 /* Contenido principal con fondo claro */
 .recepcion-main {

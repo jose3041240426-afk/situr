@@ -7,16 +7,6 @@ import { Modal } from '../components/ui'
 import { Avatar } from '../components/ui/avatar'
 import EsqueletoPantalla from './Esqueletos'
 
-function ahoraReloj(): string {
-  return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-}
-
-function ahoraFecha(): string {
-  const d = new Date()
-  const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  return `${dias[d.getDay()]}, ${d.getDate()}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
-}
-
 /**
  * Marco del panel administrativo.
  *
@@ -267,18 +257,6 @@ export default function Disposicion({
     setYaCambiado(true)
   }, [colapsado])
 
-  // Reloj y fecha en tiempo real para RECEPCIÓN
-  const [reloj, setReloj] = useState(ahoraReloj)
-  const [fechaStr, setFechaStr] = useState(ahoraFecha)
-  useEffect(() => {
-    if (!esRecepcion) return
-    const id = setInterval(() => {
-      setReloj(ahoraReloj())
-      setFechaStr(ahoraFecha())
-    }, 1000)
-    return () => clearInterval(id)
-  }, [esRecepcion])
-
   return (
     <div className="min-h-screen lg:flex">
       {/*
@@ -454,11 +432,7 @@ export default function Disposicion({
           El `backdrop-blur` se queda: sirve para el contenido que pasa por
           debajo al hacer scroll, aunque el relleno ya no sea translúcido.
         */}
-        <header className={`sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 backdrop-blur-md lg:px-8 ${
-          esRecepcion
-            ? 'px-4 py-5 recepcion-header-gradient'
-            : 'bg-navy-900 px-4 py-3'
-        }`}>
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-navy-900 px-4 py-3 backdrop-blur-md lg:px-8">
           <button
             type="button"
             onClick={() => setAbierto((v) => !v)}
@@ -470,48 +444,23 @@ export default function Disposicion({
             </svg>
           </button>
 
-          {esRecepcion ? (
-            /* Header estilo RECEPCIÓN: gradiente azul con subtítulo, título, descripción, reloj y avatar */
-            <div className="flex w-full items-center justify-between">
-              <div>
-                <p className="recepcion-header-subtitulo">PANEL DE PERSONAL</p>
-                <h1 className="recepcion-header-titulo">{tituloActual}</h1>
-                <p className="recepcion-header-descripcion">
-                  Apertura de periodos, emisión de turnos y consulta de atención.
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="recepcion-header-reloj">{reloj}</p>
-                <p className="recepcion-header-fecha">{fechaStr}</p>
-                {operador && (
-                  <div className="mt-1 inline-flex items-center justify-center">
-                    <Avatar nombre={nombreCompleto(operador)} tamano="sm" />
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Header estándar */
-            <>
-              <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
-              {operador && (
-                <NavLink
-                  to="/admin/perfil"
-                  aria-label={`Mi perfil de ${operador.nombres}`}
-                  title="Mi perfil"
-                  className="ml-auto flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
-                >
-                  <Avatar
-                    nombre={nombreCompleto(operador)}
-                    tamano="sm"
-                    etiqueta={`Avatar de ${nombreCompleto(operador)}`}
-                  />
-                  <span className="hidden max-w-40 truncate text-sm font-semibold text-white lg:block">
-                    {operador.nombres}
-                  </span>
-                </NavLink>
-              )}
-            </>
+          <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
+          {operador && (
+            <NavLink
+              to="/admin/perfil"
+              aria-label={`Mi perfil de ${operador.nombres}`}
+              title="Mi perfil"
+              className="ml-auto flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
+            >
+              <Avatar
+                nombre={nombreCompleto(operador)}
+                tamano="sm"
+                etiqueta={`Avatar de ${nombreCompleto(operador)}`}
+              />
+              <span className="hidden max-w-40 truncate text-sm font-semibold text-white lg:block">
+                {operador.nombres}
+              </span>
+            </NavLink>
           )}
         </header>
         {/*
