@@ -838,8 +838,10 @@ export default function Recepcion() {
             {/* Botón emitir fijo al fondo */}
             {!modoMasivo && (
               <div style={{
-                position: 'sticky',
+                position: 'absolute',
                 bottom: 0,
+                left: 0,
+                right: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
