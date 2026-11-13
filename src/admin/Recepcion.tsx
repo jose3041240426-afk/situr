@@ -512,7 +512,7 @@ export default function Recepcion() {
           </TarjetaSeccion>
 
           {/* B. EMITIR TURNO */}
-          <TarjetaSeccion titulo="Emitir turno" icono={<IconoSurtidor />}>
+          <TarjetaSeccion titulo="Emitir turno" icono={<IconoSurtidor />} className="recepcion-tarjeta-fija">
             <div className="space-y-4">
               {!periodoAbierto && periodoListo && (
                 <Aviso tono="alerta">

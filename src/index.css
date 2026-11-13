@@ -4426,6 +4426,17 @@ button.boton-pildora {
   padding: 1.25rem;
 }
 
+/* Tarjeta con altura fija y scroll interno (para "Emitir turno") */
+.recepcion-tarjeta-fija {
+  height: 380px;
+}
+
+.recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo {
+  max-height: calc(380px - 3.75rem);
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
 /* Periodo abierto — vista con datos grandes */
 .recepcion-periodo-abierto {
   display: flex;
