@@ -271,17 +271,24 @@ export default function ColaVentanillas() {
         ))}
       </section>
 
-      {/* Modal de opciones del turno */}
+      {/* Modal de opciones del turno — información completa */}
       {modalTurno && modalVentanilla && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-bg-entrada">
-          <div className="tarjeta w-full max-w-md p-6 modal-entrada">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gris-900">
-                {modalTurno.turno_codigo} — {modalVentanilla.codigo}
-              </h3>
+          <div className="tarjeta w-full max-w-lg p-0 modal-entrada overflow-hidden">
+
+            {/* Header del modal */}
+            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-gris-50">
+              <div>
+                <h3 className="text-lg font-bold text-gris-900">
+                  {modalTurno.turno_codigo}
+                </h3>
+                <p className="text-xs text-gris-500">
+                  Ventanilla {modalVentanilla.codigo}
+                </p>
+              </div>
               <button
                 onClick={cerrarModal}
-                className="rounded-lg p-1 text-gris-400 hover:bg-gris-100 hover:text-gris-600"
+                className="rounded-lg p-1 text-gris-400 hover:bg-gris-200 hover:text-gris-600 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
                   <path d="M0 0h24v24H0z" fill="none" />
@@ -290,21 +297,133 @@ export default function ColaVentanillas() {
               </button>
             </div>
 
-            {modalTurno.turno_denominacion_tramite && (
-              <p className="mb-4 text-sm text-gris-600">{modalTurno.turno_denominacion_tramite}</p>
-            )}
+            {/* Cuerpo con datos del turno */}
+            <div className="px-5 py-4 space-y-4">
 
-            {/* Timer de aviso */}
-            {timerActivo && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-                <div className="text-xs text-amber-600">Aviso al siguiente en</div>
-                <div className="text-2xl font-bold text-amber-700 font-mono">
-                  {formatoTiempo(timerSegundos)}
+              {/* Trámite y prioridad */}
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-gris-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" viewBox="0 0 24 24">
+                    <path d="M0 0h24v24H0z" fill="none"/>
+                    <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V9zM6 20V7h5v6h6v7z"/>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-gris-900">
+                    {modalTurno.turno_denominacion_tramite || 'Sin trámite'}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {modalTurno.turno_clave_tramite && (
+                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {modalTurno.turno_clave_tramite}
+                      </span>
+                    )}
+                    {modalTurno.turno_folio != null && (
+                      <span className="text-xs text-gris-500">Folio {modalTurno.turno_folio}</span>
+                    )}
+                    {modalTurno.turno_prioridad && modalTurno.turno_prioridad !== 'NORMAL' && (
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                        modalTurno.turno_prioridad === 'URGENTE'
+                          ? 'bg-rojo-100 text-rojo-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {modalTurno.turno_prioridad === 'URGENTE' ? 'Urgente' : 'Preferente'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="flex flex-col gap-2">
+              {/* Estado */}
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-gris-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" viewBox="0 0 24 24">
+                    <path d="M0 0h24v24H0z" fill="none"/>
+                    <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-4.5v-5a1 1 0 0 0-2 0v5a1 1 0 0 0 1 1h.5a1 1 0 0 0 0-2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-gris-900">Estado</div>
+                  <div className="text-sm text-gris-600">
+                    {modalTurno.turno_estado === 'ASIGNED' && 'Asignado — esperando llamada'}
+                    {modalTurno.turno_estado === 'CALLED' && 'Llamado — esperando atención'}
+                    {modalTurno.turno_estado === 'SERVING' && 'En atención'}
+                    {modalTurno.turno_estado === 'WAITING' && 'En espera'}
+                    {modalTurno.turno_estado === 'COMPLETED' && 'Completado'}
+                    {modalTurno.turno_estado === 'CANCELLED' && 'Cancelado'}
+                    {modalTurno.turno_estado === 'SKIPPED' && 'Saltado'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Línea de tiempo */}
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-gris-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" viewBox="0 0 24 24">
+                    <path d="M0 0h24v24H0z" fill="none"/>
+                    <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm.5-13h-1v6l4.7 3.2.7-.9-4-2.8z"/>
+                  </svg>
+                </div>
+                <div className="flex-1 space-y-2">
+                  {modalTurno.turno_creado_en && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gris-500">Emisión</span>
+                      <span className="font-medium text-gris-700">
+                        {new Date(modalTurno.turno_creado_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                  {modalTurno.turno_llamado_en && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gris-500">Llamado</span>
+                      <span className="font-medium text-gris-700">
+                        {new Date(modalTurno.turno_llamado_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                  {modalTurno.turno_inicio_atencion && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gris-500">Inicio atención</span>
+                      <span className="font-medium text-gris-700">
+                        {new Date(modalTurno.turno_inicio_atencion).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                  {!modalTurno.turno_llamado_en && !modalTurno.turno_inicio_atencion && (
+                    <div className="text-sm text-gris-400 italic">Sin registros de tiempo aún</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Operador */}
+              {modalTurno.operador_nombres && (
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 text-gris-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1.1em" height="1.1em" viewBox="0 0 24 24">
+                      <path d="M0 0h24v24H0z" fill="none"/>
+                      <path fill="currentColor" d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5s-5 2.3-5 5s2.3 5 5 5zm0 2c-2.7 0-7 1.3-7 4v1h14v-1c0-2.7-4.3-4-7-4z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gris-900">Operador</div>
+                    <div className="text-sm text-gris-600">{modalTurno.operador_nombres}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Timer de aviso */}
+              {timerActivo && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                  <div className="text-xs text-amber-600">Aviso al siguiente en</div>
+                  <div className="text-2xl font-bold text-amber-700 font-mono">
+                    {formatoTiempo(timerSegundos)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Acciones */}
+            <div className="border-t border-gris-200 bg-gris-50 px-5 py-4 space-y-2">
               {/* Llamar — solo si está ASIGNED */}
               {modalTurno.turno_estado === 'ASIGNED' && (
                 <button
@@ -347,6 +466,7 @@ export default function ColaVentanillas() {
                 {accionando ? 'Procesando…' : 'Eliminar turno'}
               </button>
             </div>
+
           </div>
         </div>
       )}

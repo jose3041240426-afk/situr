@@ -109,7 +109,15 @@ export interface TurnoAsignado {
   turno_id: string
   turno_codigo: string
   turno_estado: EstadoTurno | null
+  turno_clave_tramite: string | null
   turno_denominacion_tramite: string | null
+  turno_folio: number | null
+  turno_prioridad: PrioridadTurno | null
+  turno_creado_en: string | null
+  turno_llamado_en: string | null
+  turno_inicio_atencion: string | null
+  turno_modulo_codigo: string | null
+  turno_modulo_denominacion: string | null
   minutos_en_ventanilla: number | null
   operador_nombres: string | null
 }
