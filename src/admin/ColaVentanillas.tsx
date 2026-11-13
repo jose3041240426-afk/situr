@@ -115,7 +115,7 @@ const t = await tokenTurnoParaQr(turnoId)
                 className="min-w-[150px] shrink-0 rounded-2xl border border-gris-200 bg-white p-3 shadow-sm"
               >
                 <div className="text-xs text-gris-500">Pos. {t.posicion}</div>
-                <div className="text-lg font-bold text-gris-900">{t.codigo}</div>
+                <div className="text-lg font-bold text-gris-900">{t.codigo_turno}</div>
                 <div className="text-xs text-gris-600">{t.tramite_denominacion}</div>
                 <span className="mt-1 inline-block rounded-full bg-gris-100 px-2 py-0.5 text-xs">
                   {ETIQUETA_PRIORIDAD[t.prioridad] ?? t.prioridad}
@@ -127,13 +127,18 @@ const t = await tokenTurnoParaQr(turnoId)
       </section>
 
       {/* Contenedores de ventanillas */}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {ventanillas.map((v: Ventanilla) => (
-          <div key={v.modulo_id} className="tarjeta flex flex-col gap-3 p-4">
+          <div key={v.modulo_id} className="tarjeta flex flex-col gap-3 p-4" style={{ minHeight: 320 }}>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-lg font-bold text-gris-900">{v.codigo}</div>
                 <div className="text-xs text-gris-500">{v.denominacion}</div>
+                {v.es_mia && (
+                  <span className="mt-1 inline-block rounded-full bg-azul-100 px-2 py-0.5 text-xs font-medium text-azul-700">
+                    Tu ventanilla
+                  </span>
+                )}
               </div>
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_ventanilla]}`}
@@ -161,7 +166,7 @@ const t = await tokenTurnoParaQr(turnoId)
                   {v.turno_estado === 'CALLED' && (
                     <button
                       className="boton-primario text-xs"
-                      disabled={ocupado === v.turno_id!}
+                      disabled={ocupado === v.turno_id! || !v.es_mia}
                       onClick={() => accionTurno(v.turno_id!, 'iniciar')}
                     >
                       Iniciar atención
@@ -170,7 +175,7 @@ const t = await tokenTurnoParaQr(turnoId)
                   {v.turno_estado === 'SERVING' && (
                     <button
                       className="boton-ok text-xs"
-                      disabled={ocupado === v.turno_id!}
+                      disabled={ocupado === v.turno_id! || !v.es_mia}
                       onClick={() => accionTurno(v.turno_id!, 'finalizar')}
                     >
                       Finalizar
@@ -185,7 +190,7 @@ const t = await tokenTurnoParaQr(turnoId)
                   </button>
                   <button
                     className="boton-peligro text-xs"
-                    disabled={ocupado === v.turno_id!}
+                    disabled={ocupado === v.turno_id! || !v.es_mia}
                     onClick={() => accionTurno(v.turno_id!, 'cancelar')}
                   >
                     Cancelar
@@ -198,7 +203,7 @@ const t = await tokenTurnoParaQr(turnoId)
 
             <button
               className="boton-primario w-full"
-              disabled={!v.disponible || ocupado === v.modulo_id}
+              disabled={!v.disponible || !v.es_mia || ocupado === v.modulo_id}
               onClick={() => solicitar(v.modulo_id)}
             >
               {ocupado === v.modulo_id ? 'Solicitando…' : 'Solicitar siguiente turno'}

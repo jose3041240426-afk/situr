@@ -95,7 +95,7 @@ export interface Configuracion {
 export interface FilaColaVentanilla {
   posicion: number
   turno_id: string
-  codigo: string
+  codigo_turno: string
   prioridad: PrioridadTurno
   tramite_clave: string
   tramite_denominacion: string
@@ -112,6 +112,7 @@ export interface Ventanilla {
   activo: boolean
   estado_ventanilla: EstadoVentanilla
   disponible: boolean
+  es_mia: boolean
   ultima_asignacion_en: string | null
   turno_id: string | null
   turno_codigo: string | null

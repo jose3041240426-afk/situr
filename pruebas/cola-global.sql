@@ -45,19 +45,19 @@ BEGIN
     DELETE FROM periodos_operativos;
     DELETE FROM usuarios WHERE email LIKE '%@prueba.situr.test';
     DELETE FROM apellidos WHERE apellido LIKE 'PRUEBAOP%';
-    DELETE FROM modulos WHERE codigo LIKE 'M9%';
+    DELETE FROM modulos WHERE codigo LIKE 'V9%';
 
     INSERT INTO periodos_operativos (clave, fecha, estado)
     VALUES (current_date, current_date, 'ABIERTO');
 
     INSERT INTO modulos (codigo, denominacion, estado, activo)
-    VALUES ('M90', 'Ventanilla de prueba 1', 'ACTIVO', true),
-           ('M91', 'Ventanilla de prueba 2', 'ACTIVO', true),
-           ('M92', 'Ventanilla de prueba 3', 'ACTIVO', true);
+    VALUES ('V90', 'Ventanilla de prueba 1', 'ACTIVO', true),
+           ('V91', 'Ventanilla de prueba 2', 'ACTIVO', true),
+           ('V92', 'Ventanilla de prueba 3', 'ACTIVO', true);
 
-    SELECT id INTO v_m01 FROM modulos WHERE codigo = 'M90';
-    SELECT id INTO v_m02 FROM modulos WHERE codigo = 'M91';
-    SELECT id INTO v_m03 FROM modulos WHERE codigo = 'M92';
+    SELECT id INTO v_m01 FROM modulos WHERE codigo = 'V90';
+    SELECT id INTO v_m02 FROM modulos WHERE codigo = 'V91';
+    SELECT id INTO v_m03 FROM modulos WHERE codigo = 'V92';
 
     INSERT INTO apellidos (apellido)
     VALUES ('PRUEBAOP1'), ('PRUEBAOP2'), ('PRUEBAOP3');
@@ -152,15 +152,15 @@ ORDER BY
 
 -- Cada conexión es una sesión de psql aparte: se lanzan en paralelo.
 \! export PGHOST=127.0.0.1 PGUSER=postgres
-\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op1@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M90'))->>'codigo_turno' AS t1;" > /tmp/opencode/p1.txt 2>&1 &
-\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op2@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M91'))->>'codigo_turno' AS t2;" > /tmp/opencode/p2.txt 2>&1 &
-\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op3@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M92'))->>'codigo_turno' AS t3;" > /tmp/opencode/p3.txt 2>&1 &
+\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op1@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V90'))->>'codigo_turno' AS t1;" > /tmp/opencode/p1.txt 2>&1 &
+\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op2@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V91'))->>'codigo_turno' AS t2;" > /tmp/opencode/p2.txt 2>&1 &
+\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op3@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V92'))->>'codigo_turno' AS t3;" > /tmp/opencode/p3.txt 2>&1 &
 \! sleep 3
 \! wait
 \echo '--- lo que devolvió cada uno ---'
-\echo 'M90:'; cat /tmp/opencode/p1.txt
-\echo 'M91:'; cat /tmp/opencode/p2.txt
-\echo 'M92:'; cat /tmp/opencode/p3.txt
+\echo 'V90:'; cat /tmp/opencode/p1.txt
+\echo 'V91:'; cat /tmp/opencode/p2.txt
+\echo 'V92:'; cat /tmp/opencode/p3.txt
 
 \echo ''
 \echo '--- comprobación: distintos y consecutivos en la cola global ---'
@@ -194,7 +194,7 @@ DECLARE
 BEGIN
     PERFORM set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op1@prueba.situr.test'), false);
     BEGIN
-        v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M90'));
+        v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V90'));
         RAISE EXCEPTION 'FALLO: la ventanilla ocupada recibio un turno: %', v_res;
     EXCEPTION
         WHEN SQLSTATE 'P0001' THEN
@@ -217,12 +217,12 @@ BEGIN
 
     -- Terminar el turno que tenía asignado.
     SELECT id INTO v_turno FROM turnos
-     WHERE modulo_id = (SELECT id FROM modulos WHERE codigo='M90')
+     WHERE modulo_id = (SELECT id FROM modulos WHERE codigo='V90')
        AND estado = 'CALLED'
      LIMIT 1;
 
     IF v_turno IS NULL THEN
-        RAISE EXCEPTION 'FALLO: la ventanilla M90 no tenía turno asignado.';
+        RAISE EXCEPTION 'FALLO: la ventanilla V90 no tenía turno asignado.';
     END IF;
 
     PERFORM public.iniciar_atencion_turno(v_turno);
@@ -232,7 +232,7 @@ BEGIN
         (SELECT estado FROM turnos WHERE id = v_turno);
 
     -- Ahora sí puede pedir otro.
-    v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M90'));
+    v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V90'));
     RAISE NOTICE 'OK: la ventanilla vuelve a pedir y recibe %', v_res->>'codigo_turno';
 END;
 $$;
@@ -257,7 +257,7 @@ BEGIN
 
     BEGIN
         -- La llamada se deshace: se simula con una excepción dentro.
-        PERFORM public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M91'));
+        PERFORM public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V91'));
         RAISE EXCEPTION 'FALLO simulado: la transacción se deshace';
     EXCEPTION
         WHEN OTHERS THEN
@@ -344,7 +344,7 @@ BEGIN
     RAISE NOTICE 'Turnos en espera: %', v_espera;
 
     BEGIN
-        v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M90'));
+        v_res := public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V90'));
         RAISE NOTICE 'OK: la respuesta dice «servido: %, motivo: %»',
             v_res->>'servido', v_res->>'motivo';
     EXCEPTION
@@ -387,12 +387,12 @@ BEGIN
 END;
 $$;
 
-\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op2@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M91'))->>'codigo_turno' AS t2;" > /tmp/opencode/q1.txt 2>&1 &
-\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op3@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='M92'))->>'codigo_turno' AS t3;" > /tmp/opencode/q2.txt 2>&1 &
+\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op2@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V91'))->>'codigo_turno' AS t2;" > /tmp/opencode/q1.txt 2>&1 &
+\! psql -X -q -d situr_test -c "SELECT set_config('app.uid', (SELECT id::text FROM usuarios WHERE email='op3@prueba.situr.test'), false); SELECT public.solicitar_turno_ventanilla((SELECT id FROM modulos WHERE codigo='V92'))->>'codigo_turno' AS t3;" > /tmp/opencode/q2.txt 2>&1 &
 \! sleep 3
 \! wait
-\echo '--- M91:'; cat /tmp/opencode/q1.txt
-\echo '--- M92:'; cat /tmp/opencode/q2.txt
+\echo '--- V91:'; cat /tmp/opencode/q1.txt
+\echo '--- V92:'; cat /tmp/opencode/q2.txt
 \echo '--- el turno único no puede estar en dos ventanillas ---'
 SELECT
     count(*) FILTER (WHERE estado <> 'WAITING') AS asignados,
@@ -410,7 +410,7 @@ DELETE FROM folios;
 DELETE FROM periodos_operativos WHERE clave = current_date;
 DELETE FROM usuarios WHERE email LIKE '%@prueba.situr.test';
 DELETE FROM apellidos WHERE apellido LIKE 'PRUEBAOP%';
-DELETE FROM modulos WHERE codigo LIKE 'M9%';
+DELETE FROM modulos WHERE codigo LIKE 'V9%';
 
 ALTER TABLE auditoria ENABLE TRIGGER trg_auditoria_solo_insercion;
 \echo 'Hecho.'
