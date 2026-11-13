@@ -46,6 +46,7 @@ interface ContextoAuth {
   operador: Operador | null
   cargando: boolean
   esAdministrador: boolean
+  esRecepcion: boolean
   puedeOperar: boolean
   mfaPendiente: boolean
   /**
@@ -107,6 +108,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Session | null>(null)
   const [operador, setOperador] = useState<Operador | null>(null)
   const [esAdministrador, setEsAdministrador] = useState(false)
+  const [esRecepcion, setEsRecepcion] = useState(false)
   const [puedeOperar, setPuedeOperar] = useState(false)
   const [mfaRequerido, setMfaRequerido] = useState(false)
   const [factorMfa, setFactorMfa] = useState<string | null>(null)
@@ -125,6 +127,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     if (!data.session) {
       setOperador(null)
       setEsAdministrador(false)
+      setEsRecepcion(false)
       setPuedeOperar(false)
       setCargando(false)
       return
@@ -140,6 +143,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       // está autorizado (RF-003 solo habilita a usuarios dados de alta).
       setOperador(null)
       setEsAdministrador(false)
+      setEsRecepcion(false)
       setPuedeOperar(false)
       setCargando(false)
       return
@@ -161,6 +165,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     if (errFila || !fila) {
       setOperador(null)
       setEsAdministrador(false)
+      setEsRecepcion(false)
       setPuedeOperar(false)
       setCargando(false)
       return
@@ -205,11 +210,13 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       actualizadoEn: f.actualizado_en,
     })
 
-    const [{ data: esAdmin }, { data: puedeOp }] = await Promise.all([
+    const [{ data: esAdmin }, { data: esRec }, { data: puedeOp }] = await Promise.all([
       supabase.rpc('fn_es_administrador'),
+      supabase.rpc('fn_es_recepcion'),
       supabase.rpc('fn_puede_operar_turnos'),
     ])
     setEsAdministrador(esAdmin === true)
+    setEsRecepcion(esRec === true)
     setPuedeOperar(puedeOp === true)
 
     /*
@@ -366,6 +373,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     setOperador(null)
     setSesion(null)
     setEsAdministrador(false)
+    setEsRecepcion(false)
     setPuedeOperar(false)
     setMfaRequerido(false)
     setFactorMfa(null)
@@ -389,6 +397,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       operador,
       cargando,
       esAdministrador,
+      esRecepcion,
       puedeOperar,
       // RF-026: la inscripción de MFA es obligatoria en el primer acceso.
       mfaPendiente: Boolean(operador?.activo) && !operador?.mfaHabilitado,
@@ -407,6 +416,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       operador,
       cargando,
       esAdministrador,
+      esRecepcion,
       puedeOperar,
       mfaRequerido,
       factorMfa,

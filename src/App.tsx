@@ -22,6 +22,7 @@ import { Aviso } from './components/ui'
  * mala conexión, y no tiene por qué descargar la consola de administración.
  */
 const Consola = lazy(() => import('./admin/Consola'))
+const Recepcion = lazy(() => import('./admin/Recepcion'))
 const GestionUsuarios = lazy(() => import('./admin/GestionUsuarios'))
 const Catalogos = lazy(() => import('./admin/Catalogos'))
 const Historial = lazy(() => import('./admin/Historial'))
@@ -70,6 +71,36 @@ function SoloOperador({ children }: { children: ReactNode }) {
   return sesion ? <>{children}</> : <Navigate to="/admin" replace />
 }
 
+/**
+ * Redirige al RECEPCIÓN hacia su pantalla simplificada.
+ *
+ * Un usuario con rol RECEPCIÓN que escriba /admin/turnos a mano
+ * es redirigido a /admin/recepcion. No es la defensa real —esa está
+ * en la base con RLS y RPC—; evita mostrar la consola completa a quien
+ * no la necesita.
+ */
+function RedirigirRecepcion({ children }: { children: ReactNode }) {
+  const { cargando, esRecepcion } = useAuth()
+  if (cargando) return <Cargando />
+  return esRecepcion ? <Navigate to="/admin/recepcion" replace /> : <>{children}</>
+}
+
+/**
+ * Ruta raíz: redirige según el rol del usuario.
+ *
+ * RECEPCIÓN → /admin/recepcion
+ * Demás roles → /admin/turnos (consola normal)
+ * Sin sesión → /admin (login)
+ */
+function RedirigirPorRol() {
+  const { cargando, sesion, esRecepcion } = useAuth()
+  if (cargando) return <Cargando />
+  if (!sesion) return <Navigate to="/admin" replace />
+  return esRecepcion
+    ? <Navigate to="/admin/recepcion" replace />
+    : <Navigate to="/admin/turnos" replace />
+}
+
 export default function App() {
   const { pathname } = useLocation()
   useTitulo(tituloDeRuta(pathname))
@@ -110,7 +141,7 @@ export default function App() {
       */}
       <Suspense fallback={<Cargando />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/admin" replace />} />
+          <Route path="/" element={<RedirigirPorRol />} />
 
           <Route path="/admin" element={<Entrar />} />
 
@@ -121,7 +152,14 @@ export default function App() {
             cada cambio de pantalla, y además se repintaba de más.
           */}
           <Route element={<SoloOperador><Disposicion /></SoloOperador>}>
-            <Route path="/admin/turnos" element={<Consola />} />
+            {/* RECEPCIÓN ve su pantalla simplificada */}
+            <Route path="/admin/recepcion" element={<Recepcion />} />
+
+            {/* El resto de rutas: RECEPCIÓN es redirigido a su pantalla */}
+            <Route
+              path="/admin/turnos"
+              element={<RedirigirRecepcion><Consola /></RedirigirRecepcion>}
+            />
             <Route
               path="/admin/usuarios"
               element={
@@ -138,8 +176,14 @@ export default function App() {
                 </SoloAdministrador>
               }
             />
-            <Route path="/admin/historial" element={<Historial />} />
-            <Route path="/admin/estadisticas" element={<Estadisticas />} />
+            <Route
+              path="/admin/historial"
+              element={<RedirigirRecepcion><Historial /></RedirigirRecepcion>}
+            />
+            <Route
+              path="/admin/estadisticas"
+              element={<RedirigirRecepcion><Estadisticas /></RedirigirRecepcion>}
+            />
             <Route path="/admin/perfil" element={<Perfil />} />
           </Route>
 

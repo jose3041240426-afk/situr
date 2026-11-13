@@ -24,17 +24,27 @@ import EsqueletoPantalla from './Esqueletos'
  * existe para no ofrecer puertas que no se abren.
  */
 const SECCIONES = [
-  { a: '/admin/turnos', txt: 'Turnos', icono: IconoTurnos, soloAdmin: false },
-  { a: '/admin/usuarios', txt: 'Usuarios', icono: IconoUsuarios, soloAdmin: true },
-  { a: '/admin/catalogos', txt: 'Catálogos', icono: IconoCatalogos, soloAdmin: true },
-  { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial, soloAdmin: false },
-  { a: '/admin/estadisticas', txt: 'Estadísticas', icono: IconoEstadisticas, soloAdmin: false },
+  { a: '/admin/turnos', txt: 'Turnos', icono: IconoTurnos, soloAdmin: false, soloRecepcion: false },
+  { a: '/admin/usuarios', txt: 'Usuarios', icono: IconoUsuarios, soloAdmin: true, soloRecepcion: false },
+  { a: '/admin/catalogos', txt: 'Catálogos', icono: IconoCatalogos, soloAdmin: true, soloRecepcion: false },
+  { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial, soloAdmin: false, soloRecepcion: false },
+  { a: '/admin/estadisticas', txt: 'Estadísticas', icono: IconoEstadisticas, soloAdmin: false, soloRecepcion: false },
   /*
    * «Mi perfil» va el último y NO lleva `soloAdmin`: la ficha de la cuenta
    * es de todo operador, y hasta de uno que no pueda operar. Es la pantalla
    * que dice quién eres y qué rango tienes.
    */
-  { a: '/admin/perfil', txt: 'Mi perfil', icono: IconoPerfil, soloAdmin: false },
+  { a: '/admin/perfil', txt: 'Mi perfil', icono: IconoPerfil, soloAdmin: false, soloRecepcion: false },
+]
+
+/**
+ * Menú reducido para RECEPCIÓN.
+ *
+ * Solo muestra «Mi perfil»: la pantalla de recepción ya contiene
+ * apertura de periodo, emisión y consulta de atención en un solo lugar.
+ */
+const SECCIONES_RECEPCION = [
+  { a: '/admin/perfil', txt: 'Mi perfil', icono: IconoPerfil, soloAdmin: false, soloRecepcion: false },
 ]
 
 /**
@@ -148,7 +158,7 @@ export default function Disposicion({
   titulo?: string
   children?: ReactNode
 }) {
-  const { operador, salir, esAdministrador } = useAuth()
+  const { operador, salir, esAdministrador, esRecepcion } = useAuth()
 
   /*
    * Las secciones que este usuario puede ver, memorizadas.
@@ -158,8 +168,8 @@ export default function Disposicion({
    * animación) cada vez que cambia cualquier cosa en la pantalla.
    */
   const visibles = useMemo(
-    () => SECCIONES.filter((s) => !s.soloAdmin || esAdministrador),
-    [esAdministrador],
+    () => esRecepcion ? SECCIONES_RECEPCION : SECCIONES.filter((s) => !s.soloAdmin || esAdministrador),
+    [esAdministrador, esRecepcion],
   )
   const navegar = useNavigate()
   const [abierto, setAbierto] = useState(false)
