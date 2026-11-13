@@ -229,7 +229,17 @@ export default function ColaVentanillas() {
             {v.turnos_asignados.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {v.turnos_asignados.map((t: TurnoAsignado) => (
-                  <div key={t.turno_id} className="turno-entrada rounded-xl bg-gris-50 p-3">
+                  <button
+                    key={t.turno_id}
+                    type="button"
+                    onClick={() => {
+                      setModalTurno(t)
+                      setModalVentanilla(v)
+                      setTimerSegundos(0)
+                      setTimerActivo(false)
+                    }}
+                    className="turno-entrada w-full text-left rounded-xl bg-gris-50 p-3 cursor-pointer hover:bg-gris-100 transition-colors"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
@@ -237,23 +247,8 @@ export default function ColaVentanillas() {
                           <div className="text-xs text-gris-600">{t.turno_denominacion_tramite}</div>
                         )}
                       </div>
-                      <button
-                        onClick={() => {
-                          setModalTurno(t)
-                          setModalVentanilla(v)
-                          setTimerSegundos(0)
-                          setTimerActivo(false)
-                        }}
-                        className="rounded-lg p-2 text-gris-500 hover:bg-gris-200 hover:text-gris-700 transition-colors"
-                        title="Opciones del turno"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
-                          <path d="M0 0h24v24H0z" fill="none" />
-                          <path fill="currentColor" fill-rule="evenodd" d="M13.664 6.343c0 .414.336.75.75.75h2.493v2.493a.75.75 0 0 0 1.5 0V6.343a.75.75 0 0 0-.75-.75h-3.243a.75.75 0 0 0-.75.75m3.993 7.321a.75.75 0 0 0-.75.75v2.493h-2.493a.75.75 0 1 0 0 1.5h3.243a.75.75 0 0 0 .75-.75v-3.243a.75.75 0 0 0-.75-.75m-11.314 0a.75.75 0 0 1 .75.75v2.493h2.493a.75.75 0 0 1 0 1.5H6.343a.75.75 0 0 1-.75-.75v-3.243a.75.75 0 0 1 .75-.75m3.993-7.321a.75.75 0 0 1-.75.75H7.093v2.493a.75.75 0 1 1-1.5 0V6.343a.75.75 0 0 1 .75-.75h3.243a.75.75 0 0 1 .75.75" clip-rule="evenodd" />
-                        </svg>
-                      </button>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
