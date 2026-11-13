@@ -1532,9 +1532,8 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
-  /* 15px, no los 20 del original: dentro de la tarjeta de la consola ese
-     tamaño se comía la barra de acciones. */
-  font-size: 15px;
+  /* 13px para modal compacto del operador; 15px era para la consola. */
+  font-size: 13px;
   font-family: inherit;
   font-weight: 700;
   /* Mismo azul que `.boton-primario` («Iniciar atención»), para que el
@@ -1542,16 +1541,12 @@ body {
   background: var(--color-azul-500);
   color: #fff;
   /*
-   * Relleno HORIZONTAL SIMÉTRICO (0.9em).
-   *
-   * Antes el derecho era 1.05em y el izquierdo 0.9em: con el texto delante no
-   * se notaba, pero al desaparecer el texto queda solo el icono, y ese
-   * desequilibrio de 0.15em lo pegaba al borde derecho. Con los dos lados
-   * iguales el icono respira igual por los dos lados.
+   * Relleno HORIZONTAL SIMÉTRICO (0.7em).
+   * Compacto para el modal de turnos asignados.
    */
-  padding: 0.7em 0.9em;
+  padding: 0.5em 0.7em;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
   /* Sin `all` como en el original: `all` también transiciona `display` y
@@ -1594,7 +1589,7 @@ body {
  */
 .boton-llamar-envoltura {
   position: absolute;
-  left: 0.9em;
+  left: 0.7em;
   top: 50%;
   margin-top: -0.575em;
   display: grid;
