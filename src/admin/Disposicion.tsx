@@ -40,10 +40,13 @@ const SECCIONES = [
 /**
  * Menú reducido para RECEPCIÓN.
  *
- * Solo muestra «Mi perfil»: la pantalla de recepción ya contiene
- * apertura de periodo, emisión y consulta de atención en un solo lugar.
+ * La pantalla de recepción (/admin/recepcion) contiene apertura de periodo,
+ * emisión y consulta de atención en un solo lugar. El menú lateral ofrece
+ * acceso rápido al historial y al perfil.
  */
 const SECCIONES_RECEPCION = [
+  { a: '/admin/recepcion', txt: 'Turnos', icono: IconoTurnos, soloAdmin: false, soloRecepcion: false },
+  { a: '/admin/historial', txt: 'Historial', icono: IconoHistorial, soloAdmin: false, soloRecepcion: false },
   { a: '/admin/perfil', txt: 'Mi perfil', icono: IconoPerfil, soloAdmin: false, soloRecepcion: false },
 ]
 

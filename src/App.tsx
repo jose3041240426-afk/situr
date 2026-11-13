@@ -176,10 +176,7 @@ export default function App() {
                 </SoloAdministrador>
               }
             />
-            <Route
-              path="/admin/historial"
-              element={<RedirigirRecepcion><Historial /></RedirigirRecepcion>}
-            />
+            <Route path="/admin/historial" element={<Historial />} />
             <Route
               path="/admin/estadisticas"
               element={<RedirigirRecepcion><Estadisticas /></RedirigirRecepcion>}
@@ -226,6 +223,8 @@ function tituloDeRuta(ruta: string): string | null {
   switch (ruta) {
     case '/admin':
       return 'Acceso'
+    case '/admin/recepcion':
+      return 'Recepción'
     case '/admin/turnos':
       return 'Turnos'
     case '/admin/usuarios':
