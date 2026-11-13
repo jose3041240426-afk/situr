@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   listarCola,
-  obtenerPeriodoAbierto,
 } from '../lib/rpc'
-import type { FilaCola, PeriodoOperativo } from '../lib/tipos'
+import type { FilaCola } from '../lib/tipos'
 import { Esqueleto } from '../components/ui'
 
 /**
@@ -92,22 +91,14 @@ function TarjetaSeccion({
 }
 
 export default function TurnosVivos() {
-  const [periodo, setPeriodo] = useState<PeriodoOperativo | null>(null)
   const [cola, setCola] = useState<FilaCola[]>([])
   const [listo, setListo] = useState(false)
-  const [actualizado, setActualizado] = useState<Date | null>(null)
 
   const cargar = useCallback(async () => {
     try {
-      const [p, c] = await Promise.all([
-        obtenerPeriodoAbierto(),
-        listarCola(),
-      ])
-      setPeriodo(p)
+      const c = await listarCola()
       setCola(c)
       setListo(true)
-      setActualizado(new Date())
-
     } catch (err) {
       console.error('TurnosVivos: error al cargar', err)
     }
@@ -124,32 +115,8 @@ export default function TurnosVivos() {
   return (
     <div className="min-h-screen bg-navy-900 p-6">
       {/* Header */}
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white">Turnos en vivo</h1>
-          <p className="text-sm text-gris-300 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            RECEPCIÓN — Actualización automática cada 5 segundos
-            {actualizado && (
-              <span className="text-gris-400 tabular-nums">
-                · última {actualizado.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {periodo ? (
-            <ChipRecepcion texto="Periodo abierto" tono="verde" />
-          ) : (
-            <ChipRecepcion texto="Sin periodo" tono="gris" />
-          )}
-          <a
-            href="/admin/recepcion"
-            className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
-          >
-            ← Volver a recepción
-          </a>
-        </div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-black text-white">Turnos en vivo</h1>
       </header>
 
       {/* Resumen rápido */}
@@ -163,8 +130,8 @@ export default function TurnosVivos() {
         </div>
       </div>
 
-      {/* Cola de espera */}
-      <div className="w-full">
+      {/* Grid: Cola en mitad izquierda */}
+      <div className="grid grid-cols-2 gap-6">
         {/* COLA DE ESPERA */}
         <TarjetaSeccion
           titulo="Cola de espera"
