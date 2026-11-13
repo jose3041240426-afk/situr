@@ -703,7 +703,7 @@ export default function Recepcion() {
               </div>
             )}
 
-            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'auto', minHeight: 0, position: 'relative' }}>
             <BloqueExpandible clave={modoMasivo}>
               {!modoMasivo ? (
                 <div>
@@ -835,15 +835,20 @@ export default function Recepcion() {
             )}
             </div>
 
-            {/* Botón emitir al fondo */}
+            {/* Botón emitir fijo al fondo */}
             {!modoMasivo && (
               <div style={{
+                position: 'sticky',
+                bottom: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginTop: 'auto',
                 paddingTop: 20,
+                paddingBottom: 4,
+                background: 'linear-gradient(to bottom, rgba(248,250,252,0.85) 0%, rgba(248,250,252,0.98) 100%)',
+                backdropFilter: 'blur(8px)',
                 borderTop: `1px solid ${C.line}`,
+                zIndex: 5,
               }}>
                 <span style={{ fontSize: 13, color: C.muted }}>
                   {tramiteSeleccionado
