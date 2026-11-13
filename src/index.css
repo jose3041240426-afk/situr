@@ -4334,6 +4334,7 @@ button.boton-pildora {
 .recepcion-layout {
   display: flex;
   flex-direction: column;
+  gap: 2rem;
   min-height: 100vh;
 }
 
