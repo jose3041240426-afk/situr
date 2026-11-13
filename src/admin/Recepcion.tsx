@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import BloqueExpandible from '../components/BloqueExpandible'
+import BotonChispa from '../components/BotonChispa'
 import BotonEmitir from '../components/BotonEmitir'
 import BotonRepartir from '../components/BotonRepartir'
 import CodigoQR from '../components/CodigoQR'
@@ -112,7 +113,7 @@ function Tarjeta({ children, style }: { children: React.ReactNode; style?: React
       style={{
         background: C.panel,
         borderRadius: 20,
-        boxShadow: '0 4px 20px rgba(18,60,124,0.08)',
+        boxShadow: '0 4px 20px rgba(18,60,124,0.24), 0 28px 60px -6px rgba(18,60,124,0.45), 0 0 0 1px rgba(18,60,124,0.08)',
         padding: 24,
         ...style,
       }}
@@ -585,11 +586,9 @@ export default function Recepcion() {
   return (
     <div
       style={{
-        background: `linear-gradient(180deg, #DBEAFE 0%, ${C.bg} 40%, #BFDBFE 100%)`,
         fontFamily: font,
         color: C.text,
         minHeight: '100%',
-        padding: '0 0 40px',
       }}
     >
       {/* Mensajes */}
@@ -604,8 +603,7 @@ export default function Recepcion() {
       {/* ======================================== */}
       {/* TARJETA SUPERIOR: Periodo operativo      */}
       {/* ======================================== */}
-      <div style={{ padding: '20px 24px 0' }}>
-        <Tarjeta style={{ marginBottom: 20 }}>
+      <Tarjeta style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <IconoCalendario />
             <div style={{ flexShrink: 0 }}>
@@ -622,12 +620,12 @@ export default function Recepcion() {
             {periodoAbierto && periodoListo && (
               <>
                 <BadgeInfo
-                  icono="📅"
+                  icono=""
                   etiqueta="Periodo"
                   valor={formatearFecha(periodoAbierto.clave)}
                 />
                 <BadgeInfo
-                  icono="🕐"
+                  icono=""
                   etiqueta="Inicio"
                   valor={periodoAbierto.hora_inicio ? new Date(periodoAbierto.hora_inicio).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
                 />
@@ -640,62 +638,22 @@ export default function Recepcion() {
             {/* Botón de acción al final */}
             <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
               {periodoAbierto ? (
-                <button
-                  type="button"
-                  onClick={() => void cerrar()}
-                  disabled={ocupado}
-                  style={{
-                    padding: '10px 24px',
-                    borderRadius: 12,
-                    border: `2px solid ${C.blue600}`,
-                    background: '#fff',
-                    color: C.blue600,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: ocupado ? 'not-allowed' : 'pointer',
-                    opacity: ocupado ? 0.5 : 1,
-                    fontFamily: font,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />
-                  </svg>
+                <BotonChispa tono="rojo" onClick={() => void cerrar()} disabled={ocupado}>
                   Cerrar periodo
-                </button>
+                </BotonChispa>
               ) : periodoListo ? (
-                <button
-                  type="button"
-                  onClick={() => void abrir()}
-                  disabled={ocupado}
-                  style={{
-                    padding: '10px 24px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: C.blue600,
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: ocupado ? 'not-allowed' : 'pointer',
-                    opacity: ocupado ? 0.5 : 1,
-                    fontFamily: font,
-                  }}
-                >
+                <BotonChispa tono="verde" onClick={() => void abrir()} disabled={ocupado}>
                   Abrir periodo de hoy
-                </button>
+                </BotonChispa>
               ) : null}
             </div>
           </div>
         </Tarjeta>
-      </div>
 
       {/* ======================================== */}
       {/* GRID: Emitir turno + Atención ahora     */}
       {/* ======================================== */}
-      <div style={{ padding: '0 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
           {/* TARJETA IZQUIERDA: Emitir turno (span 1 columna) */}
           <Tarjeta>
@@ -956,7 +914,6 @@ export default function Recepcion() {
           </Tarjeta>
 
         </div>
-      </div>
     </div>
   )
 }
