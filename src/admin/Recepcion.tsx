@@ -21,66 +21,122 @@ import { useAuth } from '../lib/auth'
 /**
  * SITUR — Pantalla de RECEPCIÓN.
  *
- * Interfaz simplificada con estilo moderno basado en la referencia visual:
- * header azul con gradiente, tarjetas con bordes redondeados y sombras,
- * layout en grid de 2 columnas.
+ * Diseño basado en RecepcionDashboard.tsx de referencia:
+ * fondo light, header con gradiente navy, grid 2x2 con tarjetas blancas.
  *
  * Secciones:
- *   A. Abrir / Cerrar periodo — control de apertura y cierre.
- *   B. Emitir turno — generación de turnos conforme a las reglas existentes.
- *   C. Atención ahora — vista informativa de los turnos en atención (solo lectura).
- *
- * El rol RECEPCIÓN no puede llamar turnos, finalizar atenciones, cancelar,
- * omitir ni acceder a funciones administrativas.
- * El historial y el perfil se acceden desde el menú lateral.
+ *   A. Abrir / Cerrar periodo
+ *   B. Emitir turno (simple y masivo)
+ *   C. Atención ahora (solo lectura)
  */
 
+const C = {
+  bg: '#EAF1FB',
+  panel: '#FFFFFF',
+  navy: '#0B2A5B',
+  blue900: '#123C7C',
+  blue700: '#1D4ED8',
+  blue600: '#2563EB',
+  blue500: '#3B82F6',
+  blue200: '#BFDBFE',
+  blue100: '#DBEAFE',
+  blue50: '#EFF6FF',
+  text: '#0F2547',
+  muted: '#5B7399',
+  line: '#D5E2F5',
+}
+
+const font = 'Inter, "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif'
+
 /**
- * Icono SVG para Abrir periodo
+ * Icono SVG genérico
  */
-function IconoCalendario() {
+function Svg({ d, size = 28 }: { d: string; size?: number }) {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
     </svg>
   )
 }
 
 /**
- * Icono SVG para Emitir turno
+ * Badge reutilizable
  */
-function IconoSurtidor() {
+function Badge({ label, dot, dark }: { label: string; dot?: boolean; dark?: boolean }) {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-    </svg>
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 20px',
+        borderRadius: 999,
+        fontSize: 22,
+        fontWeight: 600,
+        background: dark ? C.blue600 : C.blue100,
+        color: dark ? '#fff' : C.blue700,
+      }}
+    >
+      {dot && <span style={{ width: 12, height: 12, borderRadius: 99, background: dark ? '#fff' : C.blue500 }} />}
+      {label}
+    </div>
   )
 }
 
 /**
- * Icono SVG para Atención ahora
+ * Tarjeta Card del diseño de referencia
  */
-function IconoAtencion() {
+function Card({
+  title,
+  icon,
+  right,
+  children,
+  style,
+}: {
+  title: string
+  icon: React.ReactNode
+  right?: React.ReactNode
+  children: React.ReactNode
+  style?: React.CSSProperties
+}) {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
+    <div
+      style={{
+        background: C.panel,
+        borderRadius: 28,
+        border: `1px solid ${C.line}`,
+        boxShadow: '0 20px 50px rgba(18,60,124,0.10)',
+        padding: 32,
+        display: 'flex',
+        flexDirection: 'column',
+        ...style,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 16,
+            background: C.blue100,
+            color: C.blue700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {icon}
+        </div>
+        <div style={{ fontSize: 32, fontWeight: 700, color: C.navy, flex: 1 }}>{title}</div>
+        {right}
+      </div>
+      {children}
+    </div>
   )
 }
 
 /**
- * Icono SVG para reloj (vacío)
- */
-function IconoReloj() {
-  return (
-    <svg className="w-12 h-12 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )
-}
-
-/**
- * Icono SVG para abrir en otra pestaña
+ * Icono para abrir en otra pestaña
  */
 function IconoNuevaPestana() {
   return (
@@ -91,59 +147,7 @@ function IconoNuevaPestana() {
 }
 
 /**
- * Tarjeta de sección con estilo moderno
- */
-function TarjetaSeccion({
-  titulo,
-  icono,
-  badge,
-  children,
-  className,
-}: {
-  titulo: string
-  icono: React.ReactNode
-  badge?: React.ReactNode
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <section className={`recepcion-tarjeta ${className || ''}`}>
-      <div className="recepcion-tarjeta-header">
-        <div className="flex items-center gap-2.5">
-          <span className="recepcion-icono">{icono}</span>
-          <h2 className="recepcion-tarjeta-titulo">{titulo}</h2>
-        </div>
-        {badge && <div>{badge}</div>}
-      </div>
-      <div className="recepcion-tarjeta-cuerpo">
-        {children}
-      </div>
-    </section>
-  )
-}
-
-/**
- * Chip de estado para RECEPCIÓN
- */
-function ChipRecepcion({ texto, tono }: { texto: string; tono: 'verde' | 'azul' | 'gris' }) {
-  const clases = {
-    verde: 'bg-emerald-100 text-emerald-700 ring-emerald-600/20',
-    azul: 'bg-blue-100 text-blue-700 ring-blue-600/20',
-    gris: 'bg-slate-100 text-slate-600 ring-slate-500/10',
-  }
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${clases[tono]}`}>
-      {tono === 'verde' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-      {texto}
-    </span>
-  )
-}
-
-/**
  * Emisión masiva adaptada al estilo de RECEPCIÓN.
- *
- * Reutiliza la misma lógica que Consola.tsx pero con los componentes
- * y estilos de recepción (select nativo, tarjetas, etc.).
  */
 function EmisionMasivaRecepcion({
   tramites,
@@ -186,7 +190,6 @@ function EmisionMasivaRecepcion({
 
   return (
     <div className="space-y-4">
-      {/* Repartir total */}
       <div className="flex gap-2">
         <div className="flex-1">
           <label className="mb-1 block text-xs font-medium text-slate-700">
@@ -216,7 +219,6 @@ function EmisionMasivaRecepcion({
         para dividirlo en partes iguales.
       </p>
 
-      {/* Filas por trámite */}
       <div className="space-y-2">
         {filas.map((l) => {
           const t = tramites.find((x) => x.clave === l.tramite)
@@ -275,7 +277,6 @@ function EmisionMasivaRecepcion({
         })}
       </div>
 
-      {/* Añadir trámites */}
       <div className="flex flex-col items-center gap-2">
         {tramites.length > filas.length && (
           <div className="w-full">
@@ -328,7 +329,6 @@ function EmisionMasivaRecepcion({
         )}
       </div>
 
-      {/* Total */}
       <div className="flex items-center justify-between border-t border-slate-200 pt-3">
         <span className="text-xs text-slate-600">Total a emitir</span>
         <span className="text-lg font-black text-slate-900">{suma}</span>
@@ -348,10 +348,10 @@ function EmisionMasivaRecepcion({
   )
 }
 
+// ------------------------------------------------------------------ Componente principal
+
 export default function Recepcion() {
   useAuth()
-
-  // ------------------------------------------------------------------ Estado
 
   const [periodoAbierto, setPeriodoAbierto] = useState<PeriodoOperativo | null>(null)
   const [periodoListo, setPeriodoListo] = useState(false)
@@ -362,14 +362,18 @@ export default function Recepcion() {
   const [mensaje, setMensaje] = useState<{ texto: string; tono: 'ok' | 'peligro' | 'alerta' } | null>(null)
   const [ultimoTurno, setUltimoTurno] = useState<{ codigo: string; token: string } | null>(null)
 
-  // Emisión masiva (lote)
   const [modoMasivo, setModoMasivo] = useState(false)
   const [lotes, setLotes] = useState<LoteTurnos[]>([])
   const [loteEmitido, setLoteEmitido] = useState<
     { total: number; turnos: Array<{ codigo: string; tramite: string }> } | null
   >(null)
 
-  // ------------------------------------------------------------------ Carga
+  // Reloj
+  const [reloj, setReloj] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setReloj(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const cargar = useCallback(async () => {
     try {
@@ -392,8 +396,6 @@ export default function Recepcion() {
     const id = setInterval(cargar, 15_000)
     return () => clearInterval(id)
   }, [cargar])
-
-  // ------------------------------------------------------------------ Acciones
 
   async function abrir() {
     const hoy = new Date().toISOString().slice(0, 10)
@@ -442,7 +444,6 @@ export default function Recepcion() {
     }
   }
 
-  /** Emite un lote de turnos (migración 009). */
   async function emitirMasivo() {
     const pedido = lotes.filter((l) => l.cantidad > 0)
     if (pedido.length === 0) return
@@ -462,233 +463,376 @@ export default function Recepcion() {
     }
   }
 
-  // ------------------------------------------------------------------ Render
-
   const tramitesActivos = tramites.filter((t) => t.activo)
 
+  const horaStr = reloj.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  const fechaStr = reloj.toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+
   return (
-    <div className="recepcion-layout">
-      {/* Mensajes */}
-      {mensaje && (
-        <Aviso tono={mensaje.tono}>
-          <p className="font-bold">{mensaje.texto}</p>
-        </Aviso>
-      )}
-
-      {/* Botón: abrir turnos en vivo en otra pestaña */}
-      <button
-        type="button"
-        onClick={() => window.open('/admin/turnos-vivos', '_blank')}
-        className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+    <div
+      style={{
+        background: C.bg,
+        fontFamily: font,
+        color: C.text,
+        minHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Header con gradiente navy */}
+      <div
+        style={{
+          height: 120,
+          flexShrink: 0,
+          background: `linear-gradient(120deg, ${C.navy} 0%, ${C.blue900} 55%, ${C.blue600} 100%)`,
+          padding: '0 40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
       >
-        <IconoNuevaPestana />
-        Ver turnos en vivo en otra pestaña
-      </button>
+        <div>
+          <div style={{ fontSize: 14, letterSpacing: 4, color: C.blue200, fontWeight: 600, marginBottom: 6 }}>
+            PANEL DE PERSONAL
+          </div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Recepción</div>
+          <div style={{ fontSize: 16, color: C.blue200, marginTop: 8 }}>
+            Apertura de periodos, emisión de turnos y consulta de atención.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: '#fff' }}>{horaStr}</div>
+            <div style={{ fontSize: 14, color: C.blue200, textTransform: 'capitalize' }}>{fechaStr}</div>
+          </div>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 99,
+              background: 'rgba(255,255,255,0.16)',
+              border: '2px solid rgba(255,255,255,0.4)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 20,
+              fontWeight: 700,
+            }}
+          >
+            RP
+          </div>
+        </div>
+      </div>
 
-        {/* ============================================ */}
-        {/* GRID: ABRIR / CERRAR PERIODO + EMITIR TURNO  */}
-        {/* ============================================ */}
-        <div className="recepcion-grid">
-          {/* A. ABRIR / CERRAR PERIODO */}
-          <TarjetaSeccion
-            titulo="Periodo operativo"
-            icono={<IconoCalendario />}
-            badge={periodoAbierto ? <ChipRecepcion texto="Abierto" tono="verde" /> : <ChipRecepcion texto="Cerrado" tono="gris" />}
+      {/* Body */}
+      <div style={{ flex: 1, padding: '24px 40px 32px' }}>
+        {/* Mensajes */}
+        {mensaje && (
+          <div className="mb-4">
+            <Aviso tono={mensaje.tono}>
+              <p className="font-bold">{mensaje.texto}</p>
+            </Aviso>
+          </div>
+        )}
+
+        {/* Botón: abrir turnos en vivo en otra pestaña */}
+        <button
+          type="button"
+          onClick={() => window.open('/admin/turnos-vivos', '_blank')}
+          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          style={{ fontFamily: font }}
+        >
+          <IconoNuevaPestana />
+          Ver turnos en vivo en otra pestaña
+        </button>
+
+        {/* Grid 2x2 */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'auto auto',
+            gap: 32,
+          }}
+        >
+          {/* A. ABRIR / CERRAR PERIODO — izq arriba */}
+          <Card
+            title="Abrir periodo"
+            icon={<Svg d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}
+            right={periodoAbierto ? <Badge label="Abierto" dot dark /> : <Badge label="Cerrado" />}
+            style={{ gridColumn: 1, gridRow: 1 }}
           >
             {periodoListo ? (
               periodoAbierto ? (
-                <div className="space-y-4">
-                  <div className="recepcion-periodo-abierto">
-                    <div className="recepcion-periodo-dato">
-                      <span className="recepcion-periodo-label">Periodo</span>
-                      <span className="recepcion-periodo-fecha">{formatearFecha(periodoAbierto.clave)}</span>
-                    </div>
-                    <div className="recepcion-periodo-dato">
-                      <span className="recepcion-periodo-label">Inicio</span>
-                      <span className="recepcion-periodo-hora">
-                        {periodoAbierto.hora_inicio ? new Date(periodoAbierto.hora_inicio).toLocaleTimeString('es-MX') : '—'}
-                      </span>
+                <div
+                  style={{
+                    background: C.blue50,
+                    border: `1px solid ${C.blue200}`,
+                    borderRadius: 20,
+                    padding: '24px 28px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flex: 1,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>Periodo abierto</div>
+                    <div style={{ fontSize: 36, fontWeight: 800, color: C.navy, lineHeight: 1.1 }}>
+                      {formatearFecha(periodoAbierto.clave)}
                     </div>
                   </div>
-                  <BotonChispa tono="rojo" onClick={() => void cerrar()} disabled={ocupado}>
-                    Cerrar periodo
-                  </BotonChispa>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>Inicio</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: C.blue700 }}>
+                      {periodoAbierto.hora_inicio ? new Date(periodoAbierto.hora_inicio).toLocaleTimeString('es-MX') : '—'}
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="recepcion-periodo-cerrado">
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">No hay periodo abierto</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Abra el periodo de hoy para comenzar a emitir turnos.
-                    </p>
-                  </div>
-                  <BotonChispa tono="verde" onClick={() => void abrir()} disabled={ocupado}>
-                    Abrir periodo de hoy
-                  </BotonChispa>
+                <div
+                  style={{
+                    background: C.blue50,
+                    border: `1px solid ${C.blue200}`,
+                    borderRadius: 20,
+                    padding: '24px 28px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <p style={{ fontSize: 16, fontWeight: 600, color: C.navy }}>No hay periodo abierto</p>
+                  <p style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
+                    Abra el periodo de hoy para comenzar a emitir turnos.
+                  </p>
                 </div>
               )
             ) : (
               <Esqueleto filas={2} />
             )}
-          </TarjetaSeccion>
+            <div className="mt-4" style={{ width: '100%', marginTop: 'auto' }}>
+              {periodoAbierto ? (
+                <BotonChispa
+                  tono="rojo"
+                  onClick={() => void cerrar()}
+                  disabled={ocupado}
+                >
+                  Cerrar periodo
+                </BotonChispa>
+              ) : (
+                <BotonChispa
+                  tono="verde"
+                  onClick={() => void abrir()}
+                  disabled={ocupado}
+                >
+                  Abrir periodo de hoy
+                </BotonChispa>
+              )}
+            </div>
+          </Card>
 
-          {/* B. EMITIR TURNO */}
-          <TarjetaSeccion titulo="Emitir turno" icono={<IconoSurtidor />} className="recepcion-tarjeta-fija">
-            <div className="space-y-4">
-              {!periodoAbierto && periodoListo && (
+          {/* B. EMITIR TURNO — derecha, span 2 filas */}
+          <Card
+            title="Emitir turno"
+            icon={<Svg d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2z" />}
+            style={{ gridColumn: 2, gridRow: '1 / span 2' }}
+          >
+            {!periodoAbierto && periodoListo && (
+              <div className="mb-4">
                 <Aviso tono="alerta">
                   <p className="text-sm">Abra un periodo operativo antes de emitir turnos.</p>
                 </Aviso>
-              )}
-
-              {/* Toggle: Un turno / Varios turnos */}
-              <div
-                className="glass-radio-group"
-                role="radiogroup"
-                aria-label="Modo de emisión"
-              >
-                <input
-                  type="radio"
-                  name="modo-emision-recepcion"
-                  id="modo-un-turno-recepcion"
-                  checked={!modoMasivo}
-                  onChange={() => setModoMasivo(false)}
-                />
-                <label htmlFor="modo-un-turno-recepcion">Un turno</label>
-
-                <input
-                  type="radio"
-                  name="modo-emision-recepcion"
-                  id="modo-varios-turnos-recepcion"
-                  checked={modoMasivo}
-                  onChange={() => setModoMasivo(true)}
-                />
-                <label htmlFor="modo-varios-turnos-recepcion">Varios turnos</label>
-
-                <div className="glass-glider" aria-hidden="true" />
               </div>
+            )}
 
-              <BloqueExpandible clave={modoMasivo}>
-                {!modoMasivo ? (
-                  /* Emisión simple: un turno */
-                  <div className="space-y-4">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">Trámite</label>
-                      <div className="relative">
-                        <select
-                          value={tramiteId}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
-                          disabled={!periodoAbierto || ocupado}
-                          className="recepcion-select"
-                        >
-                          <option value="">— Seleccione un trámite —</option>
-                          {tramitesActivos.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.prefijo} — {t.denominacion}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+            {/* Toggle: Un turno / Varios turnos */}
+            <div
+              className="glass-radio-group"
+              role="radiogroup"
+              aria-label="Modo de emisión"
+            >
+              <input
+                type="radio"
+                name="modo-emision-recepcion"
+                id="modo-un-turno-recepcion"
+                checked={!modoMasivo}
+                onChange={() => setModoMasivo(false)}
+              />
+              <label htmlFor="modo-un-turno-recepcion">Un turno</label>
+
+              <input
+                type="radio"
+                name="modo-emision-recepcion"
+                id="modo-varios-turnos-recepcion"
+                checked={modoMasivo}
+                onChange={() => setModoMasivo(true)}
+              />
+              <label htmlFor="modo-varios-turnos-recepcion">Varios turnos</label>
+
+              <div className="glass-glider" aria-hidden="true" />
+            </div>
+
+            <BloqueExpandible clave={modoMasivo}>
+              {!modoMasivo ? (
+                <div className="space-y-4">
+                  <div>
+                    <label style={{ fontSize: 18, color: C.muted, fontWeight: 600, marginBottom: 12, display: 'block' }}>
+                      Trámite
+                    </label>
+                    <div
+                      style={{
+                        border: `2px solid ${C.blue500}`,
+                        borderRadius: 18,
+                        padding: '16px 22px',
+                        fontSize: 20,
+                        color: C.muted,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: `0 0 0 6px ${C.blue100}`,
+                      }}
+                    >
+                      <select
+                        value={tramiteId}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
+                        disabled={!periodoAbierto || ocupado}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          fontSize: 20,
+                          color: C.muted,
+                          width: '100%',
+                          outline: 'none',
+                          fontFamily: font,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="">— Seleccione un trámite —</option>
+                        {tramitesActivos.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.prefijo} — {t.denominacion}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                  </div>
 
+                  <div style={{ marginTop: 20, width: '100%' }}>
                     <BotonEmitir
                       onClick={() => void emitir()}
                       disabled={ocupado || !tramiteId || !periodoAbierto}
                     >
                       Emitir turno
                     </BotonEmitir>
-
-                    {/* Último turno emitido con QR */}
-                    {ultimoTurno && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                        <p className="mb-2 text-sm font-bold text-slate-900">
-                          Turno {ultimoTurno.codigo}
-                        </p>
-                        <CodigoQR valor={ultimoTurno.token} tamano={160} />
-                      </div>
-                    )}
                   </div>
-                ) : (
-                  /* Emisión masiva: lote */
-                  <EmisionMasivaRecepcion
-                    tramites={tramitesActivos}
-                    lotes={lotes}
-                    onCambiar={setLotes}
-                    onEmitir={() => void emitirMasivo()}
-                    ocupado={ocupado}
-                    periodoAbierto={periodoAbierto}
-                  />
-                )}
-              </BloqueExpandible>
 
-              {/* Resumen del último lote emitido */}
-              {loteEmitido && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="mb-2 text-sm font-bold text-emerald-800">
-                    Lote emitido: {loteEmitido.total} turnos
-                  </p>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {loteEmitido.turnos.map((t, i) => (
-                      <p key={i} className="text-xs text-emerald-700">
-                        {t.codigo} — {t.tramite}
+                  {ultimoTurno && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <p className="mb-2 text-sm font-bold text-slate-900">
+                        Turno {ultimoTurno.codigo}
                       </p>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLoteEmitido(null)}
-                    className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-800"
-                  >
-                    Cerrar
-                  </button>
+                      <CodigoQR valor={ultimoTurno.token} tamano={160} />
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <EmisionMasivaRecepcion
+                  tramites={tramitesActivos}
+                  lotes={lotes}
+                  onCambiar={setLotes}
+                  onEmitir={() => void emitirMasivo()}
+                  ocupado={ocupado}
+                  periodoAbierto={periodoAbierto}
+                />
               )}
-            </div>
-          </TarjetaSeccion>
-        </div>
+            </BloqueExpandible>
 
-        {/* ============================================ */}
-        {/* C. ATENCIÓN AHORA (ancho completo)           */}
-        {/* ============================================ */}
-        <TarjetaSeccion
-          titulo="Atención ahora"
-          icono={<IconoAtencion />}
-          badge={<ChipRecepcion texto="Solo lectura" tono="azul" />}
-        >
-          <p className="mb-3 text-xs text-slate-500">
-            Vista informativa — no se pueden realizar acciones desde aquí.
-          </p>
-          {actuales.length === 0 ? (
-            <div className="recepcion-vacio">
-              <IconoReloj />
-              <p className="recepcion-vacio-texto">
-                No hay turnos en atención en este momento.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {actuales.map((t) => (
-                <div
-                  key={t.turno_id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
-                    <p className="text-xs text-slate-500 truncate">{t.denominacion_tramite}</p>
-                  </div>
-                  <div className="ml-4 flex items-center gap-2">
-                    {t.denominacion_modulo && (
-                      <span className="whitespace-nowrap text-xs text-slate-500">
-                        {t.denominacion_modulo}
-                      </span>
-                    )}
-                    <ChipEstado estado={t.estado} />
-                  </div>
+            {loteEmitido && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <p className="mb-2 text-sm font-bold text-emerald-800">
+                  Lote emitido: {loteEmitido.total} turnos
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {loteEmitido.turnos.map((t, i) => (
+                    <p key={i} className="text-xs text-emerald-700">
+                      {t.codigo} — {t.tramite}
+                    </p>
+                  ))}
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setLoteEmitido(null)}
+                  className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-800"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </Card>
+
+          {/* C. ATENCIÓN AHORA — izq abajo */}
+          <Card
+            title="Atención ahora"
+            icon={<Svg d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />}
+            right={<Badge label="Solo lectura" />}
+            style={{ gridColumn: 1, gridRow: 2 }}
+          >
+            <div style={{ fontSize: 18, color: C.muted, marginBottom: 20 }}>
+              Vista informativa — no se pueden realizar acciones desde aquí.
             </div>
-          )}
-        </TarjetaSeccion>
+            {actuales.length === 0 ? (
+              <div
+                style={{
+                  flex: 1,
+                  border: `2px dashed ${C.blue200}`,
+                  borderRadius: 20,
+                  background: C.blue50,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 14,
+                  minHeight: 120,
+                }}
+              >
+                <div style={{ color: C.blue500 }}>
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: C.blue900 }}>
+                  No hay turnos en atención en este momento.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {actuales.map((t) => (
+                  <div
+                    key={t.turno_id}
+                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900">{t.codigo_turno}</p>
+                      <p className="text-xs text-slate-500 truncate">{t.denominacion_tramite}</p>
+                    </div>
+                    <div className="ml-4 flex items-center gap-2">
+                      {t.denominacion_modulo && (
+                        <span className="whitespace-nowrap text-xs text-slate-500">
+                          {t.denominacion_modulo}
+                        </span>
+                      )}
+                      <ChipEstado estado={t.estado} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

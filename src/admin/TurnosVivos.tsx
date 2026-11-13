@@ -158,30 +158,8 @@ export default function TurnosVivos() {
         className="flex items-center justify-between"
         style={{ height: 100, flexShrink: 0 }}
       >
-        <div>
-          <div
-            className="flex items-center gap-2 mb-2"
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: 3,
-              color: C.blue200,
-            }}
-          >
-            <span
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 99,
-                background: C.blue400,
-                boxShadow: '0 0 0 4px rgba(96,165,250,0.25)',
-              }}
-            />
-            EN VIVO
-          </div>
-          <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1 }}>
-            Turnos en vivo
-          </div>
+        <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1 }}>
+          Turnos en vivo
         </div>
 
         {/* Badge En espera — glass */}
@@ -311,7 +289,7 @@ export default function TurnosVivos() {
 
           {/* Leyenda de escaneo */}
           <div
-            className="flex items-start gap-3"
+            className="flex flex-col items-center gap-2"
             style={{
               marginTop: 6,
               background: '#fff',
@@ -322,6 +300,7 @@ export default function TurnosVivos() {
               fontWeight: 700,
               lineHeight: 1.35,
               maxWidth: 300,
+              textAlign: 'center',
             }}
           >
             <svg
@@ -333,7 +312,6 @@ export default function TurnosVivos() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
             >
               <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10" />
             </svg>
@@ -358,7 +336,7 @@ export default function TurnosVivos() {
           height="18"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={C.blue400}
+          stroke="#fff"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
