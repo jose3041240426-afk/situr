@@ -367,13 +367,15 @@ export default function ColaVentanillas() {
                 <div className="flex-1 space-y-2">
                   {modalTurno.turno_creado_en && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gris-500">Emisión</span>
+                      <span className="text-gris-500">Creado</span>
                       <span className="font-medium text-gris-700">
+                        {new Date(modalTurno.turno_creado_en).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {' '}
                         {new Date(modalTurno.turno_creado_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
                   )}
-                  {modalTurno.turno_llamado_en && (
+                  {modalTurno.turno_llamado_en && (modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gris-500">Llamado</span>
                       <span className="font-medium text-gris-700">
