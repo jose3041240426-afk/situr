@@ -100,7 +100,7 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
         <div
           style={{
             position: 'absolute',
-            top: -10,
+            top: 8,
             right: 14,
             fontSize: 10,
             fontWeight: 800,
