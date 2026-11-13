@@ -4435,33 +4435,45 @@ button.boton-pildora {
   max-height: calc(380px - 3.75rem);
   overflow-y: auto;
   padding: 1.25rem;
+  padding-right: 1rem;
   scrollbar-width: thin;
-  scrollbar-color: #1e293b transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.5) rgba(241, 245, 249, 0.5);
 }
 
-/* Scrollbar personalizado — línea negra delgada y redondeada (sin flechas) */
+/* Scrollbar personalizado — estilo glass moderno (sin flechas) */
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(241, 245, 249, 0.5);
   border-radius: 999px;
 }
 
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: rgba(148, 163, 184, 0.5);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 150ms ease;
 }
 
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-thumb:hover {
-  background: #0f172a;
+  background: rgba(100, 116, 139, 0.7);
+}
+
+.recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-thumb:active {
+  background: rgba(71, 85, 105, 0.8);
 }
 
 .recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-button {
   display: none;
   height: 0;
   width: 0;
+}
+
+.recepcion-tarjeta-fija .recepcion-tarjeta-cuerpo::-webkit-scrollbar-corner {
+  display: none;
 }
 
 /* Periodo abierto — vista con datos grandes */
