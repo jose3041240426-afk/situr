@@ -703,154 +703,149 @@ export default function Recepcion() {
               </div>
             )}
 
-            <div style={{ flex: 1, overflow: 'auto', minHeight: 0, position: 'relative' }}>
-            <BloqueExpandible clave={modoMasivo}>
-              {!modoMasivo ? (
-                <div>
-                  {/* Selector de trámite estilo referencia */}
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <div style={{
-                        width: 24, height: 24, borderRadius: 99, background: C.blue600, color: '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
-                      }}>1</div>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Elige el trámite</span>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '12px 16px',
-                        borderRadius: 14,
-                        border: `2px solid ${tramiteId ? C.blue500 : C.line}`,
-                        background: '#fff',
-                        boxShadow: tramiteId ? `0 0 0 4px ${C.blue100}` : 'none',
-                      }}
-                    >
-                      {tramiteSeleccionado && (
+            {/* Contenedor scrollable — solo el contenido variable */}
+            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+              <BloqueExpandible clave={modoMasivo}>
+                {!modoMasivo ? (
+                  <div>
+                    {/* Selector de trámite estilo referencia */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                         <div style={{
-                          width: 32, height: 32, borderRadius: 8, background: C.blue600, color: '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0,
-                        }}>
-                          {tramiteSeleccionado.prefijo}
-                        </div>
-                      )}
-                      <select
-                        value={tramiteId}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
-                        disabled={!periodoAbierto || ocupado}
+                          width: 24, height: 24, borderRadius: 99, background: C.blue600, color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+                        }}>1</div>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Elige el trámite</span>
+                      </div>
+                      <div
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          fontSize: 15,
-                          color: tramiteId ? C.text : C.muted,
-                          width: '100%',
-                          outline: 'none',
-                          fontFamily: font,
-                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 16px',
+                          borderRadius: 14,
+                          border: `2px solid ${tramiteId ? C.blue500 : C.line}`,
+                          background: '#fff',
+                          boxShadow: tramiteId ? `0 0 0 4px ${C.blue100}` : 'none',
                         }}
                       >
-                        <option value="">— Seleccione un trámite —</option>
-                        {tramitesActivos.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.prefijo} — {t.denominacion}
-                          </option>
-                        ))}
-                      </select>
+                        {tramiteSeleccionado && (
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 8, background: C.blue600, color: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0,
+                          }}>
+                            {tramiteSeleccionado.prefijo}
+                          </div>
+                        )}
+                        <select
+                          value={tramiteId}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
+                          disabled={!periodoAbierto || ocupado}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: 15,
+                            color: tramiteId ? C.text : C.muted,
+                            width: '100%',
+                            outline: 'none',
+                            fontFamily: font,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">— Seleccione un trámite —</option>
+                          {tramitesActivos.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.prefijo} — {t.denominacion}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+
+                    {/* Resumen del turno */}
+                    {tramiteSeleccionado && (
+                      <div
+                        style={{
+                          padding: '16px 20px',
+                          borderRadius: 14,
+                          background: C.blue50,
+                          border: `1px solid ${C.blue100}`,
+                          marginBottom: 20,
+                        }}
+                      >
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: C.muted, textTransform: 'uppercase', marginBottom: 10 }}>
+                          Resumen del turno
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                            <span style={{ color: C.muted }}>Tipo de emisión</span>
+                            <span style={{ fontWeight: 600, color: C.text }}>Un turno</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                            <span style={{ color: C.muted }}>Trámite</span>
+                            <span style={{ fontWeight: 600, color: C.text }}>{tramiteSeleccionado.prefijo} — {tramiteSeleccionado.denominacion}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                            <span style={{ color: C.muted }}>Periodo</span>
+                            <span style={{ fontWeight: 600, color: C.text }}>{periodoAbierto ? formatearFecha(periodoAbierto.clave) : '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* QR del último turno */}
+                    {ultimoTurno && (
+                      <div style={{ padding: 16, borderRadius: 14, background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: 20 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>Turno {ultimoTurno.codigo}</div>
+                        <CodigoQR valor={ultimoTurno.token} tamano={160} />
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <EmisionMasivaRecepcion
+                    tramites={tramitesActivos}
+                    lotes={lotes}
+                    onCambiar={setLotes}
+                    onEmitir={() => void emitirMasivo()}
+                    ocupado={ocupado}
+                    periodoAbierto={periodoAbierto}
+                  />
+                )}
+              </BloqueExpandible>
 
-                  {/* Resumen del turno */}
-                  {tramiteSeleccionado && (
-                    <div
-                      style={{
-                        padding: '16px 20px',
-                        borderRadius: 14,
-                        background: C.blue50,
-                        border: `1px solid ${C.blue100}`,
-                        marginBottom: 20,
-                      }}
-                    >
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: C.muted, textTransform: 'uppercase', marginBottom: 10 }}>
-                        Resumen del turno
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                          <span style={{ color: C.muted }}>Tipo de emisión</span>
-                          <span style={{ fontWeight: 600, color: C.text }}>Un turno</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                          <span style={{ color: C.muted }}>Trámite</span>
-                          <span style={{ fontWeight: 600, color: C.text }}>{tramiteSeleccionado.prefijo} — {tramiteSeleccionado.denominacion}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                          <span style={{ color: C.muted }}>Periodo</span>
-                          <span style={{ fontWeight: 600, color: C.text }}>{periodoAbierto ? formatearFecha(periodoAbierto.clave) : '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* QR del último turno */}
-                  {ultimoTurno && (
-                    <div style={{ padding: 16, borderRadius: 14, background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>Turno {ultimoTurno.codigo}</div>
-                      <CodigoQR valor={ultimoTurno.token} tamano={160} />
-                    </div>
-                  )}
+              {loteEmitido && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 mt-4">
+                  <p className="mb-2 text-sm font-bold text-emerald-800">
+                    Lote emitido: {loteEmitido.total} turnos
+                  </p>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {loteEmitido.turnos.map((t, i) => (
+                      <p key={i} className="text-xs text-emerald-700">
+                        {t.codigo} — {t.tramite}
+                      </p>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLoteEmitido(null)}
+                    className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-800"
+                  >
+                    Cerrar
+                  </button>
                 </div>
-              ) : (
-                <EmisionMasivaRecepcion
-                  tramites={tramitesActivos}
-                  lotes={lotes}
-                  onCambiar={setLotes}
-                  onEmitir={() => void emitirMasivo()}
-                  ocupado={ocupado}
-                  periodoAbierto={periodoAbierto}
-                />
               )}
-            </BloqueExpandible>
-
-            {loteEmitido && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 mt-4">
-                <p className="mb-2 text-sm font-bold text-emerald-800">
-                  Lote emitido: {loteEmitido.total} turnos
-                </p>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {loteEmitido.turnos.map((t, i) => (
-                    <p key={i} className="text-xs text-emerald-700">
-                      {t.codigo} — {t.tramite}
-                    </p>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLoteEmitido(null)}
-                  className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-800"
-                >
-                  Cerrar
-                </button>
-              </div>
-            )}
             </div>
 
-            {/* Botón emitir fijo al fondo */}
+            {/* Botón emitir — fuera del scroll, fijo al fondo por flex layout */}
             {!modoMasivo && (
               <div style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
+                flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 paddingTop: 20,
                 paddingBottom: 4,
-                background: 'linear-gradient(to bottom, rgba(248,250,252,0.85) 0%, rgba(248,250,252,0.98) 100%)',
-                backdropFilter: 'blur(8px)',
                 borderTop: `1px solid ${C.line}`,
-                zIndex: 5,
               }}>
                 <span style={{ fontSize: 13, color: C.muted }}>
                   {tramiteSeleccionado
