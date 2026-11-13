@@ -1532,22 +1532,16 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
-  /* 13px para modal compacto del operador; 15px era para la consola. */
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   font-weight: 700;
   /* Mismo azul que `.boton-primario` («Iniciar atención»), para que el
      botón de llamada no sea de otra familia. */
   background: var(--color-azul-500);
   color: #fff;
-  /*
-   * Relleno HORIZONTAL SIMÉTRICO (0.7em).
-   * Compacto para el modal de turnos asignados.
-   */
-  padding: 0.5em 0.7em;
-  max-width: 180px;
+  padding: 0.6em 0.8em;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   /* Sin `all` como en el original: `all` también transiciona `display` y
@@ -1590,7 +1584,7 @@ body {
  */
 .boton-llamar-envoltura {
   position: absolute;
-  left: 0.7em;
+  left: 0.8em;
   top: 50%;
   margin-top: -0.575em;
   display: grid;
