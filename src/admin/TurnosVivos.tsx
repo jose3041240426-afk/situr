@@ -285,9 +285,18 @@ export default function TurnosVivos() {
 
   const hayAlgo = Boolean(enPanel.codigo_turno)
 
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }, [])
+
   return (
     <div
       className="min-h-screen flex flex-col"
+      onDoubleClick={toggleFullscreen}
       style={{
         background: `radial-gradient(1200px 700px at 88% 8%, rgba(59,130,246,0.30), transparent 60%), radial-gradient(900px 600px at 0% 100%, rgba(37,99,235,0.22), transparent 60%), ${C.bg}`,
         fontFamily: font,
