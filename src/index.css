@@ -1545,6 +1545,7 @@ body {
    * Compacto para el modal de turnos asignados.
    */
   padding: 0.5em 0.7em;
+  max-width: 180px;
   border: none;
   border-radius: 10px;
   overflow: hidden;
