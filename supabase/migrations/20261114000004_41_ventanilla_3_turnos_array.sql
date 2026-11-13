@@ -125,33 +125,41 @@ BEGIN
         );
     END IF;
 
-    -- [6] REGISTRO DE LA PETICIÓN -------------------------------------------
-    -- Se registra antes de repartir para que fn_repartir_turnos_ventanilla
-    -- pueda ver quien ha pedido.
+    -- [6] CONTAR TURNOS ANTES DEL REPARTO -----------------------------------
+    -- Para saber si se asignó uno nuevo, comparamos antes y después.
+    SELECT COUNT(*) INTO v_abiertos
+      FROM turnos
+     WHERE modulo_id = v_modulo.id
+       AND estado IN ('ASIGNED', 'CALLED', 'SERVING');
+
+    -- [7] REGISTRO DE LA PETICIÓN -------------------------------------------
     INSERT INTO solicitudes_ventanilla (modulo_id, operador_id, periodo_operativo_id)
     VALUES (v_modulo.id, v_operador, v_periodo)
     RETURNING id INTO v_solicitud;
 
-    -- [7] REPARTIR ---------------------------------------------------------
-    -- fn_repartir_turnos_ventanilla toma el primer turno de la cola y se lo
-    -- asigna a la ventanilla que lo ha pedido. Si no hay turno, devuelve 0.
+    -- [8] REPARTIR ---------------------------------------------------------
     PERFORM fn_repartir_turnos_ventanilla(v_periodo);
 
-    -- [8] RESULTADO --------------------------------------------------------
-    -- Ver si se asignó un turno a esta ventanilla.
-    SELECT t.* INTO v_turno
-      FROM turnos t
-     WHERE t.modulo_id = v_modulo.id
-       AND t.estado IN ('ASIGNED', 'CALLED', 'SERVING')
-       AND t.creado_en > now() - interval '30 seconds'
-     ORDER BY t.creado_en DESC LIMIT 1;
+    -- [9] RESULTADO --------------------------------------------------------
+    -- Comparar si hay un turno más asignado a esta ventanilla.
+    SELECT COUNT(*) INTO v_tope
+      FROM turnos
+     WHERE modulo_id = v_modulo.id
+       AND estado IN ('ASIGNED', 'CALLED', 'SERVING');
 
     SELECT COUNT(*) INTO v_en_espera
       FROM turnos
      WHERE periodo_operativo_id = v_periodo
        AND estado = 'WAITING';
 
-    IF v_turno.id IS NOT NULL THEN
+    IF v_tope > v_abiertos THEN
+        -- Se asignó al menos un turno nuevo; devolver el más reciente.
+        SELECT t.* INTO v_turno
+          FROM turnos t
+         WHERE t.modulo_id = v_modulo.id
+           AND t.estado IN ('ASIGNED', 'CALLED', 'SERVING')
+         ORDER BY t.creado_en DESC LIMIT 1;
+
         RETURN jsonb_build_object(
             'ok', true,
             'servido', true,
