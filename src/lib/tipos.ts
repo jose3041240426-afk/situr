@@ -12,6 +12,7 @@
 
 export type EstadoTurno =
   | 'WAITING'
+  | 'ASIGNED'
   | 'CALLED'
   | 'SERVING'
   | 'COMPLETED'
@@ -97,8 +98,8 @@ export interface FilaColaVentanilla {
   turno_id: string
   codigo_turno: string
   prioridad: PrioridadTurno
-  tramite_clave: string
-  tramite_denominacion: string
+  clave_tramite: string
+  denominacion_tramite: string
   creado_en: string
 }
 
@@ -481,6 +482,7 @@ export function esDenegada<T>(r: Resultado<T>): r is RespuestaDenegada {
 /** Etiqueta en español para los estados (la UI nunca muestra el enum crudo). */
 export const ETIQUETA_ESTADO: Record<EstadoTurno, string> = {
   WAITING: 'En espera',
+  ASIGNED: 'Asignado a ventanilla',
   CALLED: 'Llamado',
   SERVING: 'En atención',
   COMPLETED: 'Atendido',

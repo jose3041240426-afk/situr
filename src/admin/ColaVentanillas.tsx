@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { estadoVentanillas, solicitarTurnoVentanilla, tokenTurnoParaQr, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, tokenTurnoParaQr, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla } from '../lib/tipos'
 import CodigoQR from '../components/CodigoQR'
 
@@ -68,10 +68,13 @@ const t = await tokenTurnoParaQr(turnoId)
     }
   }
 
-  async function accionTurno(turnoId: string, accion: 'iniciar' | 'finalizar' | 'cancelar') {
+  async function accionTurno(turnoId: string, accion: 'llamar' | 'iniciar' | 'finalizar' | 'cancelar') {
     setOcupado(turnoId)
     try {
-      if (accion === 'iniciar') await iniciarAtencion(turnoId)
+      if (accion === 'llamar') {
+        const r = await llamarTurnoAsignado(turnoId)
+        setAviso(`Turno ${r.codigo} llamado a ${r.modulo_codigo}.`)
+      } else if (accion === 'iniciar') await iniciarAtencion(turnoId)
       else if (accion === 'finalizar') await finalizarTurno(turnoId)
       else await cancelarTurno(turnoId, 'Cancelado por el operador.')
       await cargar()
@@ -114,10 +117,10 @@ const t = await tokenTurnoParaQr(turnoId)
                 className="min-w-[150px] shrink-0 rounded-2xl border border-gris-200 bg-white p-3 shadow-sm"
               >
                 <div className="text-xs text-gris-500">Turno {t.posicion}</div>
-                <div className="text-xs text-gris-600">{t.tramite_denominacion}</div>
+                <div className="text-xs text-gris-600">{t.denominacion_tramite}</div>
                 <div className="text-lg font-bold text-gris-900">{t.codigo_turno}</div>
                 <span className="mt-1 inline-block rounded-full bg-gris-100 px-2 py-0.5 text-xs">
-                  {t.tramite_clave}
+                  {t.clave_tramite}
                 </span>
               </div>
             ))}
@@ -162,11 +165,22 @@ const t = await tokenTurnoParaQr(turnoId)
                   <div className="text-xs text-gris-500">Operador: {v.operador_nombres}</div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">
+                  {v.turno_estado === 'ASIGNED' && (
+                    <button
+                      className="boton-primario text-xs"
+                      disabled={ocupado === v.turno_id! || !v.es_mia}
+                      onClick={() => accionTurno(v.turno_id!, 'llamar')}
+                      title="Llamar turno"
+                    >
+                      Llamar turno
+                    </button>
+                  )}
                   {v.turno_estado === 'CALLED' && (
                     <button
                       className="boton-primario text-xs"
                       disabled={ocupado === v.turno_id! || !v.es_mia}
                       onClick={() => accionTurno(v.turno_id!, 'iniciar')}
+                      title="Iniciar atención"
                     >
                       Iniciar atención
                     </button>
@@ -201,7 +215,7 @@ const t = await tokenTurnoParaQr(turnoId)
             )}
 
             <button
-              className="boton-primario w-full"
+              className="boton-primario w-full transition-transform hover:scale-105"
               disabled={!v.disponible || !v.es_mia || ocupado === v.modulo_id}
               onClick={() => solicitar(v.modulo_id)}
             >

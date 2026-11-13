@@ -263,6 +263,19 @@ export async function reponerTurno(turnoId: string): Promise<RespuestaReposicion
   return rpc<RespuestaReposicion>('reponer_turno', { p_turno_id: turnoId })
 }
 
+/**
+ * Llama a un turno que está asignado a una ventanilla (ASIGNED → CALLED).
+ * El ciudadano recibe la notificación y ve su turno en la pantalla pública.
+ */
+export async function llamarTurnoAsignado(turnoId: string): Promise<{
+  ok: true
+  turno_id: string
+  codigo: string
+  modulo_codigo: string
+}> {
+  return rpc('llamar_turno_asignado', { p_turno_id: turnoId })
+}
+
 export async function iniciarAtencion(turnoId: string): Promise<RespuestaOperacionTurno> {
   return rpc<RespuestaOperacionTurno>('iniciar_atencion_turno', { p_turno_id: turnoId })
 }

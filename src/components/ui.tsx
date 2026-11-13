@@ -14,6 +14,7 @@ import type { EstadoTurno, PrioridadTurno } from '../lib/tipos'
 
 const ESTILO_ESTADO: Record<EstadoTurno, string> = {
   WAITING: 'bg-gris-100 text-gris-700',
+  ASIGNED: 'bg-azul-50 text-azul-600',
   CALLED: 'bg-ambar-50 text-ambar-600',
   SERVING: 'bg-verde-50 text-verde-600',
   COMPLETED: 'bg-gris-50 text-gris-700',
