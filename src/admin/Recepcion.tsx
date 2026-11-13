@@ -653,7 +653,7 @@ export default function Recepcion() {
       {/* ======================================== */}
       {/* GRID: Emitir turno + Atención ahora     */}
       {/* ======================================== */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'stretch', minHeight: 'calc(100vh - 280px)', paddingBottom: 40 }}>
 
           {/* TARJETA IZQUIERDA: Emitir turno (span 1 columna) */}
           <Tarjeta>
