@@ -44,16 +44,6 @@ function IconoAtencion() {
   )
 }
 
-/**
- * Icono SVG para turno emitido
- */
-function IconoTurno() {
-  return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v7m0 0v7m0-7h6m-6 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )
-}
 
 /**
  * Icono SVG para vacío
@@ -119,7 +109,6 @@ export default function TurnosVivos() {
   const [cola, setCola] = useState<FilaCola[]>([])
   const [actuales, setActuales] = useState<FilaActual[]>([])
   const [listo, setListo] = useState(false)
-  const [ultimoCodigo, setUltimoCodigo] = useState<string | null>(null)
   const [actualizado, setActualizado] = useState<Date | null>(null)
 
   const cargar = useCallback(async () => {
@@ -135,14 +124,6 @@ export default function TurnosVivos() {
       setListo(true)
       setActualizado(new Date())
 
-      // Detectar el último turno nuevo (el de mayor folio en la cola)
-      if (c.length > 0) {
-        const maxFolio = c.reduce((max, t) => Math.max(max, t.folio), 0)
-        const ultimo = c.find((t) => t.folio === maxFolio)
-        if (ultimo) {
-          setUltimoCodigo(ultimo.codigo_turno)
-        }
-      }
     } catch (err) {
       console.error('TurnosVivos: error al cargar', err)
     }
@@ -189,7 +170,7 @@ export default function TurnosVivos() {
       </header>
 
       {/* Resumen rápido */}
-      <div className="mb-6 grid grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4">
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
           <div className="flex items-center gap-2 text-gris-300">
             <IconoCola />
@@ -203,15 +184,6 @@ export default function TurnosVivos() {
             <span className="text-xs font-medium">En atención</span>
           </div>
           <p className="mt-1 text-4xl font-black text-white tabular-nums">{totalEnAtencion}</p>
-        </div>
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <div className="flex items-center gap-2 text-gris-300">
-            <IconoTurno />
-            <span className="text-xs font-medium">Último turno</span>
-          </div>
-          <p className="mt-1 text-xl font-black text-white truncate">
-            {ultimoCodigo || '—'}
-          </p>
         </div>
       </div>
 
