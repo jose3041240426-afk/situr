@@ -1,13 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listarCola } from '../lib/rpc'
-import type { FilaCola } from '../lib/tipos'
+import { colaEnVivo, ultimoTurnoEmitido } from '../lib/rpc'
+import type { FilaColaVivo, UltimoTurnoEmitido } from '../lib/rpc'
 import { Esqueleto } from '../components/ui'
 import CodigoQR from '../components/CodigoQR'
 
 /**
  * SITUR — Turnos en vivo (RECEPCIÓN).
- * Pantalla independiente con diseño glass y gradientes.
- * Se actualiza cada 5 segundos automáticamente.
+ *
+ * Pantalla independiente que el personal deja abierta en un monitor pegado a
+ * la ventanilla. Tiene dos mitades y cada una responde a una persona distinta:
+ *
+ *   - La cola, para quien YA tiene papel: en qué orden llegó la gente. El
+ *     número que se ve es la posición POR LLEGADA, que es la que entiende el
+ *     ciudadano («usted es el 4 de los que han llegado»). El folio no sirve
+ *     para eso: cada trámite lleva su propio contador, así que «G-0001» y
+ *     «A-002» no son comparables entre sí.
+ *   - El QR grande, para quien ACABA de llegar: escanea el papel que trae y ve
+ *     su turno en el teléfono. Por eso el QR es del ÚLTIMO turno emitido y no
+ *     del siguiente de la fila: quien llega a escanear es quien acaba de
+ *     recibir su papel en la ventanilla.
+ *
+ * Se actualiza cada 5 segundos. El orden de la cola lo pone la base
+ * (`cola_en_vivo`), no esta pantalla.
  */
 
 const C = {
@@ -27,9 +41,23 @@ const C = {
 const font = 'Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif'
 
 /**
- * Ticket individual — glass por defecto, gradiente azul si es el primero
+ * Cuántos turnos caben en la cola sin que el monitor tenga que hacer scroll.
+ *
+ * La pantalla no se desplaza a propósito: está en un monitor fijo y un scroll
+ * escondería turnos sin que nadie lo note. Con dos columnas de cinco, diez
+ * caben con holgura en 768 px de alto.
  */
-function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
+const VISIBLES = 10
+
+/**
+ * Ticket individual — glass por defecto, gradiente azul si es el siguiente.
+ *
+ * El número grande es la posición POR LLEGADA. Con la prioridad de un turno
+ * marcado a mano, el orden real de llamada puede adelantar a alguien: por eso
+ * el ticket que va a ser llamado primero lleva el distintivo «SIGUIENTE»
+ * aunque no sea el primero de la lista.
+ */
+function Ticket({ t, siguiente }: { t: FilaColaVivo; siguiente?: boolean }) {
   return (
     <div
       className="relative flex items-center overflow-hidden rounded-3xl transition-colors"
@@ -37,33 +65,34 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
         height: 80,
         gap: 16,
         padding: '0 20px 0 16px',
-        background: first
+        background: siguiente
           ? `linear-gradient(120deg, ${C.blue600}, ${C.blue700})`
           : C.glass,
-        border: first
+        border: siguiente
           ? `2px solid ${C.blue400}`
           : `1px solid ${C.glassLine}`,
-        boxShadow: first ? '0 0 40px rgba(59,130,246,0.4)' : 'none',
+        boxShadow: siguiente ? '0 0 40px rgba(59,130,246,0.4)' : 'none',
         fontFamily: font,
       }}
     >
-      {/* Número de posición */}
+      {/* Número de posición por llegada */}
       <div
         style={{
           width: 48,
           height: 48,
           borderRadius: 14,
-          background: first ? '#fff' : 'rgba(59,130,246,0.18)',
-          color: first ? C.blue700 : C.blue200,
-          fontSize: 22,
+          background: siguiente ? '#fff' : 'rgba(59,130,246,0.18)',
+          color: siguiente ? C.blue700 : C.blue200,
+          fontSize: 20,
           fontWeight: 800,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {t.posicion}
+        {t.posicion_llegada}
       </div>
 
       {/* Info del turno */}
@@ -74,7 +103,8 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
             fontWeight: 800,
             color: '#fff',
             lineHeight: 1.1,
-            fontFamily: font,
+            letterSpacing: 0.5,
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {t.codigo_turno}
@@ -82,21 +112,34 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
         <div
           style={{
             fontSize: 12,
-            color: first ? C.blue100 : C.muted,
+            color: siguiente ? C.blue100 : C.muted,
             marginTop: 4,
             fontWeight: 500,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            fontFamily: font,
           }}
         >
           {t.clave_tramite} — {t.denominacion_tramite}
         </div>
       </div>
 
-      {/* Badge SIGUIENTE en el primero */}
-      {first && (
+      {/* La hora dice lo que el código no dice: quién llegó antes */}
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: siguiente ? C.blue100 : C.muted,
+          fontVariantNumeric: 'tabular-nums',
+          flexShrink: 0,
+        }}
+        title="Hora de emisión del turno"
+      >
+        {horaDe(t.creado_en)}
+      </div>
+
+      {/* Badge SIGUIENTE en el que va a ser llamado primero */}
+      {siguiente && (
         <div
           style={{
             position: 'absolute',
@@ -110,7 +153,6 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
             padding: '4px 12px',
             borderRadius: 999,
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            fontFamily: font,
           }}
         >
           SIGUIENTE
@@ -120,14 +162,26 @@ function Ticket({ t, first }: { t: FilaCola; first?: boolean }) {
   )
 }
 
+/** Hora local en formato corto: «1:58 p.m.». */
+function horaDe(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-MX', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 export default function TurnosVivos() {
-  const [cola, setCola] = useState<FilaCola[]>([])
+  const [filas, setFilas] = useState<FilaColaVivo[]>([])
+  const [total, setTotal] = useState(0)
+  const [ultimo, setUltimo] = useState<UltimoTurnoEmitido | null>(null)
   const [listo, setListo] = useState(false)
 
   const cargar = useCallback(async () => {
     try {
-      const c = await listarCola()
-      setCola(c)
+      const [cola, ultimoTurno] = await Promise.all([colaEnVivo(VISIBLES), ultimoTurnoEmitido()])
+      setFilas(cola.filas)
+      setTotal(cola.total)
+      setUltimo(ultimoTurno)
       setListo(true)
     } catch (err) {
       console.error('TurnosVivos: error al cargar', err)
@@ -140,8 +194,12 @@ export default function TurnosVivos() {
     return () => clearInterval(id)
   }, [cargar])
 
-  const totalEnCola = cola.length
-  const proximos10 = cola.slice(0, 10)
+  /*
+   * El que va a ser llamado primero no siempre es el primero que llegó: un
+   * turno con prioridad marcada a mano se adelanta (RN-017). La base ya lo
+   * calculó (`posicion_global`), así que aquí solo se busca cuál es.
+   */
+  const idSiguiente = filas.find((f) => f.posicion_global === 1)?.turno_id ?? null
 
   return (
     <div
@@ -154,13 +212,8 @@ export default function TurnosVivos() {
       }}
     >
       {/* Header */}
-      <div
-        className="flex items-center justify-between"
-        style={{ height: 100, flexShrink: 0 }}
-      >
-        <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1 }}>
-          Turnos en vivo
-        </div>
+      <div className="flex items-center justify-between" style={{ height: 100, flexShrink: 0 }}>
+        <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1 }}>Turnos en vivo</div>
 
         {/* Badge En espera — glass */}
         <div
@@ -185,43 +238,50 @@ export default function TurnosVivos() {
             <circle cx="12" cy="12" r="10" />
             <path d="M12 6v6l4 2" />
           </svg>
-          <div style={{ fontSize: 16, color: C.muted, fontWeight: 600 }}>
-            En espera
-          </div>
-          <div style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>
-            {totalEnCola}
+          <div style={{ fontSize: 16, color: C.muted, fontWeight: 600 }}>En espera</div>
+          <div
+            style={{
+              fontSize: 40,
+              fontWeight: 800,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {total}
           </div>
         </div>
       </div>
 
       {/* Main: cola + QR */}
-      <div
-        className="flex-1 flex min-h-0 gap-6"
-        style={{ flex: 1 }}
-      >
+      <div className="flex-1 flex min-h-0 gap-6" style={{ flex: 1 }}>
         {/* COLA — contenedor glass */}
         <div
           className="flex-1 flex flex-col rounded-3xl p-5 gap-4"
-          style={{
-            background: C.glass,
-            border: `1px solid ${C.glassLine}`,
-          }}
+          style={{ background: C.glass, border: `1px solid ${C.glassLine}` }}
         >
           <div className="flex items-center justify-between px-2">
-            <div style={{ fontSize: 22, fontWeight: 700 }}>
-              Turnos a continuación
-            </div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>Turnos a continuación</div>
             <div style={{ fontSize: 14, color: C.muted, fontWeight: 600 }}>
-              Próximos {Math.min(proximos10.length, 10)}
+              {total > 0 ? `Próximos ${Math.min(total, VISIBLES)} de ${total}` : 'Sin turnos en espera'}
             </div>
           </div>
 
           {!listo ? (
             <Esqueleto filas={5} />
-          ) : proximos10.length === 0 ? (
+          ) : filas.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-              <svg className="w-16 h-16 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-16 h-16 text-slate-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="mt-3 text-sm font-medium" style={{ color: C.muted }}>
                 No hay turnos en espera.
@@ -235,16 +295,21 @@ export default function TurnosVivos() {
               className="flex-1"
               style={{
                 display: 'grid',
-                gridAutoFlow: 'column',
+                /*
+                 * Se llena por FILAS, no por columnas: el turno 2 va a la
+                 * derecha del 1, no debajo. La cola se lee de izquierda a
+                 * derecha, y con las columnas el público leía 1, 4, 2, 5, 3.
+                 */
+                gridAutoFlow: 'row',
                 gridTemplateColumns: '1fr 1fr',
-                gridTemplateRows: `repeat(${Math.ceil(proximos10.length / 2)}, 80px)`,
+                gridTemplateRows: `repeat(${Math.ceil(filas.length / 2)}, 80px)`,
                 gap: 12,
                 columnGap: 14,
-                alignItems: 'start',
+                alignContent: 'start',
               }}
             >
-              {proximos10.map((t, i) => (
-                <Ticket key={t.turno_id} t={t} first={i === 0} />
+              {filas.map((t) => (
+                <Ticket key={t.turno_id} t={t} siguiente={t.turno_id === idSiguiente} />
               ))}
             </div>
           )}
@@ -261,30 +326,80 @@ export default function TurnosVivos() {
               fontWeight: 700,
               letterSpacing: 3,
               color: C.blue200,
+              textAlign: 'center',
             }}
           >
-            SIGUIENTE TURNO
+            ESCANEA TU TURNO
           </div>
+
+          {listo && !ultimo ? (
+            /*
+             * Sin turnos emitidos todavía no hay nada que escanear. Se dice con
+             * palabras en vez de pintar un QR vacío, que parecería roto.
+             */
+            <div
+              className="flex flex-col items-center justify-center text-center"
+              style={{
+                width: 280,
+                height: 280,
+                borderRadius: 28,
+                border: `2px dashed ${C.glassLine}`,
+                color: C.muted,
+                fontSize: 15,
+                fontWeight: 600,
+                padding: 24,
+                lineHeight: 1.5,
+              }}
+            >
+              Aún no se ha emitido ningún turno en este periodo.
+            </div>
+          ) : (
+            <div
+              style={{
+                background: '#fff',
+                padding: 20,
+                borderRadius: 28,
+                boxShadow:
+                  '0 24px 60px rgba(0,0,0,0.45), 0 0 0 8px rgba(96,165,250,0.15)',
+              }}
+            >
+              {ultimo?.token_publico ? (
+                <CodigoQR
+                  valor={`${window.location.origin}/turno/${ultimo.token_publico}`}
+                  tamano={240}
+                />
+              ) : (
+                /* Mientras llega el token, el hueco mide lo mismo que el QR:
+                   así el panel no salta cuando aparece. */
+                <div
+                  className="animate-pulse"
+                  style={{ width: 240, height: 240, borderRadius: 8, background: '#e2e8f0' }}
+                />
+              )}
+            </div>
+          )}
 
           <div
             style={{
-              background: '#fff',
-              padding: 20,
-              borderRadius: 28,
-              boxShadow: '0 24px 60px rgba(0,0,0,0.45), 0 0 0 8px rgba(96,165,250,0.15)',
+              fontSize: 56,
+              fontWeight: 800,
+              lineHeight: 1,
+              marginTop: 4,
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
-            <CodigoQR
-              valor={`${window.location.origin}/turno/R-006`}
-              tamano={240}
-            />
+            {ultimo?.codigo_turno ?? '—'}
           </div>
-
-          <div style={{ fontSize: 56, fontWeight: 800, lineHeight: 1, marginTop: 4 }}>
-            R-006
-          </div>
-          <div style={{ fontSize: 18, color: C.blue200, fontWeight: 500 }}>
-            Registro catastral
+          <div
+            style={{
+              fontSize: 18,
+              color: C.blue200,
+              fontWeight: 500,
+              textAlign: 'center',
+              maxWidth: 320,
+            }}
+          >
+            {ultimo?.denominacion_tramite ?? 'Sin turnos emitidos'}
           </div>
 
           {/* Leyenda de escaneo */}
@@ -315,7 +430,7 @@ export default function TurnosVivos() {
             >
               <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10" />
             </svg>
-            Escanea tu código para estar al tanto de tu turno
+            Escanea el código de tu turno para seguirlo en tu teléfono
           </div>
         </div>
       </div>
@@ -344,7 +459,7 @@ export default function TurnosVivos() {
           <circle cx="12" cy="12" r="10" />
           <path d="M12 16v-4M12 8h.01" />
         </svg>
-        Si tu turno no aparece, es porque está más abajo en la cola. En un momento será visible aquí.
+        Si tu turno no aparece en la lista, es porque aún está más abajo en la cola. En un momento será visible aquí.
       </div>
     </div>
   )

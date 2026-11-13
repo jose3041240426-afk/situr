@@ -362,10 +362,111 @@ export async function eliminarSuscripcion(token: string): Promise<RespuestaSuscr
 // LECTURA ADMINISTRATIVA  (vistas)
 // ===========================================================================
 
+/**
+ * La cola de espera, en el orden real en que se va a llamar.
+ *
+ * `vista_cola_espera` trae su propio `ORDER BY` (migración 035), así que el
+ * orden llega puesto desde la base: es el mismo que usa
+ * `llamar_siguiente_turno()` (RN-017). Antes la vista no lo traía y el
+ * orden dependía del plan de ejecución —el índice `idx_turnos_cola` agrupa
+ * por `tramite_id`—, de modo que «G-0001» salía antes que «A-0002» aunque
+ * el A-0002 se hubiera emitido antes.
+ *
+ * Se ordena igual en el cliente por `posicion_global` para que la fila que
+ * se ve primero sea la que se va a llamar, y `creado_en` queda como
+ * desempate defensivo.
+ */
 export async function listarCola(): Promise<FilaCola[]> {
   const { data, error } = await supabase.from('vista_cola_espera').select('*')
   if (error) throw traducirError(error)
-  return (data ?? []) as FilaCola[]
+  return ((data ?? []) as FilaCola[]).sort(
+    (a, b) =>
+      a.posicion_global - b.posicion_global ||
+      a.creado_en.localeCompare(b.creado_en) ||
+      a.codigo_turno.localeCompare(b.codigo_turno),
+  )
+}
+
+/**
+ * La cola de la pantalla de turnos en vivo, POR FECHA DE CREACIÓN.
+ *
+ * Es una RPC de la base (`cola_en_vivo`) y no una consulta suelta, por dos
+ * razones:
+ *
+ *   - El orden por llegada lo calcula la base (`posicion_llegada`). El folio
+ *     NO sirve para ordenar: es un contador por trámite, así que «G-0001» y
+ *     «A-002» no son comparables. La hora de creación sí lo es.
+ *   - `turnos` solo es legible por ADMINISTRADOR y RECEPCIÓN (RLS), y esta
+ *     pantalla la abre cualquier operador.
+ *
+ * Trae las dos posiciones a propósito: `posicion_llegada` es la que se
+ * muestra al ciudadano (cuántas personas hay delante) y `posicion_global` es
+ * el orden real de llamada, que puede adelantar a alguien con prioridad.
+ */
+export type FilaColaVivo = {
+  turno_id: string
+  codigo_turno: string
+  folio: number
+  clave_tramite: string
+  denominacion_tramite: string
+  prioridad: PrioridadTurno
+  /** Posición por fecha de creación: la que ve el ciudadano. */
+  posicion_llegada: number
+  /** Posición real de llamada (RN-017): puede ser anterior si hay prioridad. */
+  posicion_global: number
+  creado_en: string
+}
+
+export type ColaEnVivo = {
+  total: number
+  filas: FilaColaVivo[]
+}
+
+export async function colaEnVivo(limite = 10): Promise<ColaEnVivo> {
+  const { data, error } = await supabase.rpc('cola_en_vivo', { p_limite: limite })
+  if (error) throw traducirError(error)
+  const r = (data ?? {}) as { total?: number; filas?: FilaColaVivo[] }
+  return { total: r.total ?? 0, filas: r.filas ?? [] }
+}
+
+/**
+ * El último turno emitido del periodo, con su token: el que la pantalla de
+ * turnos en vivo ofrece para escanear.
+ *
+ * Es la RPC `ultimo_turno_emitido()`. Va por RPC y no por consulta directa
+ * a `turnos` porque el token es lo que abre el portal del ciudadano y la
+ * tabla `turnos` está restringida por RLS a ADMINISTRADOR y RECEPCIÓN.
+ */
+export type UltimoTurnoEmitido = {
+  hay_turno: boolean
+  turno_id: string
+  codigo_turno: string
+  folio: number
+  estado: string
+  prioridad: PrioridadTurno
+  token_publico: string
+  clave_tramite: string
+  denominacion_tramite: string
+  creado_en: string
+}
+
+export async function ultimoTurnoEmitido(): Promise<UltimoTurnoEmitido | null> {
+  const { data, error } = await supabase.rpc('ultimo_turno_emitido')
+  if (error) throw traducirError(error)
+  const r = (data ?? {}) as Partial<UltimoTurnoEmitido>
+  if (!r.hay_turno) return null
+  return {
+    hay_turno: true,
+    turno_id: r.turno_id ?? '',
+    codigo_turno: r.codigo_turno ?? '',
+    folio: r.folio ?? 0,
+    estado: r.estado ?? '',
+    prioridad: (r.prioridad ?? 'NORMAL') as PrioridadTurno,
+    token_publico: r.token_publico ?? '',
+    clave_tramite: r.clave_tramite ?? '',
+    denominacion_tramite: r.denominacion_tramite ?? '',
+    creado_en: r.creado_en ?? '',
+  }
 }
 
 /**

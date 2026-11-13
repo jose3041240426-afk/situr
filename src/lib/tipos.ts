@@ -106,6 +106,15 @@ export interface FilaCola {
   personas_delante: number
   /** Orden real de llamada, entre todos los trámites (RN-017). */
   posicion_global: number
+  /**
+   * Posición por fecha de creación, entre todos los trámites (migración 035).
+   *
+   * Es la que ve el ciudadano: «cuántas personas hay delante de mí». No es la
+   * misma que `posicion_global` porque un turno con prioridad marcada a mano
+   * se adelanta al resto (RN-017), mientras que el folio no dice quién
+   * llegó antes porque es un contador por trámite.
+   */
+  posicion_llegada: number
   creado_en: string
   tiempo_estimado_mostrado_minutos: number | null
   tiempo_estimado_minutos: number | null
