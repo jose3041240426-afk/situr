@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 
@@ -425,13 +426,13 @@ export default function ColaVentanillas() {
               {/* Izquierda: Llamar (ASIGNED) o Iniciar atención (CALLED) */}
               <div className="flex-1">
                 {modalTurno.turno_estado === 'ASIGNED' && (
-                  <button
+                  <BotonLlamar
                     onClick={manejarLlamar}
                     disabled={accionando}
-                    className="boton-primario w-full"
+                    className="w-full"
                   >
                     {accionando ? 'Procesando…' : 'Llamar turno'}
-                  </button>
+                  </BotonLlamar>
                 )}
                 {modalTurno.turno_estado === 'CALLED' && (
                   <button
