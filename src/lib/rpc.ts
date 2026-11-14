@@ -1026,3 +1026,24 @@ export async function solicitarTurnoVentanilla(moduloId: string): Promise<Respue
   if (error) throw traducirError(error)
   return data as RespuestaSolicitarTurnoVentanilla
 }
+
+export interface RespuestaTransferirTurno {
+  ok: boolean
+  servido?: boolean
+  turno_id?: string
+  codigo_turno?: string
+  destino_modulo_id?: string
+  motivo?: string
+}
+
+export async function transferirTurnoVentanilla(
+  turnoId: string,
+  destinoModuloId: string,
+): Promise<RespuestaTransferirTurno> {
+  const { data, error } = await supabase.rpc('transferir_turno_ventanilla', {
+    p_turno_id: turnoId,
+    p_destino_modulo_id: destinoModuloId,
+  })
+  if (error) throw traducirError(error)
+  return data as RespuestaTransferirTurno
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, transferirTurnoVentanilla } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -26,6 +26,7 @@ export default function ColaVentanillas() {
   const [accionando, setAccionando] = useState(false)
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
+  const [modalTransferir, setModalTransferir] = useState(false)
 
   const cargar = useCallback(async () => {
     try {
@@ -83,6 +84,7 @@ export default function ColaVentanillas() {
     setModalVentanilla(null)
     setTimerActivo(false)
     setTimerSegundos(0)
+    setModalTransferir(false)
   }
 
   async function manejarLlamar() {
@@ -146,6 +148,26 @@ export default function ColaVentanillas() {
       await cargar()
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'No se pudo eliminar el turno.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  async function manejarTransferir(destinoModuloId: string) {
+    if (!modalTurno) return
+    setAccionando(true)
+    try {
+      const r = await transferirTurnoVentanilla(modalTurno.turno_id, destinoModuloId)
+      if (r.ok && r.servido) {
+        const destino = ventanillas.find(v => v.modulo_id === destinoModuloId)
+        setAviso(`Turno ${modalTurno.turno_codigo} transferido a ${destino?.codigo || 'ventanilla'}.`)
+        cerrarModal()
+        await cargar()
+      } else {
+        setAviso(r.motivo || 'No se pudo transferir el turno.')
+      }
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'No se pudo transferir el turno.')
     } finally {
       setAccionando(false)
     }
@@ -445,7 +467,7 @@ export default function ColaVentanillas() {
                 )}
               </div>
 
-              {/* Derecha: Finalizar (CALLED/SERVING) y Eliminar (siempre) */}
+              {/* Derecha: Finalizar (CALLED/SERVING), Transferir (ASIGNED) y Eliminar (siempre) */}
               <div className="flex flex-col gap-2">
                 {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
                   <button
@@ -454,6 +476,15 @@ export default function ColaVentanillas() {
                     className="rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
                   >
                     {accionando ? 'Procesando…' : 'Finalizar'}
+                  </button>
+                )}
+                {modalTurno.turno_estado === 'ASIGNED' && (
+                  <button
+                    onClick={() => setModalTransferir(true)}
+                    disabled={accionando}
+                    className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                  >
+                    Transferir
                   </button>
                 )}
                 <button
@@ -466,6 +497,69 @@ export default function ColaVentanillas() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Sub-modal de transferencia */}
+      {modalTransferir && modalTurno && modalVentanilla && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 modal-bg-entrada">
+          <div className="tarjeta w-full max-w-md p-0 modal-entrada overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-violet-50">
+              <div>
+                <h3 className="text-lg font-bold text-gris-900">Transferir turno</h3>
+                <p className="text-xs text-gris-500">
+                  {modalTurno.turno_codigo} — desde {modalVentanilla.codigo}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalTransferir(false)}
+                className="rounded-lg p-1 text-gris-400 hover:bg-gris-200 hover:text-gris-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                  <path d="M0 0h24v24H0z" fill="none" />
+                  <path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Cuerpo: lista de ventanillas disponibles */}
+            <div className="px-5 py-4">
+              <p className="text-sm text-gris-600 mb-3">
+                Selecciona la ventanilla destino. Solo se muestran las que tienen menos de 3 turnos.
+              </p>
+              <div className="flex flex-col gap-2">
+                {ventanillas
+                  .filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.activo && v.estado === 'ACTIVO')
+                  .map(v => (
+                    <button
+                      key={v.modulo_id}
+                      type="button"
+                      onClick={() => manejarTransferir(v.modulo_id)}
+                      disabled={accionando}
+                      className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-violet-50 hover:border-violet-200 transition-colors disabled:opacity-50"
+                    >
+                      <div>
+                        <div className="font-semibold text-gris-900">{v.codigo}</div>
+                        <div className="text-xs text-gris-500">{v.denominacion}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gris-500">{v.turno_count}/3 turnos</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                          <path d="M0 0h24v24H0z" fill="none" />
+                          <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                        </svg>
+                      </div>
+                    </button>
+                  ))}
+                {ventanillas.filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.activo && v.estado === 'ACTIVO').length === 0 && (
+                  <div className="rounded-xl border border-gris-200 bg-gris-50 p-4 text-center">
+                    <p className="text-sm text-gris-500">No hay ventanillas disponibles para recibir turnos.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
