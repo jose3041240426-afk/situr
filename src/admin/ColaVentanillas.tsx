@@ -531,7 +531,7 @@ export default function ColaVentanillas() {
               </p>
               <div className="flex flex-col gap-2">
                 {ventanillas
-                  .filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.activo && v.estado === 'ACTIVO')
+                  .filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.disponible)
                   .map(v => (
                     <button
                       key={v.modulo_id}
@@ -553,7 +553,7 @@ export default function ColaVentanillas() {
                       </div>
                     </button>
                   ))}
-                {ventanillas.filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.activo && v.estado === 'ACTIVO').length === 0 && (
+                {ventanillas.filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.disponible).length === 0 && (
                   <div className="rounded-xl border border-gris-200 bg-gris-50 p-4 text-center">
                     <p className="text-sm text-gris-500">No hay ventanillas disponibles para recibir turnos.</p>
                   </div>
