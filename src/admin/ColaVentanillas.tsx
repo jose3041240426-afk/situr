@@ -28,6 +28,11 @@ export default function ColaVentanillas() {
   const [modalTransferir, setModalTransferir] = useState(false)
   const { publicar, registrarRefrescar } = useTransferencias()
 
+  function nombreVentanilla(codigo: string): string {
+    const m = codigo.match(/^V(\\d+)$/i)
+    return m ? `Ventanilla ${m[1]}` : codigo
+  }
+
   const cargar = useCallback(async () => {
     try {
       const d = await estadoVentanillas()
@@ -250,7 +255,7 @@ export default function ColaVentanillas() {
           <div key={v.modulo_id} className="tarjeta flex flex-col gap-3 p-4 overflow-hidden" style={{ height: 420 }}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-lg font-bold text-gris-900">{v.codigo}</div>
+                <div className="text-lg font-bold text-gris-900">{nombreVentanilla(v.codigo)}</div>
                 <div className="text-xs text-gris-500">{v.denominacion}</div>
                 {v.es_mia && (
                   <span className="mt-1 inline-block rounded-full bg-azul-100 px-2 py-0.5 text-xs font-medium text-azul-700">
@@ -331,7 +336,7 @@ export default function ColaVentanillas() {
                   {modalTurno.turno_codigo}
                 </h3>
                 <p className="text-xs text-gris-500">
-                  Ventanilla {modalVentanilla.codigo}
+                  {nombreVentanilla(modalVentanilla.codigo)}
                 </p>
               </div>
               <button
@@ -545,7 +550,7 @@ export default function ColaVentanillas() {
               <div>
                 <h3 className="text-lg font-bold text-gris-900">Transferir turno</h3>
                 <p className="text-xs text-gris-500">
-                  {modalTurno.turno_codigo} — desde {modalVentanilla.codigo}
+                  {modalTurno.turno_codigo} — desde {nombreVentanilla(modalVentanilla.codigo)}
                 </p>
               </div>
               <button
@@ -576,7 +581,7 @@ export default function ColaVentanillas() {
                       className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-violet-50 hover:border-violet-200 transition-colors disabled:opacity-50"
                     >
                       <div>
-                        <div className="font-semibold text-gris-900">{v.codigo}{v.estado_ventanilla !== 'ACTIVO' ? ' (pausada)' : ''}</div>
+                        <div className="font-semibold text-gris-900">{nombreVentanilla(v.codigo)}{v.estado_ventanilla !== 'ACTIVO' ? ' (pausada)' : ''}</div>
                         <div className="text-xs text-gris-500">{v.denominacion}</div>
                       </div>
                       <div className="flex items-center gap-2">
