@@ -492,7 +492,7 @@ export default function ColaVentanillas() {
                     <span className="icono-transferir" />
                   </button>
                 )}
-                {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
+                {modalTurno.turno_estado === 'SERVING' && (
                   <button
                     onClick={manejarFinalizar}
                     disabled={accionando}
@@ -505,7 +505,7 @@ export default function ColaVentanillas() {
                   <button
                     onClick={manejarIniciarAtencion}
                     disabled={accionando}
-                    className="boton-primario flex-1"
+                    className="boton-primario w-1/2"
                   >
                     {accionando ? 'Procesando…' : 'Iniciar atención'}
                   </button>
