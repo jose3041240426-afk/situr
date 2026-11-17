@@ -130,7 +130,8 @@ export interface Ventanilla {
   denominacion: string
   estado: EstadoModulo
   activo: boolean
-  estado_ventanilla: EstadoVentanilla
+  estado_ventanilla: string
+  estado_con_turno: 'ATENDIENDO' | 'DISPONIBLE'
   disponible: boolean
   es_mia: boolean
   turno_count: number

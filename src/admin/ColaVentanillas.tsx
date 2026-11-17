@@ -6,13 +6,11 @@ import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoA
 const ESTADO_COLOR: Record<string, string> = {
   DISPONIBLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   ATENDIENDO: 'bg-amber-50 text-amber-700 border-amber-200',
-  SIN_DISPONIBILIDAD: 'bg-gris-100 text-gris-500 border-gris-200',
 }
 
 const ESTADO_TEXTO: Record<string, string> = {
   DISPONIBLE: 'Disponible',
   ATENDIENDO: 'Atendiendo',
-  SIN_DISPONIBILIDAD: 'Sin disponibilidad',
 }
 
 export default function ColaVentanillas() {
@@ -246,9 +244,9 @@ export default function ColaVentanillas() {
                 )}
               </div>
               <span
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_ventanilla]}`}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_con_turno]}`}
               >
-                {ESTADO_TEXTO[v.estado_ventanilla]}
+                {ESTADO_TEXTO[v.estado_con_turno]}
               </span>
             </div>
 
