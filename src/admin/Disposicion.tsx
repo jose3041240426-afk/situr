@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useTransferencias } from '../lib/transferencias'
+import { estadoVentanillas, responderTransferencia } from '../lib/rpc'
 import { nombreCompleto } from '../lib/operador'
 import { Modal } from '../components/ui'
 import { Avatar } from '../components/ui/avatar'
@@ -162,23 +163,127 @@ function MenuCristal({
  * respuesta (que vive en la pantalla de turnos, quien publica los pendientes).
  */
 function CampanaTransferencias() {
-  const { pendientes, solicitarApertura } = useTransferencias()
-  if (pendientes.length === 0) return null
+  const { pendientes, panelAbierto, abrirPanel, cerrarPanel } = useTransferencias()
+  const hay = pendientes.length > 0
   return (
     <button
       type="button"
-      onClick={solicitarApertura}
-      className="relative rounded-full p-2 text-amber-300 transition-colors hover:bg-white/10 hover:text-amber-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
-      aria-label={`${pendientes.length} solicitudes de transferencia pendientes`}
-      title="Solicitudes de transferencia pendientes"
+      onClick={() => (panelAbierto ? cerrarPanel() : abrirPanel())}
+      className={`relative rounded-full p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300 ${
+        hay
+          ? 'text-amber-300 hover:bg-white/10 hover:text-amber-200'
+          : 'text-gris-300 hover:bg-white/10 hover:text-gris-100'
+      }`}
+      aria-label="Solicitudes de transferencia"
+      title="Solicitudes de transferencia"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24">
         <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
       </svg>
-      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-        {pendientes.length}
-      </span>
+      {hay && (
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+          {pendientes.length}
+        </span>
+      )}
     </button>
+  )
+}
+
+/**
+ * Panel desplegable de solicitudes de transferencia (anclado a la campana,
+ * debajo de la cabecera), estilo panel de notificaciones.
+ */
+function PanelTransferencias() {
+  const { pendientes, codigoVentanilla, panelAbierto, cerrarPanel, publicar, refrescar } = useTransferencias()
+  const [accionando, setAccionando] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  if (!panelAbierto) return null
+
+  async function responder(solicitudId: number, aceptar: boolean) {
+    setAccionando(true)
+    setAviso(null)
+    try {
+      const r = await responderTransferencia(solicitudId, aceptar)
+      if (r.ok) {
+        setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
+      } else {
+        setAviso(r.motivo || 'No se pudo responder.')
+      }
+      // Refresca los datos de la cabecera y de la pantalla de turnos
+      try {
+        const d = await estadoVentanillas()
+        const mia = d?.ventanillas?.find((v: { es_mia: boolean }) => v.es_mia)
+        publicar(mia?.transferencias_pendientes ?? [], mia?.codigo ?? codigoVentanilla)
+      } catch {
+        // ignora; el polling regular actualizará
+      }
+      refrescar()
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'Error al responder.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Velo transparente para cerrar al clicar fuera */}
+      <div className="fixed inset-0 z-40" onClick={cerrarPanel} />
+      <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gris-200 bg-amber-50 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-bold text-gris-900">Solicitudes de transferencia</h3>
+            <p className="text-xs text-gris-500">
+              {codigoVentanilla ? `${codigoVentanilla} — ` : ''}
+              {pendientes.length} pendiente(s)
+            </p>
+          </div>
+          <button onClick={cerrarPanel} className="rounded-lg p-1 text-gris-400 hover:bg-gris-200">
+            <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" />
+            </svg>
+          </button>
+        </div>
+        <div className="max-h-80 overflow-y-auto px-3 py-3">
+          {pendientes.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gris-500">No hay solicitudes pendientes.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {pendientes.map(st => (
+                <div key={st.solicitud_id} className="rounded-xl border border-gris-200 bg-white p-3">
+                  <p className="text-sm text-gris-800">
+                    <strong>Ventanilla {st.origen_codigo}</strong> quiere transferir el turno{' '}
+                    <strong>{st.turno_codigo}</strong> hacia ti. ¿Aceptas?
+                  </p>
+                  {aviso && (
+                    <p className="mt-2 text-xs text-azul-700">{aviso}</p>
+                  )}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={accionando}
+                      onClick={() => responder(st.solicitud_id, true)}
+                      className="boton-ok text-xs flex-1"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={accionando}
+                      onClick={() => responder(st.solicitud_id, false)}
+                      className="boton-peligro text-xs flex-1"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -475,7 +580,10 @@ export default function Disposicion({
 
           <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <CampanaTransferencias />
+            <div className="relative">
+              <CampanaTransferencias />
+              <PanelTransferencias />
+            </div>
             {operador && (
               <NavLink
                 to="/admin/perfil"

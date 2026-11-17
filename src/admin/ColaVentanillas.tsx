@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, responderTransferencia } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 import { useTransferencias } from '../lib/transferencias'
 
@@ -26,8 +26,7 @@ export default function ColaVentanillas() {
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
-  const [modalTransferencias, setModalTransferencias] = useState<string | null>(null)
-  const { publicar, aperturas } = useTransferencias()
+  const { publicar, registrarRefrescar } = useTransferencias()
 
   const cargar = useCallback(async () => {
     try {
@@ -53,28 +52,16 @@ export default function ColaVentanillas() {
     return () => window.clearTimeout(t)
   }, [aviso])
 
-  // Cierra automáticamente el modal de solicitudes cuando ya no hay pendientes
-  useEffect(() => {
-    if (!modalTransferencias) return
-    const v = datos?.ventanillas?.find(x => x.modulo_id === modalTransferencias)
-    if (!v || (v.transferencias_pendientes?.length ?? 0) === 0) {
-      setModalTransferencias(null)
-    }
-  }, [modalTransferencias, datos])
-
   // Publica los pendientes de MI ventanilla al contexto de la cabecera global
   useEffect(() => {
     const mia = datos?.ventanillas?.find(v => v.es_mia)
     publicar(mia?.transferencias_pendientes ?? [], mia?.codigo ?? null)
   }, [datos, publicar])
 
-  // La campana de la cabecera pide abrir el modal de respuesta
-  const miaIdRef = useRef<string | null>(null)
-  miaIdRef.current = datos?.ventanillas?.find(v => v.es_mia)?.modulo_id ?? null
+  // Registra la función de recarga para que el panel de la cabecera pueda refrescar
   useEffect(() => {
-    if (aperturas === 0) return
-    if (miaIdRef.current) setModalTransferencias(miaIdRef.current)
-  }, [aperturas])
+    registrarRefrescar(cargar)
+  }, [cargar, registrarRefrescar])
 
   async function solicitar(moduloId: string) {
     setOcupado(moduloId)
@@ -183,23 +170,6 @@ export default function ColaVentanillas() {
     }
   }
 
-  async function manejarResponderTransferencia(solicitudId: number, aceptar: boolean) {
-    setAccionando(true)
-    try {
-      const r = await responderTransferencia(solicitudId, aceptar)
-      if (r.ok) {
-        setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
-      } else {
-        setAviso(r.motivo || 'No se pudo responder.')
-      }
-      await cargar()
-    } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'Error al responder.')
-    } finally {
-      setAccionando(false)
-    }
-  }
-
   async function manejarTransferir(destinoModuloId: string) {
     if (!modalTurno) return
     setAccionando(true)
@@ -234,8 +204,6 @@ export default function ColaVentanillas() {
 
   const cola = datos?.cola ?? []
   const ventanillas = datos?.ventanillas ?? []
-  // Ventanilla cuyas solicitudes se muestran en el modal (derivada de datos frescos)
-  const ventT = modalTransferencias ? ventanillas.find(v => v.modulo_id === modalTransferencias) ?? null : null
 
   return (
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
@@ -625,52 +593,7 @@ export default function ColaVentanillas() {
         </div>
       )}
 
-      {modalTransferencias && ventT && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 modal-bg-entrada">
-          <div className="tarjeta w-full max-w-md p-0 modal-entrada overflow-hidden">
-            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-amber-50">
-              <div>
-                <h3 className="text-lg font-bold text-gris-900">Solicitudes de transferencia</h3>
-                <p className="text-xs text-gris-500">{ventT.codigo} — {ventT.transferencias_pendientes?.length ?? 0} pendiente(s)</p>
-              </div>
-              <button onClick={() => setModalTransferencias(null)} className="rounded-lg p-1 text-gris-400 hover:bg-gris-200">
-                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" /></svg>
-              </button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-3">
-              {(ventT.transferencias_pendientes ?? []).length === 0 ? (
-                <p className="text-sm text-gris-500">No hay solicitudes pendientes.</p>
-              ) : (
-                (ventT.transferencias_pendientes ?? []).map(st => (
-                  <div key={st.solicitud_id} className="rounded-xl border border-gris-200 bg-white p-3">
-                    <p className="text-sm text-gris-800">
-                      <strong>Ventanilla {st.origen_codigo}</strong> quiere transferir el turno <strong>{st.turno_codigo}</strong> hacia ti. ¿Aceptas?
-                    </p>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        type="button"
-                        disabled={accionando}
-                        onClick={() => manejarResponderTransferencia(st.solicitud_id, true)}
-                        className="boton-ok text-xs flex-1"
-                      >
-                        Aceptar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={accionando}
-                        onClick={() => manejarResponderTransferencia(st.solicitud_id, false)}
-                        className="boton-peligro text-xs flex-1"
-                      >
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* (El panel de solicitudes vive ahora en la cabecera global, como desplegable de la campana.) */}
 
     </div>
   )

@@ -4,34 +4,36 @@ import type { TransferenciaPendiente } from './tipos'
 /**
  * Estado compartido de las solicitudes de transferencia pendientes de la
  * ventanilla del operador. La pantalla `ColaVentanillas` las publica cada vez
- * que recarga; la cabecera global (`Disposicion`) solo las lee para mostrar la
- * campana. El modal de respuesta vive en la pantalla y se abre pidiéndolo aquí.
+ * que recarga; la cabecera global (`Disposicion`) muestra la campana y el
+ * panel de notificaciones (desplegable anclado a la campana).
  */
 interface EstadoTransferencias {
-  /** Solicitudes pendientes de la ventanilla del operador. */
   pendientes: TransferenciaPendiente[]
-  /** Código de la ventanilla del operador. */
   codigoVentanilla: string | null
-  /** Publica los pendientes desde la pantalla. */
   publicar: (pendientes: TransferenciaPendiente[], codigoVentanilla: string | null) => void
-  /** La campana pide abrir el modal. */
-  solicitarApertura: () => void
-  /** Contador de aperturas solicitadas (lo observa la pantalla). */
-  aperturas: number
+  panelAbierto: boolean
+  abrirPanel: () => void
+  cerrarPanel: () => void
+  refrescar: () => void
+  registrarRefrescar: (fn: () => void) => void
 }
 
 const Ctx = createContext<EstadoTransferencias>({
   pendientes: [],
   codigoVentanilla: null,
   publicar: () => {},
-  solicitarApertura: () => {},
-  aperturas: 0,
+  panelAbierto: false,
+  abrirPanel: () => {},
+  cerrarPanel: () => {},
+  refrescar: () => {},
+  registrarRefrescar: () => {},
 })
 
 export function TransferenciasProvider({ children }: { children: React.ReactNode }) {
   const [pendientes, setPendientes] = useState<TransferenciaPendiente[]>([])
   const [codigoVentanilla, setCodigoVentanilla] = useState<string | null>(null)
-  const [aperturas, setAperturas] = useState(0)
+  const [panelAbierto, setPanelAbierto] = useState(false)
+  const [refrescarFn, setRefrescarFn] = useState<() => void>(() => () => {})
 
   const valor = useMemo<EstadoTransferencias>(
     () => ({
@@ -41,10 +43,13 @@ export function TransferenciasProvider({ children }: { children: React.ReactNode
         setPendientes(p)
         setCodigoVentanilla(c)
       },
-      solicitarApertura: () => setAperturas(n => n + 1),
-      aperturas,
+      panelAbierto,
+      abrirPanel: () => setPanelAbierto(true),
+      cerrarPanel: () => setPanelAbierto(false),
+      refrescar: () => refrescarFn(),
+      registrarRefrescar: (fn) => setRefrescarFn(() => fn),
     }),
-    [pendientes, codigoVentanilla, aperturas]
+    [pendientes, codigoVentanilla, panelAbierto, refrescarFn]
   )
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
