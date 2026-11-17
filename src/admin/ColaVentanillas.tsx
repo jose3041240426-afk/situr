@@ -247,7 +247,7 @@ export default function ColaVentanillas() {
       {/* Contenedores de ventanillas */}
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {ventanillas.map((v: Ventanilla) => (
-          <div key={v.modulo_id} className="tarjeta flex flex-col gap-3 p-4 overflow-hidden" style={{ height: 360 }}>
+          <div key={v.modulo_id} className="tarjeta flex flex-col gap-3 p-4 overflow-hidden" style={{ height: 420 }}>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-lg font-bold text-gris-900">{v.codigo}</div>
@@ -266,7 +266,7 @@ export default function ColaVentanillas() {
             </div>
 
             {v.turnos_asignados && v.turnos_asignados.length > 0 ? (
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto min-h-0">
+              <div className="flex flex-1 flex-col gap-2">
                 {v.turnos_asignados.map((t: TurnoAsignado) =>
                   v.es_mia ? (
                     <button
