@@ -478,7 +478,8 @@ export default function ColaVentanillas() {
                 <button
                   onClick={manejarEliminar}
                   disabled={accionando}
-                  className="inline-flex items-center justify-center rounded-lg border border-rojo-200 bg-rojo-50 px-3 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
+                  className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-rojo-500 hover:text-rojo-600 disabled:opacity-50"
+                  title="Eliminar turno"
                 >
                   {accionando ? 'Procesando…' : <span className="icono-papelera" />}
                 </button>
@@ -486,7 +487,7 @@ export default function ColaVentanillas() {
                   <button
                     onClick={() => setModalTransferir(true)}
                     disabled={accionando}
-                    className="inline-flex items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                    className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-azul-500 hover:text-azul-600 disabled:opacity-50"
                   >
                     <span className="icono-transferir" />
                   </button>
