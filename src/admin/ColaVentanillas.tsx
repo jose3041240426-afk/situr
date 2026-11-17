@@ -475,22 +475,20 @@ export default function ColaVentanillas() {
             {/* Acciones: una sola fila, ancho dividido en partes iguales */}
             <div className="border-t border-gris-200 bg-gris-50 px-5 py-4">
               <div className="flex gap-2">
+                <button
+                  onClick={manejarEliminar}
+                  disabled={accionando}
+                  className="flex-1 inline-flex items-center justify-center rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
+                >
+                  {accionando ? 'Procesando…' : <span className="icono-papelera" />}
+                </button>
                 {modalTurno.turno_estado === 'ASIGNED' && (
-                  <BotonLlamar
-                    onClick={manejarLlamar}
-                    disabled={accionando}
-                    className="flex-1"
-                  >
-                    {accionando ? 'Procesando…' : 'Llamar turno'}
-                  </BotonLlamar>
-                )}
-                {modalTurno.turno_estado === 'CALLED' && (
                   <button
-                    onClick={manejarIniciarAtencion}
+                    onClick={() => setModalTransferir(true)}
                     disabled={accionando}
-                    className="boton-primario flex-1"
+                    className="flex-1 inline-flex items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                   >
-                    {accionando ? 'Procesando…' : 'Iniciar atención'}
+                    <span className="icono-transferir" />
                   </button>
                 )}
                 {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
@@ -502,22 +500,24 @@ export default function ColaVentanillas() {
                     {accionando ? 'Procesando…' : 'Finalizar'}
                   </button>
                 )}
-                {modalTurno.turno_estado === 'ASIGNED' && (
+                {modalTurno.turno_estado === 'CALLED' && (
                   <button
-                    onClick={() => setModalTransferir(true)}
+                    onClick={manejarIniciarAtencion}
                     disabled={accionando}
-                    className="flex-1 inline-flex items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                    className="boton-primario flex-1"
                   >
-                    <span className="icono-transferir" />
+                    {accionando ? 'Procesando…' : 'Iniciar atención'}
                   </button>
                 )}
-                <button
-                  onClick={manejarEliminar}
-                  disabled={accionando}
-                  className="flex-1 inline-flex items-center justify-center rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
-                >
-                  {accionando ? 'Procesando…' : <span className="icono-papelera" />}
-                </button>
+                {modalTurno.turno_estado === 'ASIGNED' && (
+                  <BotonLlamar
+                    onClick={manejarLlamar}
+                    disabled={accionando}
+                    className="flex-1"
+                  >
+                    {accionando ? 'Procesando…' : 'Llamar turno'}
+                  </BotonLlamar>
+                )}
               </div>
             </div>
 
