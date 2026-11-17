@@ -40,10 +40,10 @@ export default function ColaVentanillas() {
   }, [])
 
   useEffect(() => {
-    cargar()
-    const id = window.setInterval(cargar, 4000)
-    return () => window.clearInterval(id)
-  }, [cargar])
+    if (!aviso) return
+    const t = window.setTimeout(() => setAviso(null), 4000)
+    return () => window.clearTimeout(t)
+  }, [aviso])
 
   async function solicitar(moduloId: string) {
     setOcupado(moduloId)
@@ -212,11 +212,33 @@ export default function ColaVentanillas() {
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
-        {aviso && (
-          <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm text-azul-700">
-            {aviso}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {(() => {
+            const mia = ventanillas.find(v => v.es_mia)
+            const pendientes = mia?.transferencias_pendientes ?? []
+            if (pendientes.length === 0) return null
+            return (
+              <button
+                type="button"
+                onClick={() => mia && setModalTransferencias(mia)}
+                className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
+                title="Solicitudes de transferencia pendientes"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
+                </svg>
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
+                  {pendientes.length}
+                </span>
+              </button>
+            )
+          })()}
+          {aviso && (
+            <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm font-semibold text-azul-700">
+              {aviso}
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Carrusel horizontal de turnos pendientes */}
