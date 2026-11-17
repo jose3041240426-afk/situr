@@ -1586,7 +1586,7 @@ body {
   position: absolute;
   left: 0.8em;
   top: 50%;
-  margin-top: -0.3em;
+  transform: translateY(-50%);
   display: grid;
   place-items: center;
   width: 1.15em;
