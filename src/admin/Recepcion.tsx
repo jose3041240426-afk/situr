@@ -798,6 +798,16 @@ export default function Recepcion() {
                       <div style={{ padding: 16, borderRadius: 14, background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: 20 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>Turno {ultimoTurno.codigo}</div>
                         <CodigoQR valor={ultimoTurno.token} tamano={160} />
+                        <div style={{ marginTop: 12 }}>
+                          <a
+                            href="/admin/turnos-vivos"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'inline-block', padding: '8px 14px', borderRadius: 10, background: C.blue600, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+                          >
+                            Abrir pantalla de turnos (código y cola)
+                          </a>
+                        </div>
                       </div>
                     )}
                   </div>
