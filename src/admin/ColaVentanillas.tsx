@@ -25,7 +25,7 @@ export default function ColaVentanillas() {
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
-  const [modalTransferencias, setModalTransferencias] = useState<Ventanilla | null>(null)
+  const [modalTransferencias, setModalTransferencias] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     try {
@@ -50,6 +50,15 @@ export default function ColaVentanillas() {
     const t = window.setTimeout(() => setAviso(null), 4000)
     return () => window.clearTimeout(t)
   }, [aviso])
+
+  // Cierra automáticamente el modal de solicitudes cuando ya no hay pendientes
+  useEffect(() => {
+    if (!modalTransferencias) return
+    const v = datos?.ventanillas?.find(x => x.modulo_id === modalTransferencias)
+    if (!v || (v.transferencias_pendientes?.length ?? 0) === 0) {
+      setModalTransferencias(null)
+    }
+  }, [modalTransferencias, datos])
 
   async function solicitar(moduloId: string) {
     setOcupado(moduloId)
@@ -168,10 +177,6 @@ export default function ColaVentanillas() {
         setAviso(r.motivo || 'No se pudo responder.')
       }
       await cargar()
-      if (modalTransferencias) {
-        const updated = ventanillas.find(v => v.modulo_id === modalTransferencias.modulo_id)
-        if (updated) setModalTransferencias(updated)
-      }
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'Error al responder.')
     } finally {
@@ -213,6 +218,8 @@ export default function ColaVentanillas() {
 
   const cola = datos?.cola ?? []
   const ventanillas = datos?.ventanillas ?? []
+  // Ventanilla cuyas solicitudes se muestran en el modal (derivada de datos frescos)
+  const ventT = modalTransferencias ? ventanillas.find(v => v.modulo_id === modalTransferencias) ?? null : null
 
   return (
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
@@ -226,7 +233,7 @@ export default function ColaVentanillas() {
             return (
               <button
                 type="button"
-                onClick={() => mia && setModalTransferencias(mia)}
+                onClick={() => mia && setModalTransferencias(mia.modulo_id)}
                 className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
                 title="Solicitudes de transferencia pendientes"
               >
@@ -290,10 +297,10 @@ export default function ColaVentanillas() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {(v.transferencias_pendientes?.length ?? 0) > 0 && (
+                {v.es_mia && (v.transferencias_pendientes?.length ?? 0) > 0 && (
                   <button
                     type="button"
-                    onClick={() => setModalTransferencias(v)}
+                    onClick={() => setModalTransferencias(v.modulo_id)}
                     className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
                     title="Solicitudes de transferencia pendientes"
                   >
@@ -315,28 +322,41 @@ export default function ColaVentanillas() {
 
             {v.turnos_asignados && v.turnos_asignados.length > 0 ? (
               <div className="flex flex-col gap-2">
-                {v.turnos_asignados.map((t: TurnoAsignado) => (
-                  <button
-                    key={t.turno_id}
-                    type="button"
-                    onClick={() => {
-                      setModalTurno(t)
-                      setModalVentanilla(v)
-                      setTimerSegundos(0)
-                      setTimerActivo(false)
-                    }}
-                    className="turno-entrada w-full text-left rounded-xl bg-gris-50 p-3 cursor-pointer hover:bg-gris-100 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
-                        {t.turno_denominacion_tramite && (
-                          <div className="text-xs text-gris-600">{t.turno_denominacion_tramite}</div>
-                        )}
+                {v.turnos_asignados.map((t: TurnoAsignado) =>
+                  v.es_mia ? (
+                    <button
+                      key={t.turno_id}
+                      type="button"
+                      onClick={() => {
+                        setModalTurno(t)
+                        setModalVentanilla(v)
+                        setTimerSegundos(0)
+                        setTimerActivo(false)
+                      }}
+                      className="turno-entrada w-full text-left rounded-xl bg-gris-50 p-3 cursor-pointer hover:bg-gris-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
+                          {t.turno_denominacion_tramite && (
+                            <div className="text-xs text-gris-600">{t.turno_denominacion_tramite}</div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div key={t.turno_id} className="w-full rounded-xl bg-gris-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xl font-bold text-gris-900">{t.turno_codigo}</div>
+                          {t.turno_denominacion_tramite && (
+                            <div className="text-xs text-gris-600">{t.turno_denominacion_tramite}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </button>
-                ))}
+                  )
+                )}
               </div>
             ) : (
               <p className="text-sm text-gris-500">Sin turno asignado.</p>
@@ -628,23 +648,23 @@ export default function ColaVentanillas() {
         </div>
       )}
 
-      {modalTransferencias && (
+      {modalTransferencias && ventT && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 modal-bg-entrada">
           <div className="tarjeta w-full max-w-md p-0 modal-entrada overflow-hidden">
             <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-amber-50">
               <div>
                 <h3 className="text-lg font-bold text-gris-900">Solicitudes de transferencia</h3>
-                <p className="text-xs text-gris-500">{modalTransferencias.codigo} — {modalTransferencias.transferencias_pendientes?.length ?? 0} pendiente(s)</p>
+                <p className="text-xs text-gris-500">{ventT.codigo} — {ventT.transferencias_pendientes?.length ?? 0} pendiente(s)</p>
               </div>
               <button onClick={() => setModalTransferencias(null)} className="rounded-lg p-1 text-gris-400 hover:bg-gris-200">
                 <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" /></svg>
               </button>
             </div>
             <div className="px-5 py-4 flex flex-col gap-3">
-              {(modalTransferencias.transferencias_pendientes ?? []).length === 0 ? (
+              {(ventT.transferencias_pendientes ?? []).length === 0 ? (
                 <p className="text-sm text-gris-500">No hay solicitudes pendientes.</p>
               ) : (
-                (modalTransferencias.transferencias_pendientes ?? []).map(st => (
+                (ventT.transferencias_pendientes ?? []).map(st => (
                   <div key={st.solicitud_id} className="rounded-xl border border-gris-200 bg-white p-3">
                     <p className="text-sm text-gris-800">
                       <strong>Ventanilla {st.origen_codigo}</strong> quiere transferir el turno <strong>{st.turno_codigo}</strong> hacia ti. ¿Aceptas?
