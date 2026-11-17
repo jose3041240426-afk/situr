@@ -238,7 +238,7 @@ export default function ColaVentanillas() {
                 <div className="text-xs text-gris-600">{t.denominacion_tramite}</div>
                 <div className="text-lg font-bold text-gris-900">{t.codigo_turno}</div>
                 <div className="text-xs text-gris-500">
-                  {t.modulo_codigo ? `Ventanilla ${t.modulo_codigo}` : 'Ventanilla por asignar'}
+                  {t.modulo_codigo ? nombreVentanilla(t.modulo_codigo) : 'Ventanilla por asignar'}
                 </div>
                 <span className="mt-1 inline-block rounded-full bg-gris-100 px-2 py-0.5 text-xs">
                   {t.clave_tramite}
