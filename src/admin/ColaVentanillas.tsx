@@ -190,8 +190,11 @@ export default function ColaVentanillas() {
   // Key para re-disparar la animación escalonada cuando los datos cambian
   const animKey = `${cola.length}-${ventanillas.map(v => v.turno_count ?? 0).join('-')}`
 
+  // Key para re-disparar la animación escalonada cuando los datos cambian
+  const animKey = `${cola.length}-${ventanillas.map(v => v.turno_count ?? 0).join('-')}`
+
   return (
-    <div key={animKey} className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
+    <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
         {aviso && (
@@ -532,17 +535,17 @@ export default function ColaVentanillas() {
               </p>
               <div className="flex flex-col gap-2">
                 {ventanillas
-                  .filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.disponible)
+                  .filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3)
                   .map(v => (
                     <button
                       key={v.modulo_id}
                       type="button"
                       onClick={() => manejarTransferir(v.modulo_id)}
-                      disabled={accionando}
+                      disabled={accionando || !v.disponible}
                       className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-violet-50 hover:border-violet-200 transition-colors disabled:opacity-50"
                     >
                       <div>
-                        <div className="font-semibold text-gris-900">{v.codigo}</div>
+                        <div className="font-semibold text-gris-900">{v.codigo}{!v.disponible ? ' (pausada)' : ''}</div>
                         <div className="text-xs text-gris-500">{v.denominacion}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -554,7 +557,7 @@ export default function ColaVentanillas() {
                       </div>
                     </button>
                   ))}
-                {ventanillas.filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3 && v.disponible).length === 0 && (
+                {ventanillas.filter(v => v.modulo_id !== modalVentanilla.modulo_id && v.turno_count < 3).length === 0 && (
                   <div className="rounded-xl border border-gris-200 bg-gris-50 p-4 text-center">
                     <p className="text-sm text-gris-500">No hay ventanillas disponibles para recibir turnos.</p>
                   </div>
