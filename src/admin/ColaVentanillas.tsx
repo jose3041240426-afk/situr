@@ -190,7 +190,7 @@ export default function ColaVentanillas() {
   const ventanillas = datos?.ventanillas ?? []
 
   // Key para re-disparar la animación escalonada cuando los datos cambian
-  const animKey = `${cola.length}-${ventanillas.map(v => v.turno_count).join('-')}`
+  const animKey = `${cola.length}-${ventanillas.map(v => v.turno_count ?? 0).join('-')}`
 
   return (
     <div key={animKey} className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
@@ -252,7 +252,7 @@ export default function ColaVentanillas() {
               </span>
             </div>
 
-            {v.turnos_asignados.length > 0 ? (
+            {v.turnos_asignados && v.turnos_asignados.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {v.turnos_asignados.map((t: TurnoAsignado) => (
                   <button

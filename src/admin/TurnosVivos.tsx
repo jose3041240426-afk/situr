@@ -151,29 +151,33 @@ function Ticket({
         </div>
         <div
           style={{
-            fontSize: 11,
-            color: siguiente ? C.blue100 : 'rgba(157,184,227,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             marginTop: 2,
-            fontWeight: 600,
+            gap: 8,
           }}
         >
-          {t.modulo_codigo ? `Ventanilla ${t.modulo_codigo}` : 'Ventanilla por asignar'}
-        </div>
-        {/*
-          La hora va debajo del trámite: dice lo que el código no dice (quién
-          llegó antes) sin competir por el espacio con el distintivo.
-        */}
-        <div
-          style={{
-            fontSize: 11,
-            color: siguiente ? C.blue100 : 'rgba(157,184,227,0.65)',
-            marginTop: 2,
-            fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-          }}
-          title="Hora de emisión del turno"
-        >
-          {horaDe(t.creado_en)}
+          <span
+            style={{
+              fontSize: 11,
+              color: siguiente ? C.blue100 : 'rgba(157,184,227,0.85)',
+              fontWeight: 600,
+            }}
+          >
+            {t.modulo_codigo ? `Ventanilla ${t.modulo_codigo}` : 'Ventanilla por asignar'}
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: siguiente ? C.blue100 : 'rgba(157,184,227,0.65)',
+              fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+            title="Hora de emisión del turno"
+          >
+            {horaDe(t.creado_en)}
+          </span>
         </div>
       </div>
 

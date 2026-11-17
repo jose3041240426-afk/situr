@@ -134,7 +134,7 @@ export interface Ventanilla {
   disponible: boolean
   es_mia: boolean
   turno_count: number
-  turnos_asignados: TurnoAsignado[]
+  turnos_asignados?: TurnoAsignado[]
 }
 
 export interface RespuestaEstadoVentanillas {
