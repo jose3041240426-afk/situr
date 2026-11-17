@@ -171,15 +171,13 @@ function CampanaTransferencias() {
       onClick={() => (panelAbierto ? cerrarPanel() : abrirPanel())}
       className={`relative rounded-full p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300 ${
         hay
-          ? 'text-amber-300 hover:bg-white/10 hover:text-amber-200'
+          ? 'text-azul-400 hover:bg-white/10 hover:text-azul-300'
           : 'text-gris-300 hover:bg-white/10 hover:text-gris-100'
       }`}
       aria-label="Solicitudes de transferencia"
       title="Solicitudes de transferencia"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24" className={hay ? 'campana-sonando' : ''}>
-        <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
-      </svg>
+      <span className={`icono-campana ${hay ? 'campana-sonando' : ''}`} />
       {hay && (
         <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
           {pendientes.length}
