@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { useTransferencias } from '../lib/transferencias'
 import { nombreCompleto } from '../lib/operador'
 import { Modal } from '../components/ui'
 import { Avatar } from '../components/ui/avatar'
@@ -150,6 +151,34 @@ function MenuCristal({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Campana de solicitudes de transferencia en la cabecera global.
+ *
+ * Muestra el conteo de solicitudes pendientes dirigidas a la ventanilla del
+ * operador. Solo aparece si hay alguna; al pulsarla pide abrir el modal de
+ * respuesta (que vive en la pantalla de turnos, quien publica los pendientes).
+ */
+function CampanaTransferencias() {
+  const { pendientes, solicitarApertura } = useTransferencias()
+  if (pendientes.length === 0) return null
+  return (
+    <button
+      type="button"
+      onClick={solicitarApertura}
+      className="relative rounded-full p-2 text-amber-300 transition-colors hover:bg-white/10 hover:text-amber-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
+      aria-label={`${pendientes.length} solicitudes de transferencia pendientes`}
+      title="Solicitudes de transferencia pendientes"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
+      </svg>
+      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+        {pendientes.length}
+      </span>
+    </button>
   )
 }
 
@@ -445,23 +474,26 @@ export default function Disposicion({
           </button>
 
           <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
-          {operador && (
-            <NavLink
-              to="/admin/perfil"
-              aria-label={`Mi perfil de ${operador.nombres}`}
-              title="Mi perfil"
-              className="ml-auto flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
-            >
-              <Avatar
-                nombre={nombreCompleto(operador)}
-                tamano="sm"
-                etiqueta={`Avatar de ${nombreCompleto(operador)}`}
-              />
-              <span className="hidden max-w-40 truncate text-sm font-semibold text-white lg:block">
-                {operador.nombres}
-              </span>
-            </NavLink>
-          )}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <CampanaTransferencias />
+            {operador && (
+              <NavLink
+                to="/admin/perfil"
+                aria-label={`Mi perfil de ${operador.nombres}`}
+                title="Mi perfil"
+                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300"
+              >
+                <Avatar
+                  nombre={nombreCompleto(operador)}
+                  tamano="sm"
+                  etiqueta={`Avatar de ${nombreCompleto(operador)}`}
+                />
+                <span className="hidden max-w-40 truncate text-sm font-semibold text-white lg:block">
+                  {operador.nombres}
+                </span>
+              </NavLink>
+            )}
+          </div>
         </header>
         {/*
           El `Suspense` va AQUÍ DENTRO y no envolviendo todo el layout.

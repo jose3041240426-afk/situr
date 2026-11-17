@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, responderTransferencia } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
+import { useTransferencias } from '../lib/transferencias'
 
 const ESTADO_COLOR: Record<string, string> = {
   DISPONIBLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -26,6 +27,7 @@ export default function ColaVentanillas() {
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
   const [modalTransferencias, setModalTransferencias] = useState<string | null>(null)
+  const { publicar, aperturas } = useTransferencias()
 
   const cargar = useCallback(async () => {
     try {
@@ -59,6 +61,20 @@ export default function ColaVentanillas() {
       setModalTransferencias(null)
     }
   }, [modalTransferencias, datos])
+
+  // Publica los pendientes de MI ventanilla al contexto de la cabecera global
+  useEffect(() => {
+    const mia = datos?.ventanillas?.find(v => v.es_mia)
+    publicar(mia?.transferencias_pendientes ?? [], mia?.codigo ?? null)
+  }, [datos, publicar])
+
+  // La campana de la cabecera pide abrir el modal de respuesta
+  const miaIdRef = useRef<string | null>(null)
+  miaIdRef.current = datos?.ventanillas?.find(v => v.es_mia)?.modulo_id ?? null
+  useEffect(() => {
+    if (aperturas === 0) return
+    if (miaIdRef.current) setModalTransferencias(miaIdRef.current)
+  }, [aperturas])
 
   async function solicitar(moduloId: string) {
     setOcupado(moduloId)
@@ -225,39 +241,11 @@ export default function ColaVentanillas() {
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
-        <div className="flex items-center gap-3">
-          {(() => {
-            const mia = ventanillas.find(v => v.es_mia)
-            const pendientes = mia?.transferencias_pendientes ?? []
-            const hay = pendientes.length > 0
-            return (
-              <button
-                type="button"
-                onClick={() => mia && setModalTransferencias(mia.modulo_id)}
-                className={`relative rounded-full p-2 transition-colors ${
-                  hay
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'bg-gris-100 text-gris-400 hover:bg-gris-200'
-                }`}
-                title={hay ? 'Solicitudes de transferencia pendientes' : 'Sin solicitudes pendientes'}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
-                </svg>
-                {hay && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
-                    {pendientes.length}
-                  </span>
-                )}
-              </button>
-            )
-          })()}
-          {aviso && (
-            <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm font-semibold text-azul-700">
-              {aviso}
-            </div>
-          )}
-        </div>
+        {aviso && (
+          <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm font-semibold text-azul-700">
+            {aviso}
+          </div>
+        )}
       </header>
 
       {/* Carrusel horizontal de turnos pendientes */}

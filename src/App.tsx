@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ProveedorAuth, useAuth } from './lib/auth'
 import { hayConfiguracion } from './lib/supabase'
 import { useTitulo } from './lib/useTitulo'
+import { TransferenciasProvider } from './lib/transferencias'
 import Entrar from './admin/Entrar'
 import Disposicion from './admin/Disposicion'
 import FondoBloom from './components/FondoBloom'
@@ -137,6 +138,7 @@ export default function App() {
 
   return (
     <ProveedorAuth>
+      <TransferenciasProvider>
       {/*
         El fondo va fuera del enrutador y no se remonta al cambiar de pantalla:
         el degradado sigue su animación sin saltar al navegar.
@@ -208,6 +210,7 @@ export default function App() {
           <Route path="*" element={<NoEncontrado />} />
         </Routes>
       </Suspense>
+      </TransferenciasProvider>
     </ProveedorAuth>
   )
 }
