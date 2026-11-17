@@ -472,15 +472,14 @@ export default function ColaVentanillas() {
               )}
             </div>
 
-            {/* Acciones */}
-            <div className="border-t border-gris-200 bg-gris-50 px-5 py-4 flex items-center justify-between gap-2">
-              {/* Izquierda: Llamar (ASIGNED) o Iniciar atención (CALLED) */}
-              <div className="flex-1">
+            {/* Acciones: una sola fila, ancho dividido en partes iguales */}
+            <div className="border-t border-gris-200 bg-gris-50 px-5 py-4">
+              <div className="flex gap-2">
                 {modalTurno.turno_estado === 'ASIGNED' && (
                   <BotonLlamar
                     onClick={manejarLlamar}
                     disabled={accionando}
-                    className="w-full"
+                    className="flex-1"
                   >
                     {accionando ? 'Procesando…' : 'Llamar turno'}
                   </BotonLlamar>
@@ -489,20 +488,16 @@ export default function ColaVentanillas() {
                   <button
                     onClick={manejarIniciarAtencion}
                     disabled={accionando}
-                    className="boton-primario w-full"
+                    className="boton-primario flex-1"
                   >
                     {accionando ? 'Procesando…' : 'Iniciar atención'}
                   </button>
                 )}
-              </div>
-
-              {/* Derecha: Finalizar (CALLED/SERVING), Transferir (ASIGNED) y Eliminar (siempre) */}
-              <div className="flex flex-col gap-2">
                 {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
                   <button
                     onClick={manejarFinalizar}
                     disabled={accionando}
-                    className="rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
+                    className="flex-1 rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
                   >
                     {accionando ? 'Procesando…' : 'Finalizar'}
                   </button>
@@ -511,7 +506,7 @@ export default function ColaVentanillas() {
                   <button
                     onClick={() => setModalTransferir(true)}
                     disabled={accionando}
-                    className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                    className="flex-1 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                   >
                     Transferir
                   </button>
@@ -519,7 +514,7 @@ export default function ColaVentanillas() {
                 <button
                   onClick={manejarEliminar}
                   disabled={accionando}
-                  className="rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-rojo-200 bg-rojo-50 px-4 py-2.5 text-sm font-medium text-rojo-700 hover:bg-rojo-100 disabled:opacity-50"
                 >
                   {accionando ? 'Procesando…' : 'Eliminar turno'}
                 </button>
