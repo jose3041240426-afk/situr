@@ -535,11 +535,11 @@ export default function ColaVentanillas() {
                       key={v.modulo_id}
                       type="button"
                       onClick={() => manejarTransferir(v.modulo_id)}
-                      disabled={accionando || !v.disponible}
+                      disabled={accionando || !v.activo || v.estado !== 'ACTIVO' || v.turno_count >= 3}
                       className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-violet-50 hover:border-violet-200 transition-colors disabled:opacity-50"
                     >
                       <div>
-                        <div className="font-semibold text-gris-900">{v.codigo}{!v.disponible ? ' (pausada)' : ''}</div>
+                        <div className="font-semibold text-gris-900">{v.codigo}{(!v.activo || v.estado !== 'ACTIVO') ? ' (pausada)' : ''}</div>
                         <div className="text-xs text-gris-500">{v.denominacion}</div>
                       </div>
                       <div className="flex items-center gap-2">
