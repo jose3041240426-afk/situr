@@ -229,20 +229,26 @@ export default function ColaVentanillas() {
           {(() => {
             const mia = ventanillas.find(v => v.es_mia)
             const pendientes = mia?.transferencias_pendientes ?? []
-            if (pendientes.length === 0) return null
+            const hay = pendientes.length > 0
             return (
               <button
                 type="button"
                 onClick={() => mia && setModalTransferencias(mia.modulo_id)}
-                className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
-                title="Solicitudes de transferencia pendientes"
+                className={`relative rounded-full p-2 transition-colors ${
+                  hay
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-gris-100 text-gris-400 hover:bg-gris-200'
+                }`}
+                title={hay ? 'Solicitudes de transferencia pendientes' : 'Sin solicitudes pendientes'}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
                 </svg>
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
-                  {pendientes.length}
-                </span>
+                {hay && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
+                    {pendientes.length}
+                  </span>
+                )}
               </button>
             )
           })()}
