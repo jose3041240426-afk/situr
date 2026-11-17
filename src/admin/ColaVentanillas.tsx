@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, transferirTurnoVentanilla } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, responderTransferencia } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -25,6 +25,7 @@ export default function ColaVentanillas() {
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
+  const [modalTransferencias, setModalTransferencias] = useState<Ventanilla | null>(null)
 
   const cargar = useCallback(async () => {
     try {
@@ -151,21 +152,41 @@ export default function ColaVentanillas() {
     }
   }
 
+  async function manejarResponderTransferencia(solicitudId: number, aceptar: boolean) {
+    setAccionando(true)
+    try {
+      const r = await responderTransferencia(solicitudId, aceptar)
+      if (r.ok) {
+        setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
+      } else {
+        setAviso(r.motivo || 'No se pudo responder.')
+      }
+      await cargar()
+      if (modalTransferencias) {
+        const updated = ventanillas.find(v => v.modulo_id === modalTransferencias.modulo_id)
+        if (updated) setModalTransferencias(updated)
+      }
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'Error al responder.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
   async function manejarTransferir(destinoModuloId: string) {
     if (!modalTurno) return
     setAccionando(true)
     try {
-      const r = await transferirTurnoVentanilla(modalTurno.turno_id, destinoModuloId)
-      if (r.ok && r.servido) {
-        const destino = ventanillas.find(v => v.modulo_id === destinoModuloId)
-        setAviso(`Turno ${modalTurno.turno_codigo} transferido a ${destino?.codigo || 'ventanilla'}.`)
-        cerrarModal()
-        await cargar()
+      const r = await solicitarTransferencia(modalTurno.turno_id, destinoModuloId)
+      if (r.ok) {
+        setAviso(`Solicitud de transferencia enviada. Esperando aceptación de la ventanilla destino.`)
+        setModalTransferir(false)
       } else {
-        setAviso(r.motivo || 'No se pudo transferir el turno.')
+        setAviso(r.motivo || 'No se pudo solicitar la transferencia.')
       }
+      await cargar()
     } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'No se pudo transferir el turno.')
+      setAviso(e instanceof Error ? e.message : 'No se pudo solicitar la transferencia.')
     } finally {
       setAccionando(false)
     }
@@ -240,11 +261,28 @@ export default function ColaVentanillas() {
                   </span>
                 )}
               </div>
-              <span
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_con_turno]}`}
-              >
-                {ESTADO_TEXTO[v.estado_con_turno]}
-              </span>
+              <div className="flex items-center gap-2">
+                {(v.transferencias_pendientes?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalTransferencias(v)}
+                    className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
+                    title="Solicitudes de transferencia pendientes"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
+                    </svg>
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      {v.transferencias_pendientes!.length}
+                    </span>
+                  </button>
+                )}
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_con_turno]}`}
+                >
+                  {ESTADO_TEXTO[v.estado_con_turno]}
+                </span>
+              </div>
             </div>
 
             {v.turnos_asignados && v.turnos_asignados.length > 0 ? (
@@ -557,6 +595,53 @@ export default function ColaVentanillas() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalTransferencias && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 modal-bg-entrada">
+          <div className="tarjeta w-full max-w-md p-0 modal-entrada overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-amber-50">
+              <div>
+                <h3 className="text-lg font-bold text-gris-900">Solicitudes de transferencia</h3>
+                <p className="text-xs text-gris-500">{modalTransferencias.codigo} — {modalTransferencias.transferencias_pendientes?.length ?? 0} pendiente(s)</p>
+              </div>
+              <button onClick={() => setModalTransferencias(null)} className="rounded-lg p-1 text-gris-400 hover:bg-gris-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" /></svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              {(modalTransferencias.transferencias_pendientes ?? []).length === 0 ? (
+                <p className="text-sm text-gris-500">No hay solicitudes pendientes.</p>
+              ) : (
+                (modalTransferencias.transferencias_pendientes ?? []).map(st => (
+                  <div key={st.solicitud_id} className="rounded-xl border border-gris-200 bg-white p-3">
+                    <p className="text-sm text-gris-800">
+                      <strong>Ventanilla {st.origen_codigo}</strong> quiere transferir el turno <strong>{st.turno_codigo}</strong> hacia ti. ¿Aceptas?
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        type="button"
+                        disabled={accionando}
+                        onClick={() => manejarResponderTransferencia(st.solicitud_id, true)}
+                        className="boton-ok text-xs flex-1"
+                      >
+                        Aceptar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={accionando}
+                        onClick={() => manejarResponderTransferencia(st.solicitud_id, false)}
+                        className="boton-peligro text-xs flex-1"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

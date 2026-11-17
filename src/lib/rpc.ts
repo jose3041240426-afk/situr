@@ -1051,3 +1051,15 @@ export async function transferirTurnoVentanilla(
   if (error) throw traducirError(error)
   return data as RespuestaTransferirTurno
 }
+
+export async function solicitarTransferencia(turnoId: string, destinoModuloId: string): Promise<{ ok: boolean; motivo?: string }> {
+  const { data, error } = await supabase.rpc('solicitar_transferencia', { p_turno_id: turnoId, p_destino_modulo_id: destinoModuloId })
+  if (error) throw traducirError(error)
+  return data as { ok: boolean; motivo?: string }
+}
+
+export async function responderTransferencia(solicitudId: number, aceptar: boolean): Promise<{ ok: boolean; motivo?: string }> {
+  const { data, error } = await supabase.rpc('responder_transferencia', { p_solicitud_id: solicitudId, p_aceptar: aceptar })
+  if (error) throw traducirError(error)
+  return data as { ok: boolean; motivo?: string }
+}

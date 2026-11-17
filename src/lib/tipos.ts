@@ -124,6 +124,13 @@ export interface TurnoAsignado {
   operador_nombres: string | null
 }
 
+export interface TransferenciaPendiente {
+  solicitud_id: number
+  turno_codigo: string
+  origen_codigo: string
+  creado_en: string
+}
+
 export interface Ventanilla {
   modulo_id: string
   codigo: string
@@ -136,6 +143,7 @@ export interface Ventanilla {
   es_mia: boolean
   turno_count: number
   turnos_asignados?: TurnoAsignado[]
+  transferencias_pendientes?: TransferenciaPendiente[]
 }
 
 export interface RespuestaEstadoVentanillas {
