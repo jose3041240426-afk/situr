@@ -513,7 +513,7 @@ export default function ColaVentanillas() {
                   <BotonLlamar
                     onClick={manejarLlamar}
                     disabled={accionando}
-                    className="flex-1"
+                    className="ml-auto px-4 py-2.5"
                   >
                     {accionando ? 'Procesando…' : 'Llamar turno'}
                   </BotonLlamar>
