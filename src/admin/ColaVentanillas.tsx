@@ -483,6 +483,16 @@ export default function ColaVentanillas() {
                 >
                   {accionando ? 'Procesando…' : <span className="icono-papelera" />}
                 </button>
+                {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
+                  <button
+                    onClick={manejarLlamar}
+                    disabled={accionando}
+                    className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-azul-500 hover:text-azul-600 disabled:opacity-50"
+                    title="Repetir llamado"
+                  >
+                    <span className="icono-repetir" />
+                  </button>
+                )}
                 {modalTurno.turno_estado === 'ASIGNED' && (
                   <button
                     onClick={() => setModalTransferir(true)}
@@ -505,7 +515,7 @@ export default function ColaVentanillas() {
                   <button
                     onClick={manejarIniciarAtencion}
                     disabled={accionando}
-                    className="boton-primario w-1/2"
+                    className="boton-primario ml-auto w-1/2"
                   >
                     {accionando ? 'Procesando…' : 'Iniciar atención'}
                   </button>
