@@ -98,9 +98,11 @@ export interface FilaColaVentanilla {
   turno_id: string
   codigo_turno: string
   prioridad: PrioridadTurno
+  estado: EstadoTurno
   clave_tramite: string
   denominacion_tramite: string
   creado_en: string
+  modulo_codigo: string | null
 }
 
 export type EstadoVentanilla = 'DISPONIBLE' | 'ATENDIENDO' | 'SIN_DISPONIBILIDAD'

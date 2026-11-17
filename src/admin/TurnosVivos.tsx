@@ -149,6 +149,16 @@ function Ticket({
         >
           {t.clave_tramite} — {t.denominacion_tramite}
         </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: siguiente ? C.blue100 : 'rgba(157,184,227,0.85)',
+            marginTop: 2,
+            fontWeight: 600,
+          }}
+        >
+          {t.modulo_codigo ? `Ventanilla ${t.modulo_codigo}` : 'Ventanilla por asignar'}
+        </div>
         {/*
           La hora va debajo del trámite: dice lo que el código no dice (quién
           llegó antes) sin competir por el espacio con el distintivo.

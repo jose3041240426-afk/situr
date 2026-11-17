@@ -1248,6 +1248,8 @@ function etiquetaEstado(estado: TurnoPublico['estado']): string {
       return 'Cancelado'
     case 'SKIPPED':
       return 'Omitido'
+    default:
+      return estado
   }
 }
 

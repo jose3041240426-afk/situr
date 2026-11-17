@@ -430,6 +430,8 @@ export type FilaColaVivo = {
   /** Posición real de llamada (RN-017): puede ser anterior si hay prioridad. */
   posicion_global: number
   creado_en: string
+  /** Código de la ventanilla asignada, o null si aún no se asignó. */
+  modulo_codigo: string | null
 }
 
 export type ColaEnVivo = {
@@ -857,6 +859,8 @@ export function etiquetaEstado(estado: EstadoTurno): string {
   switch (estado) {
     case 'WAITING':
       return 'En espera'
+    case 'ASIGNED':
+      return 'Asignado'
     case 'CALLED':
       return 'Llamado'
     case 'SERVING':
