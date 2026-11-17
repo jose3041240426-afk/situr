@@ -296,28 +296,11 @@ export default function ColaVentanillas() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {v.es_mia && (v.transferencias_pendientes?.length ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setModalTransferencias(v.modulo_id)}
-                    className="relative rounded-full bg-amber-100 p-2 text-amber-700 hover:bg-amber-200"
-                    title="Solicitudes de transferencia pendientes"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
-                      <path fill="currentColor" d="M21.73 15.1a1.94 1.94 0 0 1-1.48 3.2H3.75a1.93 1.93 0 0 1-1.47-3.2l1.52-1.74v-3.4a8.2 8.2 0 0 1 8.2-8.2c4.56 0 8.25 3.7 8.25 8.26v3.34zM8 20.68c.67 1.1 2.2 1.7 4 1.7s3.33-.6 4-1.7z" />
-                    </svg>
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                      {v.transferencias_pendientes!.length}
-                    </span>
-                  </button>
-                )}
-                <span
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_con_turno]}`}
-                >
-                  {ESTADO_TEXTO[v.estado_con_turno]}
-                </span>
-              </div>
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${ESTADO_COLOR[v.estado_con_turno]}`}
+              >
+                {ESTADO_TEXTO[v.estado_con_turno]}
+              </span>
             </div>
 
             {v.turnos_asignados && v.turnos_asignados.length > 0 ? (
