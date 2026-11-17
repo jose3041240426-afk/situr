@@ -40,6 +40,12 @@ export default function ColaVentanillas() {
   }, [])
 
   useEffect(() => {
+    cargar()
+    const id = window.setInterval(cargar, 4000)
+    return () => window.clearInterval(id)
+  }, [cargar])
+
+  useEffect(() => {
     if (!aviso) return
     const t = window.setTimeout(() => setAviso(null), 4000)
     return () => window.clearTimeout(t)
