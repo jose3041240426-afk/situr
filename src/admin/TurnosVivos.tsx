@@ -204,6 +204,25 @@ function Ticket({
           SIGUIENTE
         </div>
       )}
+      {t.estado === 'CALLED' && !siguiente && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 14,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: 1.5,
+            color: '#fff',
+            background: C.blue500,
+            padding: '4px 12px',
+            borderRadius: 999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
+          LLAMADO AHORA
+        </div>
+      )}
     </button>
   )
 }

@@ -432,6 +432,8 @@ export type FilaColaVivo = {
   creado_en: string
   /** Código de la ventanilla asignada, o null si aún no se asignó. */
   modulo_codigo: string | null
+  /** Estado del turno (WAITING, ASIGNED, CALLED, ...). */
+  estado?: string
 }
 
 export type ColaEnVivo = {
