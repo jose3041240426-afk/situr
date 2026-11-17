@@ -222,7 +222,7 @@
   }
 
   .boton-ok {
-    @apply bg-verde-500 text-white hover:bg-verde-600;
+    @apply bg-azul-500 text-white hover:bg-azul-600;
   }
 
   /*

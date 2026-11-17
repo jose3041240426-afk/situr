@@ -169,11 +169,7 @@ function CampanaTransferencias() {
     <button
       type="button"
       onClick={() => (panelAbierto ? cerrarPanel() : abrirPanel())}
-      className={`relative rounded-full p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300 ${
-        hay
-          ? 'text-azul-400 hover:bg-white/10 hover:text-azul-300'
-          : 'text-gris-300 hover:bg-white/10 hover:text-gris-100'
-      }`}
+      className={`relative rounded-full p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-300 text-gris-300 hover:bg-white/10 hover:text-gris-100`}
       aria-label="Solicitudes de transferencia"
       title="Solicitudes de transferencia"
     >
@@ -247,7 +243,7 @@ function PanelTransferencias() {
           {pendientes.length === 0 ? (
             <p className="py-4 text-center text-sm text-gris-500">No hay solicitudes pendientes.</p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="entrada-escalonada flex flex-col gap-2">
               {pendientes.map(st => (
                 <div key={st.solicitud_id} className="rounded-xl border border-gris-200 bg-white p-3">
                   <p className="text-sm text-gris-800">
