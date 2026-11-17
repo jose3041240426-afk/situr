@@ -239,7 +239,7 @@ function PanelTransferencias() {
             </svg>
           </button>
         </div>
-        <div className="h-72 overflow-y-auto px-3 py-3">
+        <div className="h-80 overflow-y-auto px-3 py-3">
           {pendientes.length === 0 ? (
             <p className="py-4 text-center text-sm text-gris-500">No hay solicitudes pendientes.</p>
           ) : (
