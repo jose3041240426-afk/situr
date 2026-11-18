@@ -861,6 +861,14 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             no puede funcionar no es una opción: es una trampa. Al operador se
             le dice quién puede hacerlo en vez de ofrecerle la puerta cerrada.
           */}
+          <a
+            href="/admin/turnos-vivos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-xl border border-gris-200 bg-gris-50 px-4 py-2 text-sm font-semibold text-azul-600 hover:bg-azul-50"
+          >
+            Pantalla de turnos
+          </a>
           {!esAdministrador ? (
             <p className="max-w-56 text-right text-xs leading-relaxed text-gris-500">
               Solo un administrador abre o cierra la jornada.
