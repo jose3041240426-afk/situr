@@ -1411,20 +1411,23 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   que el tope, el panel se desplaza en vez de crecer sin fin y
                   empujar «Llamar» fuera de la pantalla.
                 */}
-                <ul className="transicion-datos max-h-[26rem] divide-y divide-gris-100 overflow-y-auto">
+                <div className="transicion-datos grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {actuales.map((t) => (
-                  <li key={t.turno_id} className="flex flex-wrap items-center gap-4 px-6 py-4">
-                    <div className="min-w-0 flex-1">
+                  <div key={t.turno_id} className="rounded-xl border border-gris-200 bg-white p-5 shadow-md">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-navy-800">
+                        <span className="text-xl font-bold text-navy-800">
                           {t.codigo_turno}
                         </span>
                         <ChipEstado estado={t.estado} />
                       </div>
-                      <p className="truncate text-xs text-gris-500">
+                      <p className="mt-1 text-sm text-gris-600">
                         {t.denominacion_tramite}
-                        {t.codigo_modulo ? ` · ${t.codigo_modulo}` : ''}
-                        {t.nombre_trabajador ? ` · ${t.nombre_trabajador}` : ''}
+                      </p>
+                      <p className="text-xs text-gris-500">
+                        {t.codigo_modulo ? `${t.codigo_modulo}` : ''}
+                        {t.codigo_modulo && t.nombre_trabajador ? ' · ' : ''}
+                        {t.nombre_trabajador ? `${t.nombre_trabajador}` : ''}
                       </p>
                     </div>
                     {/*
@@ -1435,7 +1438,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                       sin «Repetir», sin «Omitir» y sin «Cancelar»: solo
                       «Atender» (Nielsen H3).
                     */}
-                    <div className="flex flex-wrap justify-end gap-1.5">
+                    <div className="mt-4 flex flex-wrap justify-end gap-1.5">
                       {t.estado === 'CALLED' && (
                         <>
 <button
@@ -1546,9 +1549,9 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                         </>
                       )}
                     </div>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
               </>
             )}
           </section>
