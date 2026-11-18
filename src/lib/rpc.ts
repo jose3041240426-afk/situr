@@ -691,6 +691,17 @@ export async function listarModulos(): Promise<Modulo[]> {
   return (data ?? []) as Modulo[]
 }
 
+export async function configurarTramitesVentanilla(moduloId: string, tramiteIds: string[]): Promise<{ ok: boolean }> {
+  return rpc<{ ok: boolean }>('configurar_tramites_ventanilla', {
+    p_modulo_id: moduloId,
+    p_tramite_ids: tramiteIds.length ? tramiteIds : null,
+  })
+}
+
+export async function tramitesPermitidosModulo(moduloId: string): Promise<string[]> {
+  return rpc<string[]>('tramites_permitidos_modulo', { p_modulo_id: moduloId })
+}
+
 export async function listarPeriodos(): Promise<PeriodoOperativo[]> {
   const { data, error } = await supabase
     .from('periodos_operativos')

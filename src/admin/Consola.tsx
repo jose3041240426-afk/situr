@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BotonChispa from '../components/BotonChispa'
@@ -25,6 +26,8 @@ import {
   ErrorSitur,
   abrirPeriodo,
   cancelarTurno,
+  configurarTramitesVentanilla,
+  tramitesPermitidosModulo,
   cerrarPeriodo,
   formatearFecha,
   formatearFechaHora,
@@ -146,6 +149,9 @@ export default function Consola() {
 
   const [tramites, setTramites] = useState<Tramite[]>([])
   const [modulos, setModulos] = useState<Modulo[]>([])
+  const [modalConfigTramites, setModalConfigTramites] = useState(false)
+  const [configModuloId, setConfigModuloId] = useState('')
+  const [configTramiteIds, setConfigTramiteIds] = useState<string[]>([])
 
   const [aviso, setAviso] = useState<{ tono: 'ok' | 'alerta' | 'peligro'; texto: string } | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -524,8 +530,28 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     )
   }
 
+  async function abrirConfigTramites(moduloId: string) {
+    setConfigModuloId(moduloId)
+    try {
+      const ids = await tramitesPermitidosModulo(moduloId)
+      setConfigTramiteIds(ids ?? [])
+    } catch {
+      setConfigTramiteIds([])
+    }
+    setModalConfigTramites(true)
+  }
+
+  async function guardarConfigTramites() {
+    if (!configModuloId) return
+    try {
+      await configurarTramitesVentanilla(configModuloId, configTramiteIds)
+      setModalConfigTramites(false)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   /**
-   * Quita el aviso programado de un turno de la cola.
    *
    * Es lo que le faltaba al operador: se podía programar un aviso, pero
    * no se podía quitar. Con el aviso puesto, programar un aviso nuevo
@@ -869,6 +895,62 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           >
             Pantalla de turnos
           </a>
+          {modulos.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) void abrirConfigTramites(e.target.value) }}
+              className="rounded-xl border border-gris-200 bg-gris-50 px-4 py-2 text-sm font-semibold text-gris-700"
+            >
+              <option value="">Configurar trámites de ventanilla…</option>
+              {modulos.map((m) => (
+                <option key={m.id} value={m.id}>{m.codigo} — {m.denominacion}</option>
+              ))}
+            </select>
+          )}
+          {createPortal(
+            modalConfigTramites ? (
+              <Modal titulo="Configurar trámites de la ventanilla" onCerrar={() => setModalConfigTramites(false)}>
+                <div className="space-y-3">
+                  <p className="text-sm text-gris-700">
+                    Selecciona los trámites que esta ventanilla puede atender. Si no seleccionas ninguno, atiende todos.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {tramites.filter((t) => t.activo).map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={configTramiteIds.includes(t.id)}
+                          onChange={(e) => {
+                            setConfigTramiteIds((prev) =>
+                              e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id)
+                            )
+                          }}
+                        />
+                        {t.prefijo} — {t.denominacion}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModalConfigTramites(false)}
+                      className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void guardarConfigTramites()}
+                      className="boton-primario px-4 py-2 text-sm"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              </Modal>
+            ) : null,
+            document.body,
+          )}
           {!esAdministrador ? (
             <p className="max-w-56 text-right text-xs leading-relaxed text-gris-500">
               Solo un administrador abre o cierra la jornada.
