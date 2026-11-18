@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia } from '../lib/rpc'
-import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente } from '../lib/rpc'
+import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso } from '../lib/tipos'
+import { supabase } from '../lib/supabase'
 import { useTransferencias } from '../lib/transferencias'
 import { AlertBanner } from '../components/ui/alert-banner'
 import { AnimatePresence } from 'framer-motion'
@@ -156,6 +157,34 @@ export default function ColaVentanillas() {
       await cargar()
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'No se pudo finalizar el turno.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  async function manejarAvisar() {
+    if (!modalTurno) return
+    setAccionando(true)
+    try {
+      const r: RespuestaProgramarAviso = await programarAvisoSiguiente(5, null)
+      // Disparar el push en el acto para cada turno avisado.
+      try {
+        const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+        const tokenOperador = sesionFresca?.access_token
+        if (tokenOperador) {
+          for (const t of r.turnos ?? []) {
+            await fetch(`/api/push?turno_id=${encodeURIComponent(t.turno_id)}`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${tokenOperador}` },
+            }).catch(() => {})
+          }
+        }
+      } catch {
+        // El cron es el respaldo.
+      }
+      setAviso(`Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos 5 minutos.`)
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'No se pudo enviar el aviso.')
     } finally {
       setAccionando(false)
     }
@@ -492,15 +521,17 @@ export default function ColaVentanillas() {
             {/* Acciones: una sola fila, ancho dividido en partes iguales */}
             <div className="border-t border-gris-200 bg-gris-50 px-5 py-4">
               <div className="flex gap-2">
-                <button
-                  onClick={manejarEliminar}
-                  disabled={accionando}
-                  className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-rojo-500 hover:text-rojo-600 disabled:opacity-50"
-                  title="Eliminar turno"
-                >
-                  {accionando ? 'Procesando…' : <span className="icono-papelera" />}
-                </button>
-                {(modalTurno.turno_estado === 'CALLED' || modalTurno.turno_estado === 'SERVING') && (
+                {modalTurno.turno_estado !== 'SERVING' && (
+                  <button
+                    onClick={manejarEliminar}
+                    disabled={accionando}
+                    className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-rojo-500 hover:text-rojo-600 disabled:opacity-50"
+                    title="Eliminar turno"
+                  >
+                    {accionando ? 'Procesando…' : <span className="icono-papelera" />}
+                  </button>
+                )}
+                {modalTurno.turno_estado === 'CALLED' && (
                   <button
                     onClick={manejarLlamar}
                     disabled={accionando}
@@ -517,6 +548,16 @@ export default function ColaVentanillas() {
                     className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-azul-500 hover:text-azul-600 disabled:opacity-50"
                   >
                     <span className="icono-transferir" />
+                  </button>
+                )}
+                {modalTurno.turno_estado === 'SERVING' && (
+                  <button
+                    onClick={manejarAvisar}
+                    disabled={accionando}
+                    className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-azul-500 hover:text-azul-600 disabled:opacity-50"
+                    title="Avisar al siguiente turno de la cola"
+                  >
+                    <span className="andrsrxn--clock text-lg" aria-hidden="true" />
                   </button>
                 )}
                 {modalTurno.turno_estado === 'SERVING' && (
