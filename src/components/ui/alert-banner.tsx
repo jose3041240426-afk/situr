@@ -10,10 +10,10 @@ const alertBannerVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-border bg-background text-foreground',
-        success: 'border-green-200/60 bg-background text-foreground dark:border-green-900/60',
-        destructive: 'border-red-200/60 bg-background text-foreground dark:border-red-900/60',
-        warning: 'border-yellow-200/60 bg-background text-foreground dark:border-yellow-900/60',
+        default: 'border-gris-200 bg-white text-gris-900',
+        success: 'border-emerald-200 bg-emerald-50 text-gris-900 dark:border-emerald-900/60',
+        destructive: 'border-rojo-200 bg-rojo-50 text-gris-900 dark:border-rojo-900/60',
+        warning: 'border-amber-200 bg-amber-50 text-gris-900 dark:border-amber-900/60',
       },
     },
     defaultVariants: {
@@ -25,10 +25,10 @@ const alertBannerVariants = cva(
 const iconVariants = cva('mt-0.5 size-6 flex-shrink-0', {
   variants: {
     variant: {
-      default: 'text-foreground',
-      success: 'text-green-500',
-      destructive: 'text-red-500',
-      warning: 'text-yellow-500',
+      default: 'text-gris-900',
+      success: 'text-emerald-500',
+      destructive: 'text-rojo-500',
+      warning: 'text-amber-500',
     },
   },
   defaultVariants: {
@@ -73,7 +73,7 @@ const AlertBanner = React.forwardRef<HTMLDivElement, AlertBannerProps>(
         <button
           onClick={onDismiss}
           aria-label="Dismiss notification"
-          className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="absolute right-3 top-3 rounded-md p-1 text-gris-500 opacity-60 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <X className="size-4" />
         </button>
@@ -82,14 +82,14 @@ const AlertBanner = React.forwardRef<HTMLDivElement, AlertBannerProps>(
 
         <div className="flex flex-1 flex-col pr-6">
           <h3 className="font-semibold text-foreground">{title}</h3>
-          {description && <div className="mt-1 text-sm text-muted-foreground">{description}</div>}
+          {description && <div className="mt-1 text-sm text-gris-600">{description}</div>}
 
           {(primaryAction || secondaryAction) && (
             <div className="mt-4 flex items-center gap-4">
               {secondaryAction && (
                 <button
                   onClick={secondaryAction.onClick}
-                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="text-sm font-medium text-gris-500 transition-colors hover:text-gris-900 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   {secondaryAction.label}
                 </button>
@@ -97,7 +97,7 @@ const AlertBanner = React.forwardRef<HTMLDivElement, AlertBannerProps>(
               {primaryAction && (
                 <button
                   onClick={primaryAction.onClick}
-                  className="text-sm font-medium text-primary transition-colors hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="text-sm font-medium text-azul-600 transition-colors hover:text-azul-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   {primaryAction.label}
                 </button>
