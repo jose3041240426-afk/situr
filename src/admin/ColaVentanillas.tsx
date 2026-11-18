@@ -511,7 +511,7 @@ export default function ColaVentanillas() {
                   <button
                     onClick={manejarFinalizar}
                     disabled={accionando}
-                    className="flex-1 rounded-lg border border-gris-300 bg-white px-4 py-2.5 text-sm font-medium text-gris-700 hover:bg-gris-50 disabled:opacity-50"
+                    className="boton-primario ml-auto w-1/2"
                   >
                     {accionando ? 'Procesando…' : 'Finalizar'}
                   </button>
