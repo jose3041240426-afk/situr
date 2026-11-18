@@ -17,7 +17,6 @@ import {
   Campo,
   Chip,
   ChipEstado,
-  ChipPrioridad,
   EsqueletoTabla,
   Modal,
   Vacio,
@@ -1263,7 +1262,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           {t.codigo_turno}
                         </span>
                         <ChipEstado estado={t.estado} />
-                        <ChipPrioridad prioridad={t.prioridad} />
                       </div>
                       <p className="truncate text-xs text-gris-500">
                         {t.denominacion_tramite}
@@ -1493,7 +1491,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   <span className="text-sm text-gris-700">
                     {propuesta.denominacion_tramite}
                   </span>
-                  {propuesta.prioridad && <ChipPrioridad prioridad={propuesta.prioridad} />}
                 </div>
                 {propuesta.razon && (
                   <p className="mt-3 text-sm text-gris-700">{propuesta.razon}</p>
@@ -1828,7 +1825,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                       {formatearSoloHora(f.creado_en)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <ChipPrioridad prioridad={f.prioridad} />
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       {/*
