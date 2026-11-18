@@ -12,7 +12,6 @@ import Selector from '../components/Selector'
 import NotificacionLote from '../components/NotificacionLote'
 import NotificacionRetirados from '../components/NotificacionRetirados'
 import Paginador from '../components/Paginador'
-import BuscadorPapel from '../components/BuscadorPapel'
 import CodigoQR from '../components/CodigoQR'
 import {
   Campo,
@@ -532,7 +531,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           ),
         )
       },
-      `${f.codigo_turno}: el papel ya tiene dueño.`,
+      `${f.codigo_turno}: el turno ya tiene dueño.`,
     )
   }
 
@@ -1749,15 +1748,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           Va FUERA del condicional de los filtros: sirve igual cuando solo hay
           un trámite en la cola, que es justo cuando más se usa.
         */}
-        <details className="mt-3 rounded-xl border border-gris-200 bg-gris-50/60">
-          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-gris-700">
-            ¿Este papel ya tiene dueño?
-          </summary>
-          <div className="border-t border-gris-200 p-3">
-            <BuscadorPapel />
-          </div>
-        </details>
-
         {cola.length > 0 && tramitesEnCola.length > 1 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-gris-100 bg-gris-50/60 px-0 py-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-gris-500">
@@ -1964,7 +1954,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                             className="peer sr-only"
                             disabled={ocupado}
                             onChange={() => void marcarReclamado(f)}
-                            aria-label={`Marcar el turno ${f.codigo_turno}: el papel ya tiene dueño`}
+                            aria-label={`Marcar el turno ${f.codigo_turno}: el turno ya tiene dueño`}
                           />
                           <span className="rounded font-bold text-navy-800 peer-focus-visible:ring-2 peer-focus-visible:ring-azul-500 peer-focus-visible:ring-offset-2">
                             {f.codigo_turno}
