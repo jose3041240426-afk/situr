@@ -903,32 +903,34 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
               href="/admin/turnos-vivos"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-azul-600 hover:bg-azul-50 overflow-hidden whitespace-nowrap transition-all duration-300"
+              className="group inline-flex items-center rounded-xl border border-gris-200 bg-gris-50 py-2 pr-3 text-sm font-semibold text-azul-600 hover:bg-azul-50 overflow-hidden whitespace-nowrap transition-all duration-300"
+              style={{ paddingLeft: 12 }}
             >
-              <span className="flex-shrink-0">
+              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300">
+                Pantalla de turnos
+              </span>
+              <span className="flex-shrink-0 ml-0 group-hover:ml-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 48 48">
                   <rect width="39" height="25" x="4.5" y="9.75" fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" rx="4" ry="4" />
                   <path fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" d="M16 38.25h16" />
                 </svg>
-              </span>
-              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 ml-0 group-hover:ml-2">
-                Pantalla de turnos
               </span>
             </a>
             {modulos.length > 0 && (
               <button
                 type="button"
                 onClick={abrirModalConfig}
-                className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-gris-700 hover:bg-gris-100 overflow-hidden whitespace-nowrap transition-all duration-300"
+                className="group inline-flex items-center rounded-xl border border-gris-200 bg-gris-50 py-2 pr-3 text-sm font-semibold text-gris-700 hover:bg-gris-100 overflow-hidden whitespace-nowrap transition-all duration-300"
+                style={{ paddingLeft: 12 }}
               >
-                <span className="flex-shrink-0">
+                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300">
+                  Configurar ventanillas
+                </span>
+                <span className="flex-shrink-0 ml-0 group-hover:ml-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
                     <path fill="currentColor" d="M12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" />
                     <path fill="currentColor" fillRule="evenodd" d="M11.46 1.838a.75.75 0 0 1 1.08 0L15.111 4.5h3.638a.75.75 0 0 1 .75.75v3.638l2.662 2.573a.75.75 0 0 1 0 1.078L19.5 15.112v3.638a.75.75 0 0 1-.75.75h-3.638l-2.573 2.661a.75.75 0 0 1-1.078 0L8.888 19.5H5.25a.75.75 0 0 1-.75-.75v-3.64l-2.661-2.57a.75.75 0 0 1 0-1.078L4.5 8.888V5.25a.75.75 0 0 1 .75-.75h3.638zM12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" clipRule="evenodd" />
                   </svg>
-                </span>
-                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 ml-0 group-hover:ml-2">
-                  Configurar ventanillas
                 </span>
               </button>
             )}
