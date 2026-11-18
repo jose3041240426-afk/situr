@@ -3,8 +3,9 @@ import BloqueExpandible from '../components/BloqueExpandible'
 import BotonChispa from '../components/BotonChispa'
 import BotonEmitir from '../components/BotonEmitir'
 import BotonRepartir from '../components/BotonRepartir'
-import CodigoQR from '../components/CodigoQR'
-import { Aviso } from '../components/ui'
+import { AlertBanner } from '../components/ui/alert-banner'
+import { AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import {
   abrirPeriodo,
   cerrarPeriodo,
@@ -503,6 +504,8 @@ export default function Recepcion() {
       setPeriodoListo(true)
       setTramites(ts)
       setActuales(a)
+      // Auto-seleccionar el primer trámite activo para no tener que elegirlo.
+      setTramiteId((prev) => prev || (ts.find((t) => t.activo)?.id ?? ''))
     } catch (err) {
       console.error('Recepción: error al cargar', err)
     }
@@ -552,7 +555,7 @@ export default function Recepcion() {
     try {
       const resultado = await generarTurno(tramiteId)
       setUltimoTurno({ codigo: resultado.codigo_turno, token: resultado.token_publico })
-      setMensaje({ texto: `Turno ${resultado.codigo_turno} emitido correctamente.`, tono: 'ok' })
+      setMensaje({ texto: `Turno ${resultado.codigo_turno} creado. Revisa la pantalla de espera en vivo.`, tono: 'ok' })
       await cargar()
     } catch (err) {
       setMensaje({ texto: (err as Error).message, tono: 'peligro' })
@@ -592,12 +595,19 @@ export default function Recepcion() {
       }}
     >
       {/* Mensajes */}
-      {mensaje && (
-        <div style={{ padding: '16px 24px 0' }}>
-          <Aviso tono={mensaje.tono}>
-            <p className="font-bold">{mensaje.texto}</p>
-          </Aviso>
-        </div>
+      {createPortal(
+        <AnimatePresence>
+          {mensaje && (
+            <div className="fixed left-1/2 top-4 z-[9999] w-full max-w-2xl -translate-x-1/2 px-4">
+              <AlertBanner
+                variant={mensaje.tono === 'ok' ? 'success' : mensaje.tono === 'peligro' ? 'destructive' : 'warning'}
+                title={mensaje.texto}
+                onDismiss={() => setMensaje(null)}
+              />
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
 
       {/* ======================================== */}
@@ -705,9 +715,11 @@ export default function Recepcion() {
 
             {!periodoAbierto && periodoListo && (
               <div className="mb-4">
-                <Aviso tono="alerta">
-                  <p className="text-sm">Abra un periodo operativo antes de emitir turnos.</p>
-                </Aviso>
+                <AlertBanner
+                  variant="warning"
+                  title="Abra un periodo operativo antes de emitir turnos."
+                  onDismiss={() => {}}
+                />
               </div>
             )}
 
@@ -716,7 +728,7 @@ export default function Recepcion() {
               <BloqueExpandible clave={modoMasivo}>
                 {!modoMasivo ? (
                   <div>
-                    {/* Selector de trámite estilo referencia */}
+                    {/* Selector de trámite: contenedores cuadrados por tipo */}
                     <div style={{ marginBottom: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                         <div style={{
@@ -725,48 +737,58 @@ export default function Recepcion() {
                         }}>1</div>
                         <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Elige el trámite</span>
                       </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '12px 16px',
-                          borderRadius: 14,
-                          border: `2px solid ${tramiteId ? C.blue500 : C.line}`,
-                          background: '#fff',
-                          boxShadow: tramiteId ? `0 0 0 4px ${C.blue100}` : 'none',
-                        }}
-                      >
-                        {tramiteSeleccionado && (
-                          <div style={{
-                            width: 32, height: 32, borderRadius: 8, background: C.blue600, color: '#fff',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            {tramiteSeleccionado.prefijo}
-                          </div>
-                        )}
-                        <select
-                          value={tramiteId}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTramiteId(e.target.value)}
-                          disabled={!periodoAbierto || ocupado}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            fontSize: 15,
-                            color: tramiteId ? C.text : C.muted,
-                            width: '100%',
-                            outline: 'none',
-                            fontFamily: font,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="">— Seleccione un trámite —</option>
-                          {tramitesActivos.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.prefijo} — {t.denominacion}
-                            </option>
-                          ))}
-                        </select>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(5, 1fr)',
+                        gap: 12,
+                      }}>
+                        {tramitesActivos.map((t) => {
+                          const seleccionado = tramiteId === t.id
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setTramiteId(t.id)}
+                              disabled={!periodoAbierto || ocupado}
+                              style={{
+                                aspectRatio: '1 / 1',
+                                background: '#fff',
+                                border: seleccionado ? `2px solid ${C.blue500}` : '2px solid transparent',
+                                borderRadius: 16,
+                                boxShadow: seleccionado
+                                  ? `0 0 0 4px ${C.blue100}, 0 8px 24px rgba(0,0,0,0.18)`
+                                  : '0 8px 24px rgba(0,0,0,0.18)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                cursor: 'pointer',
+                                transition: 'border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease',
+                                transform: seleccionado ? 'translateY(-2px)' : 'none',
+                                fontFamily: font,
+                                padding: 8,
+                              }}
+                            >
+                              <div style={{
+                                width: 40, height: 40, borderRadius: 10,
+                                background: seleccionado ? C.blue600 : C.blue50,
+                                color: seleccionado ? '#fff' : C.blue600,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 16, fontWeight: 700,
+                                transition: 'background 200ms ease, color 200ms ease',
+                              }}>
+                                {t.prefijo}
+                              </div>
+                              <div style={{
+                                fontSize: 11, fontWeight: 600, color: C.text, textAlign: 'center',
+                                lineHeight: 1.2,
+                              }}>
+                                {t.denominacion}
+                              </div>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -801,13 +823,6 @@ export default function Recepcion() {
                       </div>
                     )}
 
-                    {/* QR del último turno */}
-                    {ultimoTurno && (
-                      <div style={{ padding: 16, borderRadius: 14, background: '#F9FAFB', border: '1px solid #E5E7EB', marginBottom: 20 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>Turno {ultimoTurno.codigo}</div>
-                        <CodigoQR valor={ultimoTurno.token} tamano={160} />
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <EmisionMasivaRecepcion
