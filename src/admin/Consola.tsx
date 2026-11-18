@@ -1406,9 +1406,33 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                 {/*
                   Grid de ventanillas: se muestran todas las ventanillas activas
                   aunque no tengan turnos, para que el operador vea el estado
-                  completo de la sala.
+                  completo de la sala. Navegación con flechas en lugar de scroll
+                  nativo.
                 */}
-                <div className="transicion-datos flex gap-4 overflow-x-auto p-5">
+                {(() => {
+                  const scrollRef = useRef<HTMLDivElement>(null)
+                  const scrollStep = 300
+                  const scrollLeft = () =>
+                    scrollRef.current?.scrollBy({ left: -scrollStep, behavior: 'smooth' })
+                  const scrollRight = () =>
+                    scrollRef.current?.scrollBy({ left: scrollStep, behavior: 'smooth' })
+                  return (
+                    <div className="transicion-datos p-5">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={scrollLeft}
+                          className="flex-shrink-0 rounded-full bg-gris-100 p-2 text-gris-600 hover:bg-gris-200"
+                          title="Ver ventanillas anteriores"
+                          aria-label="Ver ventanillas anteriores"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        </button>
+                        <div
+                          ref={scrollRef}
+                          className="flex gap-4 overflow-x-auto scrollbar-hide"
+                          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
                   {modulos
                     .filter((m) => m.activo)
                     .map((m) => {
@@ -1605,7 +1629,20 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                         </div>
                       )
                     })}
-                </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={scrollRight}
+                          className="flex-shrink-0 rounded-full bg-gris-100 p-2 text-gris-600 hover:bg-gris-200"
+                          title="Ver siguientes ventanillas"
+                          aria-label="Ver siguientes ventanillas"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
               </>
             )}
           </section>
