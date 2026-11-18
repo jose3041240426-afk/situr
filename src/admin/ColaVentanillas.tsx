@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
@@ -217,17 +217,20 @@ export default function ColaVentanillas() {
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
       </header>
-      <AnimatePresence>
-        {aviso && (
-          <div className="fixed left-1/2 top-4 z-[9999] w-full max-w-2xl -translate-x-1/2 px-4">
-            <AlertBanner
-              variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
-              title={aviso}
-              onDismiss={() => setAviso(null)}
-            />
-          </div>
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {aviso && (
+            <div className="fixed left-1/2 top-4 z-[9999] w-full max-w-2xl -translate-x-1/2 px-4">
+              <AlertBanner
+                variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
+                title={aviso}
+                onDismiss={() => setAviso(null)}
+              />
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       {/* Carrusel horizontal de turnos pendientes */}
       <section className="tarjeta p-4">
