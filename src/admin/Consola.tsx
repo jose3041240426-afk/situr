@@ -152,6 +152,7 @@ export default function Consola() {
   const [modalConfigTramites, setModalConfigTramites] = useState(false)
   const [configModuloId, setConfigModuloId] = useState('')
   const [configTramiteIds, setConfigTramiteIds] = useState<string[]>([])
+  const [configPasoLista, setConfigPasoLista] = useState(true)
 
   const [aviso, setAviso] = useState<{ tono: 'ok' | 'alerta' | 'peligro'; texto: string } | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -535,15 +536,22 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     )
   }
 
-  async function abrirConfigTramites(moduloId: string) {
+  function abrirModalConfig() {
+    setConfigModuloId('')
+    setConfigTramiteIds([])
+    setConfigPasoLista(true)
+    setModalConfigTramites(true)
+  }
+
+  async function seleccionarModuloConfig(moduloId: string) {
     setConfigModuloId(moduloId)
+    setConfigPasoLista(false)
     try {
       const ids = await tramitesPermitidosModulo(moduloId)
       setConfigTramiteIds(ids ?? [])
     } catch {
       setConfigTramiteIds([])
     }
-    setModalConfigTramites(true)
   }
 
   async function guardarConfigTramites() {
@@ -551,6 +559,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     try {
       await configurarTramitesVentanilla(configModuloId, configTramiteIds)
       setModalConfigTramites(false)
+      setConfigPasoLista(true)
     } catch (e) {
       console.error(e)
     }
@@ -898,57 +907,97 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             Pantalla de turnos
           </a>
           {modulos.length > 0 && (
-            <select
-              value=""
-              onChange={(e) => { if (e.target.value) void abrirConfigTramites(e.target.value) }}
-              className="rounded-xl border border-gris-200 bg-gris-50 px-4 py-2 text-sm font-semibold text-gris-700"
+            <button
+              type="button"
+              onClick={abrirModalConfig}
+              className="rounded-xl border border-gris-200 bg-gris-50 px-4 py-2 text-sm font-semibold text-gris-700 hover:bg-gris-100"
             >
-              <option value="">Configurar trámites de ventanilla…</option>
-              {modulos.map((m) => (
-                <option key={m.id} value={m.id}>{m.codigo} — {m.denominacion}</option>
-              ))}
-            </select>
+              Configurar ventanillas
+            </button>
           )}
           {createPortal(
             modalConfigTramites ? (
-              <Modal titulo="Configurar trámites de la ventanilla" onCerrar={() => setModalConfigTramites(false)}>
-                <div className="space-y-3">
-                  <p className="text-sm text-gris-700">
-                    Selecciona los trámites que esta ventanilla puede atender. Si no seleccionas ninguno, atiende todos.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {tramites.filter((t) => t.activo).map((t) => (
-                      <label key={t.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={configTramiteIds.includes(t.id)}
-                          onChange={(e) => {
-                            setConfigTramiteIds((prev) =>
-                              e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id)
-                            )
-                          }}
-                        />
-                        {t.prefijo} — {t.denominacion}
-                      </label>
-                    ))}
+              <Modal titulo="Configurar ventanillas" onCerrar={() => setModalConfigTramites(false)}>
+                {configPasoLista ? (
+                  <div>
+                    <p className="mb-4 text-sm text-gris-700">
+                      Selecciona la ventanilla que deseas configurar.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {modulos.filter((m) => m.activo).map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => void seleccionarModuloConfig(m.id)}
+                          className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-azul-50 hover:border-azul-200 transition-colors"
+                        >
+                          <div>
+                            <div className="font-semibold text-gris-900">{m.codigo}</div>
+                            <div className="text-xs text-gris-500">{m.denominacion}</div>
+                          </div>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                            <path d="M0 0h24v24H0z" fill="none" />
+                            <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setModalConfigTramites(false)}
-                      className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void guardarConfigTramites()}
-                      className="boton-primario px-4 py-2 text-sm"
-                    >
-                      Guardar
-                    </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setConfigPasoLista(true)}
+                        className="flex items-center gap-1 text-sm text-azul-600 hover:text-azul-700"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+                          <path d="M0 0h24v24H0z" fill="none" />
+                          <path fill="currentColor" d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z" />
+                        </svg>
+                        Cambiar ventanilla
+                      </button>
+                      <span className="text-sm font-semibold text-gris-700">
+                        {modulos.find((m) => m.id === configModuloId)?.codigo}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gris-700">
+                      Selecciona los trámites que esta ventanilla puede atender. Si no seleccionas ninguno, atiende todos.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {tramites.filter((t) => t.activo).map((t) => (
+                        <label key={t.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={configTramiteIds.includes(t.id)}
+                            onChange={(e) => {
+                              setConfigTramiteIds((prev) =>
+                                e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id)
+                              )
+                            }}
+                          />
+                          {t.prefijo} — {t.denominacion}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModalConfigTramites(false)}
+                        className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void guardarConfigTramites()}
+                        className="boton-primario px-4 py-2 text-sm"
+                      >
+                        Guardar
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </Modal>
             ) : null,
             document.body,
