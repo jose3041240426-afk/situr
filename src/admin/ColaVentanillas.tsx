@@ -29,7 +29,7 @@ export default function ColaVentanillas() {
   const { publicar, registrarRefrescar } = useTransferencias()
 
   function nombreVentanilla(codigo: string): string {
-    const m = codigo.match(/^V(\\d+)$/i)
+    const m = codigo.match(/^V(\d+)$/i)
     return m ? `Ventanilla ${m[1]}` : codigo
   }
 
