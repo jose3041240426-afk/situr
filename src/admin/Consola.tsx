@@ -6,7 +6,6 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BotonChispa from '../components/BotonChispa'
 import BotonLlamar from '../components/BotonLlamar'
-import BloqueExpandible from '../components/BloqueExpandible'
 import BotonEmitir from '../components/BotonEmitir'
 import BotonRepartir from '../components/BotonRepartir'
 import Selector from '../components/Selector'
@@ -1126,52 +1125,65 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   <div className="glass-glider" aria-hidden="true" />
                 </div>
 
-                <BloqueExpandible clave={modoMasivo}>
                 {!modoMasivo ? (
                   /*
-                   * `space-y-6` AQUÍ, no en el div de arriba.
-                   *
-                   * El div padre tiene `space-y-5`, pero su hijo directo es
-                   * `BloqueExpandible`, no los campos: el espacio se aplicaba
-                   * entre bloques, no entre los tres controles. Poniendo el
-                   * `space-y` en el fragmento, cada `Campo` y el botón pasan a
-                   * ser hijos con separación real.
+                   * Contenedores cuadrados por trámite, 2 por fila: el mismo
+                   * patrón que Recepción, sin acordeón ni desplegable. El
+                   * operador ve todos los trámites de un vistazo y elige con
+                   * un toque.
                    */
-                  <div className="space-y-6">
-                    {/*
-                      `Selector` y no `<select>`: la lista nativa se ensancha
-                      al texto más largo («REG — Registro catastral» no cabe en
-                      el ancho del campo) e ignora el `width` del control.
+                  <div className="space-y-5">
+                    <div>
+                      <p className="mb-3 text-xs font-semibold text-gris-500">
+                        Elige el trámite
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {tramites
+                          .filter((t) => t.activo)
+                          .map((t) => {
+                            const seleccionado = tramiteId === t.id
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setTramiteId(t.id)}
+                                disabled={ocupado || !periodoAbierto}
+                                aria-pressed={seleccionado}
+                                className={[
+                                  'aspect-square rounded-2xl border-2 bg-white p-3 text-center',
+                                  'flex flex-col items-center justify-center gap-2',
+                                  'transition duration-200 disabled:opacity-50',
+                                  seleccionado
+                                    ? 'border-azul-500 shadow-[0_0_0_4px_rgba(59,130,246,0.15),0_8px_24px_rgba(0,0,0,0.12)] -translate-y-0.5'
+                                    : 'border-transparent shadow-[0_8px_24px_rgba(0,0,0,0.10)] hover:-translate-y-0.5',
+                                ].join(' ')}
+                              >
+                                <span
+                                  className={[
+                                    'flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold',
+                                    seleccionado
+                                      ? 'bg-azul-600 text-white'
+                                      : 'bg-azul-50 text-azul-600',
+                                  ].join(' ')}
+                                >
+                                  {t.prefijo}
+                                </span>
+                                <span className="text-xs font-semibold leading-tight text-gris-700">
+                                  {t.denominacion}
+                                </span>
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
 
-                      `grupo`: el control no es un campo nativo, así que la
-                      etiqueta visible va en un `<div>`. Un botón dentro de un
-                      `<label>` es HTML inválido y además hace que al pulsar la
-                      etiqueta se abra el desplegable.
-                    */}
-                    <Campo etiqueta="Trámite" grupo>
-                      <Selector
-                        etiqueta="Trámite"
-                        className="w-full"
-                        valor={tramiteId}
-                        onCambiar={setTramiteId}
-                        opciones={tramites.map((t) => ({
-                          valor: t.id,
-                          etiqueta: `${t.clave} — ${t.denominacion}`,
-                        }))}
-                      />
-                    </Campo>
-
-                    {/* El botón se separa más que un campo: es la acción final
-                        del formulario y conviene que no se lea como un
-                        tercer campo más. */}
-                    <div className="pt-1">
                     <BotonEmitir
                       onClick={() => void emitir()}
                       disabled={ocupado || !tramiteId}
+                      className="w-full"
                     >
                       Emitir turno
                     </BotonEmitir>
-                    </div>
                   </div>
                 ) : (
                   <EmisionMasiva
@@ -1182,7 +1194,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                     ocupado={ocupado}
                   />
                 )}
-                </BloqueExpandible>
               </div>
             )}
           </section>
