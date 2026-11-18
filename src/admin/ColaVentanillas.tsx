@@ -30,6 +30,7 @@ export default function ColaVentanillas() {
   const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
   const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   const [accionando, setAccionando] = useState(false)
+  const [errorModalAviso, setErrorModalAviso] = useState<string | null>(null)
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
@@ -169,6 +170,7 @@ export default function ColaVentanillas() {
     if (!modalTurno) return
     setAvisando(modalTurno)
     setPropuesta(null)
+    setErrorModalAviso(null)
     try {
       setMinutosAviso(await opcionesAviso())
     } catch {
@@ -714,7 +716,7 @@ export default function ColaVentanillas() {
                         setAviso(`Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos ${m} minutos.`)
                         setAvisando(null)
                       } catch (e) {
-                        setAviso(e instanceof Error ? e.message : 'No se pudo programar el aviso.')
+                        setErrorModalAviso(e instanceof Error ? e.message : 'No se pudo programar el aviso.')
                       } finally {
                         setAccionando(false)
                       }
@@ -725,6 +727,14 @@ export default function ColaVentanillas() {
                   </button>
                 ))}
               </div>
+              {errorModalAviso && (
+                <p className="text-xs text-rojo-600 text-center">{errorModalAviso}</p>
+              )}
+              <p className="mt-2 text-[11px] leading-snug text-gris-500">
+                Se avisará a tantos turnos como lugares de atención ocupados haya
+                ahora, con un mínimo de uno. Si algún turno de la cola ya tiene
+                aviso, elegir otra cantidad de minutos lo reprograma.
+              </p>
             </div>
           </div>
         </div>
