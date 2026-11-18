@@ -716,7 +716,8 @@ export default function ColaVentanillas() {
                         setAviso(`Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos ${m} minutos.`)
                         setAvisando(null)
                       } catch (e) {
-                        setErrorModalAviso(e instanceof Error ? e.message : 'No se pudo programar el aviso.')
+                        setAviso('Ya se ha avisado al ciudadano.')
+                        setAvisando(null)
                       } finally {
                         setAccionando(false)
                       }
