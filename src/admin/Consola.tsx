@@ -1408,7 +1408,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   aunque no tengan turnos, para que el operador vea el estado
                   completo de la sala.
                 */}
-                <div className="transicion-datos grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
+                <div className="transicion-datos flex gap-4 overflow-x-auto p-5">
                   {modulos
                     .filter((m) => m.activo)
                     .map((m) => {
@@ -1418,7 +1418,8 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                       return (
                         <div
                           key={m.id}
-                          className="rounded-xl border border-gris-200 bg-white p-5 shadow-md"
+                          className="flex-shrink-0 rounded-xl border border-gris-200 bg-white p-5 shadow-md"
+                          style={{ minWidth: '220px', width: 'min-content' }}
                         >
                           <div className="mb-3 flex items-center justify-between border-b border-gris-100 pb-2">
                             <div>
