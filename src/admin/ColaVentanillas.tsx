@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
 import { useTransferencias } from '../lib/transferencias'
+import { AlertBanner } from '../components/ui/alert-banner'
+import { AnimatePresence } from 'framer-motion'
 
 const ESTADO_COLOR: Record<string, string> = {
   DISPONIBLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -236,12 +239,21 @@ export default function ColaVentanillas() {
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
-        {aviso && (
-          <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm font-semibold text-azul-700">
-            {aviso}
-          </div>
-        )}
       </header>
+      {createPortal(
+        <AnimatePresence>
+          {aviso && (
+            <div className="fixed left-1/2 top-4 z-[9999] w-full max-w-2xl -translate-x-1/2 px-4">
+              <AlertBanner
+                variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
+                title={aviso}
+                onDismiss={() => setAviso(null)}
+              />
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       {/* Carrusel horizontal de turnos pendientes */}
       <section className="tarjeta p-4">
