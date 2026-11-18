@@ -1343,7 +1343,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             llamado: aquí viven Repetir, Omitir, Cancelar, Iniciar atención y
             Finalizar.
           */}
-          {/* En atención ahora */}
+          {/* En atención ahora — vista por ventanilla */}
           <section className="tarjeta overflow-hidden">
             <div className="border-b border-gris-100 px-6 py-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1381,8 +1381,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   </div>
                 ))}
               </div>
-            ) : actuales.length === 0 ? (
-              <Vacio titulo="No hay turnos en curso" detalle="Los turnos llamados y en atención aparecen aquí." />
             ) : (
               <>
                 {/*
@@ -1390,7 +1388,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   El límite existe para que nadie acumule ciudadanos llamados
                   sin atenderlos, así que la salida siempre es cerrar uno.
                 */}
-                {topeAtencion && (
+                {topeAtencion && actuales.length > 0 && (
                   <div className="flex items-start gap-2 border-b border-ambar-500/30 bg-ambar-50 px-6 py-3">
                     <span className="mt-0.5 shrink-0 text-ambar-600" aria-hidden="true">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -1406,152 +1404,207 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   </div>
                 )}
                 {/*
-                  `max-h` + `overflow-y-auto` como red de seguridad: si por
-                  datos viejos o un límite recién subido aparecen más turnos
-                  que el tope, el panel se desplaza en vez de crecer sin fin y
-                  empujar «Llamar» fuera de la pantalla.
+                  Grid de ventanillas: se muestran todas las ventanillas activas
+                  aunque no tengan turnos, para que el operador vea el estado
+                  completo de la sala.
                 */}
-                <div className="transicion-datos grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {actuales.map((t) => (
-                  <div key={t.turno_id} className="rounded-xl border border-gris-200 bg-white p-5 shadow-md">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-bold text-navy-800">
-                          {t.codigo_turno}
-                        </span>
-                        <ChipEstado estado={t.estado} />
-                      </div>
-                      <p className="mt-1 text-sm text-gris-600">
-                        {t.denominacion_tramite}
-                      </p>
-                      <p className="text-xs text-gris-500">
-                        {t.codigo_modulo ? `${t.codigo_modulo}` : ''}
-                        {t.codigo_modulo && t.nombre_trabajador ? ' · ' : ''}
-                        {t.nombre_trabajador ? `${t.nombre_trabajador}` : ''}
-                      </p>
-                    </div>
-                    {/*
-                      Las acciones del turno llamado viven AQUÍ, en la lista
-                      persistente, y no solo en el panel que aparece justo
-                      después de pulsar «Llamar». Antes, si la página se
-                      recargaba, un turno llamado pero no atendido se quedaba
-                      sin «Repetir», sin «Omitir» y sin «Cancelar»: solo
-                      «Atender» (Nielsen H3).
-                    */}
-                    <div className="mt-4 flex flex-wrap justify-end gap-1.5">
-                      {t.estado === 'CALLED' && (
-                        <>
-<button
-                          type="button"
-                          onClick={() =>
-                            void (async () => {
-                              const { ok } = await ejecutar(
-                                () => repetirLlamada(t.turno_id),
-                                'Llamada repetida.',
-                              )
-                              /*
-                                La llamada repetida también avisa, igual que
-                                la primera. Si no, el ciudadano se enteraba
-                                de que le están llamando otra vez: el aviso
-                                se quedaba esperando al cron, un minuto
-                                después, y con suerte.
-                              */
-                              if (ok) await avisarTurnoAhora(t.turno_id)
-                              if (ok) setTurnoLlamado(null)
-                            })()
-                          }
-                          disabled={ocupado}
-                          className="boton-secundario px-2.5 py-1.5"
-                          title="Volver a llamar a este ciudadano"
-                          aria-label={`Repetir la llamada al turno ${t.codigo_turno}`}
+                <div className="transicion-datos grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
+                  {modulos
+                    .filter((m) => m.activo)
+                    .map((m) => {
+                      const turnosVentanilla = actuales.filter(
+                        (t) => t.modulo_id === m.id
+                      )
+                      return (
+                        <div
+                          key={m.id}
+                          className="rounded-xl border border-gris-200 bg-white p-5 shadow-md"
                         >
-                          <span
-                            className="coolicons--repeat-fill text-base"
-                            aria-hidden="true"
-                          />
-                        </button>
-                          {/*
-                            Omitir va en blanco, como «Repetir», y no en rojo.
-                            Omitir no destruye la solicitud: el ciudadano
-                            puede reponer el turno en ventanilla. El rojo se
-                            queda para «Cancelar», que sí cierra esa puerta.
-                          */}
-                          <button
-                            type="button"
-                            onClick={() => setModalMotivo({ turno: t, accion: 'omitir' })}
-                            disabled={ocupado}
-                            className="boton-secundario px-2.5 py-1.5"
-                            title="El ciudadano no se presentó. Podrá reponerse en ventanilla."
-                            aria-label={`Omitir el turno ${t.codigo_turno}`}
-                          >
-                            <span
-                              className="bi--skip-forward-circle-fill text-base"
-                              aria-hidden="true"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setModalMotivo({ turno: t, accion: 'cancelar' })}
-                            disabled={ocupado}
-                            className="boton-peligro px-2.5 py-1.5"
-                            title="Se cancela la solicitud del ciudadano. No se puede reponer."
-                            aria-label={`Cancelar el turno ${t.codigo_turno}`}
-                          >
-                            <span className="ix--cancelled text-base" aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void conTurno(
-                                () => iniciarAtencion(t.turno_id),
-                                'Atención iniciada.',
-                              )
-                            }
-                            disabled={ocupado}
-                            className="boton-primario whitespace-nowrap px-3 py-1.5 text-xs"
-                            title="El ciudadano ya está en la ventanilla. Empieza a contar el tiempo de atención."
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 1024 1024" style={{ display: 'block' }}>
-                              <path d="M0 0h1024v1024H0z" fill="none" />
-                              <path fill="currentColor" d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448s448-200.6 448-448S759.4 64 512 64m144.1 454.9L437.7 677.8a8.02 8.02 0 0 1-12.7-6.5V353.7a8 8 0 0 1 12.7-6.5L656.1 506a7.9 7.9 0 0 1 0 12.9" />
-                            </svg>
-                          </button>
-                        </>
-)}
-                       {t.estado === 'SERVING' && (
-                         <>
-                           <button
-                            type="button"
-                            onClick={() => setAvisando(t)}
-                            disabled={ocupado}
-                            className="boton-reloj"
-                            title="Preparar al siguiente turno de la cola"
-                            aria-label="Preparar al siguiente turno de la cola"
-                          >
-                            <span
-                              className="andrsrxn--clock text-lg"
-                              aria-hidden="true"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void conTurno(
-                                () => finalizarTurno(t.turno_id),
-                                'Turno finalizado.',
-                              )
-                            }
-                            disabled={ocupado}
-                            className="boton-finalizar px-3 py-1.5 text-xs"
-                          >
-                            Finalizar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                          <div className="mb-3 flex items-center justify-between border-b border-gris-100 pb-2">
+                            <div>
+                              <span className="text-sm font-bold text-navy-800">
+                                {m.codigo}
+                              </span>
+                              <span className="ml-2 text-xs text-gris-500">
+                                {m.denominacion}
+                              </span>
+                            </div>
+                            <span className="rounded-full bg-gris-100 px-2 py-0.5 text-xs font-semibold text-gris-600">
+                              {turnosVentanilla.length} turno
+                              {turnosVentanilla.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {turnosVentanilla.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-gris-400">
+                              Sin turnos
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {turnosVentanilla.map((t) => (
+                                <div
+                                  key={t.turno_id}
+                                  className="rounded-lg border border-gris-100 bg-gris-50 p-3"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base font-bold text-navy-800">
+                                      {t.codigo_turno}
+                                    </span>
+                                    <ChipEstado estado={t.estado} />
+                                  </div>
+                                  <p className="mt-0.5 text-xs text-gris-600">
+                                    {t.denominacion_tramite}
+                                  </p>
+                                  {t.nombre_trabajador && (
+                                    <p className="text-xs text-gris-500">
+                                      {t.nombre_trabajador}
+                                    </p>
+                                  )}
+                                  {/*
+                                    Las acciones del turno llamado viven AQUÍ,
+                                    en la lista persistente, y no solo en el
+                                    panel que aparece justo después de pulsar
+                                    «Llamar». Antes, si la página se recargaba,
+                                    un turno llamado pero no atendido se quedaba
+                                    sin «Repetir», sin «Omitir» y sin «Cancelar»:
+                                    solo «Atender» (Nielsen H3).
+                                  */}
+                                  <div className="mt-2 flex flex-wrap justify-end gap-1.5">
+                                    {t.estado === 'CALLED' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void (async () => {
+                                              const { ok } = await ejecutar(
+                                                () => repetirLlamada(t.turno_id),
+                                                'Llamada repetida.',
+                                              )
+                                              if (ok)
+                                                await avisarTurnoAhora(
+                                                  t.turno_id,
+                                                )
+                                              if (ok)
+                                                setTurnoLlamado(null)
+                                            })()
+                                          }
+                                          disabled={ocupado}
+                                          className="boton-secundario px-2.5 py-1.5"
+                                          title="Volver a llamar a este ciudadano"
+                                          aria-label={`Repetir la llamada al turno ${t.codigo_turno}`}
+                                        >
+                                          <span
+                                            className="coolicons--repeat-fill text-base"
+                                            aria-hidden="true"
+                                          />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setModalMotivo({
+                                              turno: t,
+                                              accion: 'omitir',
+                                            })
+                                          }
+                                          disabled={ocupado}
+                                          className="boton-secundario px-2.5 py-1.5"
+                                          title="El ciudadano no se presentó. Podrá reponerse en ventanilla."
+                                          aria-label={`Omitir el turno ${t.codigo_turno}`}
+                                        >
+                                          <span
+                                            className="bi--skip-forward-circle-fill text-base"
+                                            aria-hidden="true"
+                                          />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setModalMotivo({
+                                              turno: t,
+                                              accion: 'cancelar',
+                                            })
+                                          }
+                                          disabled={ocupado}
+                                          className="boton-peligro px-2.5 py-1.5"
+                                          title="Se cancela la solicitud del ciudadano. No se puede reponer."
+                                          aria-label={`Cancelar el turno ${t.codigo_turno}`}
+                                        >
+                                          <span
+                                            className="ix--cancelled text-base"
+                                            aria-hidden="true"
+                                          />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void conTurno(
+                                              () =>
+                                                iniciarAtencion(t.turno_id),
+                                              'Atención iniciada.',
+                                            )
+                                          }
+                                          disabled={ocupado}
+                                          className="boton-primario whitespace-nowrap px-3 py-1.5 text-xs"
+                                          title="El ciudadano ya está en la ventanilla. Empieza a contar el tiempo de atención."
+                                        >
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="1em"
+                                            height="1em"
+                                            viewBox="0 0 1024 1024"
+                                            style={{ display: 'block' }}
+                                          >
+                                            <path
+                                              d="M0 0h1024v1024H0z"
+                                              fill="none"
+                                            />
+                                            <path
+                                              fill="currentColor"
+                                              d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448s448-200.6 448-448S759.4 64 512 64m144.1 454.9L437.7 677.8a8.02 8.02 0 0 1-12.7-6.5V353.7a8 8 0 0 1 12.7-6.5L656.1 506a7.9 7.9 0 0 1 0 12.9"
+                                            />
+                                          </svg>
+                                        </button>
+                                      </>
+                                    )}
+                                    {t.estado === 'SERVING' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => setAvisando(t)}
+                                          disabled={ocupado}
+                                          className="boton-reloj"
+                                          title="Preparar al siguiente turno de la cola"
+                                          aria-label="Preparar al siguiente turno de la cola"
+                                        >
+                                          <span
+                                            className="andrsrxn--clock text-lg"
+                                            aria-hidden="true"
+                                          />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void conTurno(
+                                              () =>
+                                                finalizarTurno(t.turno_id),
+                                              'Turno finalizado.',
+                                            )
+                                          }
+                                          disabled={ocupado}
+                                          className="boton-finalizar px-3 py-1.5 text-xs"
+                                        >
+                                          Finalizar
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
               </>
             )}
           </section>
