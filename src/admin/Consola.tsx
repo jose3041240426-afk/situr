@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { AlertBanner } from '../components/ui/alert-banner'
+import { AnimatePresence } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BotonChispa from '../components/BotonChispa'
@@ -14,7 +16,6 @@ import Paginador from '../components/Paginador'
 import BuscadorPapel from '../components/BuscadorPapel'
 import CodigoQR from '../components/CodigoQR'
 import {
-  Aviso,
   Campo,
   Chip,
   ChipEstado,
@@ -805,9 +806,11 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
 
   if (!puedeOperar) {
     return (
-      <Aviso tono="alerta">
-        Su cuenta no tiene permiso para operar turnos. Consulte con el administrador.
-      </Aviso>
+      <AlertBanner
+        variant="warning"
+        title="Su cuenta no tiene permiso para operar turnos. Consulte con el administrador."
+        onDismiss={() => {}}
+      />
     )
   }
 
@@ -815,16 +818,12 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     <>
       {mfaPendiente && (
         <div className="mb-4">
-          <Aviso tono="alerta">
-            Debe configurar la verificación en dos pasos antes de operar (RF-026).{' '}
-            <button
-              type="button"
-              onClick={() => navegar('/admin')}
-              className="font-bold underline"
-            >
-              Configurarla
-            </button>
-          </Aviso>
+          <AlertBanner
+            variant="warning"
+            title="Debe configurar la verificación en dos pasos antes de operar (RF-026)."
+            onDismiss={() => {}}
+            primaryAction={{ label: 'Configurarla', onClick: () => navegar('/admin') }}
+          />
         </div>
       )}
 
@@ -970,15 +969,19 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       </section>
       )}
 
-      {aviso && (
-        /*
-         * `role="status"`: el aviso aparece y desaparece sin que recargue la
-         * página, así que un lector de pantalla no se enteraría de que la
-         * operación se hizo (WCAG 4.1.3, nivel AA).
-         */
-        <div role="status" aria-live="polite" className="mb-6">
-          <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
-        </div>
+      {createPortal(
+        <AnimatePresence>
+          {aviso && (
+            <div className="fixed left-1/2 top-4 z-[9999] w-full max-w-2xl -translate-x-1/2 px-4">
+              <AlertBanner
+                variant={aviso.tono === 'ok' ? 'success' : aviso.tono === 'peligro' ? 'destructive' : 'warning'}
+                title={aviso.texto}
+                onDismiss={() => setAviso(null)}
+              />
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
 
       {/*
