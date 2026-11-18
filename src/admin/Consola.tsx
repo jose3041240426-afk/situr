@@ -474,6 +474,12 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargar])
 
+  useEffect(() => {
+    if (!aviso) return
+    const t = window.setTimeout(() => setAviso(null), 4000)
+    return () => window.clearTimeout(t)
+  }, [aviso])
+
   // ------------------------------------------------------------------ acciones
 
   /**

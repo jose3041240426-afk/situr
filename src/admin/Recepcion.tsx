@@ -581,6 +581,11 @@ export default function Recepcion() {
     }
   }
 
+  useEffect(() => {
+    if (!mensaje) return
+    const t = window.setTimeout(() => setMensaje(null), 4000)
+    return () => window.clearTimeout(t)
+  }, [mensaje])
   const tramitesActivos = tramites.filter((t) => t.activo)
   const tramiteSeleccionado = tramitesActivos.find((t) => t.id === tramiteId)
 
