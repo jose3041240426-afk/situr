@@ -242,7 +242,7 @@ export interface FilaActual {
   codigo_turno: string
   folio: number
   estado: EstadoTurno
-  prioridad: PrioridadTurno
+  prioridad?: PrioridadTurno
   creado_en: string
   llamado_en: string | null
   inicio_atencion: string | null

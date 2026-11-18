@@ -165,7 +165,6 @@ export default function Consola() {
 
   // Emisión
   const [tramiteId, setTramiteId] = useState('')
-  const [prioridad, setPrioridad] = useState<'NORMAL' | 'PREFERENTE' | 'URGENTE'>('NORMAL')
   const [emitido, setEmitido] = useState<{ codigo: string; token: string } | null>(null)
 
   // Emisión masiva (migración 009). Un renglón por trámite con su cantidad.
@@ -591,7 +590,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     setOcupado(true)
     setAviso(null)
     try {
-      const r = await generarTurno(tramiteId, prioridad)
+      const r = await generarTurno(tramiteId)
       setEmitido({ codigo: r.codigo_turno, token: r.token_publico })
       await cargar()
     } catch (e) {
@@ -702,7 +701,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         codigo_turno: r.codigo_turno,
         folio: r.folio,
         estado: r.estado,
-        prioridad: r.prioridad,
         creado_en: '',
         llamado_en: r.llamado_en,
         inicio_atencion: null,
@@ -1054,7 +1052,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         {/* ------------------------------------------------ emitir turno */}
         <div className="min-w-0 space-y-5">
           <section className="tarjeta p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+            <h2 className="text-sm font-bold text-gris-700">
               Emitir turno
             </h2>
 
@@ -1154,24 +1152,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                       />
                     </Campo>
 
-                    <Campo
-                      etiqueta="Prioridad"
-                      ayuda="RN-017: URGENTE sale antes que el resto."
-                      grupo
-                    >
-                      <Selector
-                        etiqueta="Prioridad"
-                        className="w-full"
-                        valor={prioridad}
-                        onCambiar={(v) => setPrioridad(v as typeof prioridad)}
-                        opciones={[
-                          { valor: 'NORMAL', etiqueta: 'Normal' },
-                          { valor: 'PREFERENTE', etiqueta: 'Preferente' },
-                          { valor: 'URGENTE', etiqueta: 'Urgente' },
-                        ]}
-                      />
-                    </Campo>
-
                     {/* El botón se separa más que un campo: es la acción final
                         del formulario y conviene que no se lea como un
                         tercer campo más. */}
@@ -1202,7 +1182,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             <section className="tarjeta p-6 impresion-boleto">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+                  <h2 className="text-sm font-bold text-gris-700">
                     Turno emitido
                   </h2>
                   <p className="mt-1 text-2xl font-black text-navy-800">
@@ -1279,7 +1259,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           <section className="tarjeta overflow-hidden">
             <div className="border-b border-gris-100 px-6 py-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+                <h2 className="text-sm font-bold text-gris-700">
                   En atención ahora
                 </h2>
                 {/*
@@ -1486,7 +1466,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           </section>
           <section className="tarjeta p-6">
             <div className="flex flex-wrap items-center justify-between gap-5">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+              <h2 className="text-sm font-bold text-gris-700">
                 Llamar siguiente
               </h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -1620,7 +1600,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             */}
             <div className="mt-5 border-t border-gris-200 pt-4">
               <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-gris-700">
+          <h2 className="text-sm font-bold text-gris-700">
             Cola de espera
           </h2>
           <span className="text-xs text-gris-500">
@@ -1767,7 +1747,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         ) : cola.length === 0 ? (
           <Vacio
             titulo="No hay nadie en espera"
-            detalle="Los turnos emitidos y no atendidos se ordenan aquí por prioridad y fecha."
+            detalle="Los turnos emitidos y no atendidos se ordenan aquí por fecha de llegada."
           />
         ) : (
           <div className="transicion-datos overflow-x-auto">
@@ -1789,7 +1769,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   <th className="px-3 py-2 font-medium whitespace-nowrap">Folio</th>
                   <th className="px-3 py-2 font-medium">Trámite</th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">Emitido</th>
-                  <th className="px-3 py-2 font-medium">Prioridad</th>
                   <th className="px-3 py-2 font-medium">
                     <span className="sr-only">Acciones</span>
                   </th>
@@ -2475,7 +2454,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
 
       {propuesta?.hay_turnos && (
         <div className="rounded-xl border border-gris-200 bg-gris-50 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gris-500">
+          <p className="text-xs font-semibold text-gris-500">
             El siguiente
           </p>
           <p className="mt-0.5 text-sm font-bold text-navy-800">
