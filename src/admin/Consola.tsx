@@ -898,143 +898,145 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             no puede funcionar no es una opción: es una trampa. Al operador se
             le dice quién puede hacerlo en vez de ofrecerle la puerta cerrada.
           */}
-          <a
-            href="/admin/turnos-vivos"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-azul-600 hover:bg-azul-50 overflow-hidden whitespace-nowrap transition-all duration-300"
-          >
-            <span className="flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 48 48">
-                <rect width="39" height="25" x="4.5" y="9.75" fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" rx="4" ry="4" />
-                <path fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" d="M16 38.25h16" />
-              </svg>
-            </span>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 ml-0 group-hover:ml-2">
-              Pantalla de turnos
-            </span>
-          </a>
-          {modulos.length > 0 && (
-            <button
-              type="button"
-              onClick={abrirModalConfig}
-              className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-gris-700 hover:bg-gris-100 overflow-hidden whitespace-nowrap transition-all duration-300"
+          <div className="flex items-center gap-2">
+            <a
+              href="/admin/turnos-vivos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-azul-600 hover:bg-azul-50 overflow-hidden whitespace-nowrap transition-all duration-300"
             >
               <span className="flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" />
-                  <path fill="currentColor" fillRule="evenodd" d="M11.46 1.838a.75.75 0 0 1 1.08 0L15.111 4.5h3.638a.75.75 0 0 1 .75.75v3.638l2.662 2.573a.75.75 0 0 1 0 1.078L19.5 15.112v3.638a.75.75 0 0 1-.75.75h-3.638l-2.573 2.661a.75.75 0 0 1-1.078 0L8.888 19.5H5.25a.75.75 0 0 1-.75-.75v-3.64l-2.661-2.57a.75.75 0 0 1 0-1.078L4.5 8.888V5.25a.75.75 0 0 1 .75-.75h3.638zM12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 48 48">
+                  <rect width="39" height="25" x="4.5" y="9.75" fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" rx="4" ry="4" />
+                  <path fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" d="M16 38.25h16" />
                 </svg>
               </span>
               <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 ml-0 group-hover:ml-2">
-                Configurar ventanillas
+                Pantalla de turnos
               </span>
-            </button>
-          )}
-          {createPortal(
-            modalConfigTramites ? (
-              <Modal titulo="Configurar ventanillas" onCerrar={() => setModalConfigTramites(false)}>
-                {configPasoLista ? (
-                  <div>
-                    <p className="mb-4 text-sm text-gris-700">
-                      Selecciona la ventanilla que deseas configurar.
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {modulos.filter((m) => m.activo).map((m) => (
+            </a>
+            {modulos.length > 0 && (
+              <button
+                type="button"
+                onClick={abrirModalConfig}
+                className="group inline-flex items-center gap-0 rounded-xl border border-gris-200 bg-gris-50 px-3 py-2 text-sm font-semibold text-gris-700 hover:bg-gris-100 overflow-hidden whitespace-nowrap transition-all duration-300"
+              >
+                <span className="flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" />
+                    <path fill="currentColor" fillRule="evenodd" d="M11.46 1.838a.75.75 0 0 1 1.08 0L15.111 4.5h3.638a.75.75 0 0 1 .75.75v3.638l2.662 2.573a.75.75 0 0 1 0 1.078L19.5 15.112v3.638a.75.75 0 0 1-.75.75h-3.638l-2.573 2.661a.75.75 0 0 1-1.078 0L8.888 19.5H5.25a.75.75 0 0 1-.75-.75v-3.64l-2.661-2.57a.75.75 0 0 1 0-1.078L4.5 8.888V5.25a.75.75 0 0 1 .75-.75h3.638zM12 7.25a4.75 4.75 0 1 0 0 9.5a4.75 4.75 0 0 0 0-9.5" clipRule="evenodd" />
+                  </svg>
+                </span>
+                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 ml-0 group-hover:ml-2">
+                  Configurar ventanillas
+                </span>
+              </button>
+            )}
+            {createPortal(
+              modalConfigTramites ? (
+                <Modal titulo="Configurar ventanillas" onCerrar={() => setModalConfigTramites(false)}>
+                  {configPasoLista ? (
+                    <div>
+                      <p className="mb-4 text-sm text-gris-700">
+                        Selecciona la ventanilla que deseas configurar.
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {modulos.filter((m) => m.activo).map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => void seleccionarModuloConfig(m.id)}
+                            className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-azul-50 hover:border-azul-200 transition-colors"
+                          >
+                            <div>
+                              <div className="font-semibold text-gris-900">{m.codigo}</div>
+                              <div className="text-xs text-gris-500">{m.denominacion}</div>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                              <path d="M0 0h24v24H0z" fill="none" />
+                              <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
                         <button
-                          key={m.id}
                           type="button"
-                          onClick={() => void seleccionarModuloConfig(m.id)}
-                          className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-azul-50 hover:border-azul-200 transition-colors"
+                          onClick={() => setConfigPasoLista(true)}
+                          className="flex items-center gap-1 text-sm text-azul-600 hover:text-azul-700"
                         >
-                          <div>
-                            <div className="font-semibold text-gris-900">{m.codigo}</div>
-                            <div className="text-xs text-gris-500">{m.denominacion}</div>
-                          </div>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
                             <path d="M0 0h24v24H0z" fill="none" />
-                            <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                            <path fill="currentColor" d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z" />
                           </svg>
+                          Cambiar ventanilla
                         </button>
-                      ))}
+                        <span className="text-sm font-semibold text-gris-700">
+                          {modulos.find((m) => m.id === configModuloId)?.codigo}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gris-700">
+                        Selecciona los trámites que esta ventanilla puede atender. Si no seleccionas ninguno, atiende todos.
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {tramites.filter((t) => t.activo).map((t) => (
+                          <label key={t.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={configTramiteIds.includes(t.id)}
+                              onChange={(e) => {
+                                setConfigTramiteIds((prev) =>
+                                  e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id)
+                                )
+                              }}
+                            />
+                            {t.prefijo} — {t.denominacion}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setModalConfigTramites(false)}
+                          className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void guardarConfigTramites()}
+                          className="boton-primario px-4 py-2 text-sm"
+                        >
+                          Guardar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => setConfigPasoLista(true)}
-                        className="flex items-center gap-1 text-sm text-azul-600 hover:text-azul-700"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-                          <path d="M0 0h24v24H0z" fill="none" />
-                          <path fill="currentColor" d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z" />
-                        </svg>
-                        Cambiar ventanilla
-                      </button>
-                      <span className="text-sm font-semibold text-gris-700">
-                        {modulos.find((m) => m.id === configModuloId)?.codigo}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gris-700">
-                      Selecciona los trámites que esta ventanilla puede atender. Si no seleccionas ninguno, atiende todos.
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {tramites.filter((t) => t.activo).map((t) => (
-                        <label key={t.id} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={configTramiteIds.includes(t.id)}
-                            onChange={(e) => {
-                              setConfigTramiteIds((prev) =>
-                                e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id)
-                              )
-                            }}
-                          />
-                          {t.prefijo} — {t.denominacion}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setModalConfigTramites(false)}
-                        className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void guardarConfigTramites()}
-                        className="boton-primario px-4 py-2 text-sm"
-                      >
-                        Guardar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Modal>
-            ) : null,
-            document.body,
-          )}
-          {!esAdministrador ? (
-            <p className="max-w-56 text-right text-xs leading-relaxed text-gris-500">
-              Solo un administrador abre o cierra la jornada.
-            </p>
-          ) : periodoAbierto ? (
-            <BotonChispa
-              tono="rojo"
-              onClick={() => setConfirmandoCierre(true)}
-              disabled={ocupado}
-            >
-              Cerrar periodo
-            </BotonChispa>
-          ) : (
-            <BotonChispa tono="verde" onClick={() => void abrir()} disabled={ocupado}>
-              Abrir periodo de hoy
-            </BotonChispa>
-          )}
+                  )}
+                </Modal>
+              ) : null,
+              document.body,
+            )}
+            {!esAdministrador ? (
+              <p className="max-w-56 text-right text-xs leading-relaxed text-gris-500">
+                Solo un administrador abre o cierra la jornada.
+              </p>
+            ) : periodoAbierto ? (
+              <BotonChispa
+                tono="rojo"
+                onClick={() => setConfirmandoCierre(true)}
+                disabled={ocupado}
+              >
+                Cerrar periodo
+              </BotonChispa>
+            ) : (
+              <BotonChispa tono="verde" onClick={() => void abrir()} disabled={ocupado}>
+                Abrir periodo de hoy
+              </BotonChispa>
+            )}
+          </div>
         </div>
       </section>
       )}
