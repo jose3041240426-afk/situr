@@ -485,7 +485,6 @@ export default function Recepcion() {
   const [actuales, setActuales] = useState<FilaActual[]>([])
   const [ocupado, setOcupado] = useState(false)
   const [mensaje, setMensaje] = useState<{ texto: string; tono: 'ok' | 'peligro' | 'alerta' } | null>(null)
-  const [ultimoTurno, setUltimoTurno] = useState<{ codigo: string; token: string } | null>(null)
 
   const [modoMasivo, setModoMasivo] = useState(false)
   const [lotes, setLotes] = useState<LoteTurnos[]>([])
@@ -554,7 +553,6 @@ export default function Recepcion() {
     setOcupado(true)
     try {
       const resultado = await generarTurno(tramiteId)
-      setUltimoTurno({ codigo: resultado.codigo_turno, token: resultado.token_publico })
       setMensaje({ texto: `Turno ${resultado.codigo_turno} creado. Revisa la pantalla de espera en vivo.`, tono: 'ok' })
       await cargar()
     } catch (err) {
