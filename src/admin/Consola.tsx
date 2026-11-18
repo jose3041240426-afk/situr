@@ -1089,7 +1089,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       ) : (
       <div className="transicion-datos mb-6 grid gap-5 sm:grid-cols-3">
         <TarjetaCifra
-          rotulo="Turno actual"
+          rotulo="Turnos actuales"
           valor={enAtencion?.codigo_turno ?? '—'}
           pie={
             enAtencion
