@@ -3,6 +3,8 @@ import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado } from '../lib/tipos'
 import { useTransferencias } from '../lib/transferencias'
+import { AlertBanner } from '../components/ui/alert-banner'
+import { AnimatePresence } from 'framer-motion'
 
 const ESTADO_COLOR: Record<string, string> = {
   DISPONIBLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -214,12 +216,16 @@ export default function ColaVentanillas() {
     <div className="entrada-escalonada flex flex-col gap-6 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gris-900">Turnos — Cola global</h1>
-        {aviso && (
-          <div className="rounded-lg border border-azul-200 bg-azul-50 px-4 py-2 text-sm font-semibold text-azul-700">
-            {aviso}
-          </div>
-        )}
       </header>
+      <AnimatePresence>
+        {aviso && (
+          <AlertBanner
+            variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
+            title={aviso}
+            onDismiss={() => setAviso(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Carrusel horizontal de turnos pendientes */}
       <section className="tarjeta p-4">
