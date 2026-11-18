@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia } from '../lib/rpc'
