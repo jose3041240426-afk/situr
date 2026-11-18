@@ -904,7 +904,10 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             rel="noopener noreferrer"
             className="inline-block rounded-xl border border-gris-200 bg-gris-50 px-4 py-2 text-sm font-semibold text-azul-600 hover:bg-azul-50"
           >
-            Pantalla de turnos
+            <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 48 48">
+              <rect width="39" height="25" x="4.5" y="9.75" fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" rx="4" ry="4" />
+              <path fill="none" stroke="currentColor" stroke-width="4" strokeLinecap="round" strokeLinejoin="round" d="M16 38.25h16" />
+            </svg>
           </a>
           {modulos.length > 0 && (
             <button
