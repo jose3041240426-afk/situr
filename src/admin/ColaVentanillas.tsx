@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente } from '../lib/rpc'
-import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso } from '../lib/tipos'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
+import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
 import { useTransferencias } from '../lib/transferencias'
 import { AlertBanner } from '../components/ui/alert-banner'
@@ -26,6 +26,9 @@ export default function ColaVentanillas() {
   const [aviso, setAviso] = useState<string | null>(null)
   const [modalTurno, setModalTurno] = useState<TurnoAsignado | null>(null)
   const [modalVentanilla, setModalVentanilla] = useState<Ventanilla | null>(null)
+  const [avisando, setAvisando] = useState<TurnoAsignado | null>(null)
+  const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
+  const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   const [accionando, setAccionando] = useState(false)
   const [timerSegundos, setTimerSegundos] = useState(0)
   const [timerActivo, setTimerActivo] = useState(false)
@@ -164,29 +167,17 @@ export default function ColaVentanillas() {
 
   async function manejarAvisar() {
     if (!modalTurno) return
-    setAccionando(true)
+    setAvisando(modalTurno)
+    setPropuesta(null)
     try {
-      const r: RespuestaProgramarAviso = await programarAvisoSiguiente(5, null)
-      // Disparar el push en el acto para cada turno avisado.
-      try {
-        const { data: { session: sesionFresca } } = await supabase.auth.getSession()
-        const tokenOperador = sesionFresca?.access_token
-        if (tokenOperador) {
-          for (const t of r.turnos ?? []) {
-            await fetch(`/api/push?turno_id=${encodeURIComponent(t.turno_id)}`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${tokenOperador}` },
-            }).catch(() => {})
-          }
-        }
-      } catch {
-        // El cron es el respaldo.
-      }
-      setAviso(`Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos 5 minutos.`)
-    } catch (e) {
-      setAviso(e instanceof Error ? e.message : 'No se pudo enviar el aviso.')
-    } finally {
-      setAccionando(false)
+      setMinutosAviso(await opcionesAviso())
+    } catch {
+      setMinutosAviso([5, 10, 15])
+    }
+    try {
+      setPropuesta(await proponerSiguienteTurno(null, null))
+    } catch {
+      setPropuesta(null)
     }
   }
 
@@ -651,6 +642,88 @@ export default function ColaVentanillas() {
                     <p className="text-sm text-gris-500">No hay ventanillas disponibles para recibir turnos.</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {avisando && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 modal-bg-entrada">
+          <div className="tarjeta w-full max-w-md p-0 modal-entrada overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-amber-50">
+              <div>
+                <h3 className="text-lg font-bold text-gris-900">Preparar al siguiente turno</h3>
+                <p className="text-xs text-gris-500">
+                  {avisando.turno_codigo} está en atención.
+                </p>
+              </div>
+              <button
+                onClick={() => setAvisando(null)}
+                className="rounded-lg p-1 text-gris-400 hover:bg-gris-200 hover:text-gris-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                  <path d="M0 0h24v24H0z" fill="none" />
+                  <path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gris-700">
+                Elige con cuánta anticipación quieres avisar a los próximos de la cola para que se preparen.
+              </p>
+              {propuesta?.hay_turnos && (
+                <div className="rounded-xl border border-gris-200 bg-gris-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gris-500">
+                    El siguiente
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold text-gris-900">
+                    {propuesta.codigo_turno}
+                    {propuesta.denominacion_tramite ? ` · ${propuesta.denominacion_tramite}` : ''}
+                  </p>
+                  {propuesta.razon && (
+                    <p className="mt-0.5 text-[11px] leading-snug text-gris-700">
+                      {propuesta.razon}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap justify-center gap-2">
+                {minutosAviso.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={accionando}
+                    onClick={async () => {
+                      setAccionando(true)
+                      try {
+                        const r: RespuestaProgramarAviso = await programarAvisoSiguiente(m, null)
+                        try {
+                          const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+                          const tokenOperador = sesionFresca?.access_token
+                          if (tokenOperador) {
+                            for (const t of r.turnos ?? []) {
+                              await fetch(`/api/push?turno_id=${encodeURIComponent(t.turno_id)}`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${tokenOperador}` },
+                              }).catch(() => {})
+                            }
+                          }
+                        } catch {
+                          // El cron es el respaldo.
+                        }
+                        setAviso(`Aviso enviado: los turnos que siguen en la cola ya saben que su turno llega en unos ${m} minutos.`)
+                        setAvisando(null)
+                      } catch (e) {
+                        setAviso(e instanceof Error ? e.message : 'No se pudo programar el aviso.')
+                      } finally {
+                        setAccionando(false)
+                      }
+                    }}
+                    className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700 hover:bg-amber-50 hover:border-amber-200 transition-colors disabled:opacity-50"
+                  >
+                    {m} min
+                  </button>
+                ))}
               </div>
             </div>
           </div>
