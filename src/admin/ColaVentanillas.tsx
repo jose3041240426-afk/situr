@@ -219,11 +219,13 @@ export default function ColaVentanillas() {
       </header>
       <AnimatePresence>
         {aviso && (
-          <AlertBanner
-            variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
-            title={aviso}
-            onDismiss={() => setAviso(null)}
-          />
+          <div className="fixed left-1/2 top-4 z-50 w-full max-w-2xl -translate-x-1/2 px-4">
+            <AlertBanner
+              variant={aviso.toLowerCase().includes('no se pudo') ? 'destructive' : 'success'}
+              title={aviso}
+              onDismiss={() => setAviso(null)}
+            />
+          </div>
         )}
       </AnimatePresence>
 
