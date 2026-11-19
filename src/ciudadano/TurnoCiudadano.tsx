@@ -45,8 +45,6 @@ export default function TurnoCiudadano() {
   const [consideracion, setConsideracion] = useState('')
   const [errorConsideracion, setErrorConsideracion] = useState<string | null>(null)
   const [vivo, setVivo] = useState(false)
-  /** Cambiando la preferencia del aviso (P14). */
-  const [cambiandoPref, setCambiandoPref] = useState<number | null | undefined>(undefined)
   /** 0 = cerrado, 1 = "autorizar notificaciones". */
   const [pasoModalAviso, setPasoModalAviso] = useState<0 | 1>(0)
   /** El ciudadano ya cerró el modal alguna vez (eligió o dijo No). */
@@ -472,7 +470,6 @@ export default function TurnoCiudadano() {
   /** Cambiar la preferencia de aviso: alterna entre 5 y 15 minutos. */
   async function cambiarPreferenciaAviso() {
     if (!turno || turno.preferencia_aviso_minutos === null) return
-    setCambiandoPref(turno.preferencia_aviso_minutos)
     try {
       // Alternar: si tiene 15, poner 5; si tiene 5, poner 15
       const nuevosMinutos = turno.preferencia_aviso_minutos === 15 ? 5 : 15
@@ -482,8 +479,6 @@ export default function TurnoCiudadano() {
       )
     } catch {
       // Silenciar error — el usuario puede reintentar
-    } finally {
-      setCambiandoPref(undefined)
     }
   }
 
