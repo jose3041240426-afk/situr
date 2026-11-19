@@ -126,6 +126,7 @@ export interface TurnoAsignado {
 
 export interface TransferenciaPendiente {
   solicitud_id: number
+  turno_id: string
   turno_codigo: string
   origen_codigo: string
   creado_en: string

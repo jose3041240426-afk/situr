@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useTransferencias } from '../lib/transferencias'
 import { estadoVentanillas, responderTransferencia } from '../lib/rpc'
+import { supabase } from '../lib/supabase'
 import { nombreCompleto } from '../lib/operador'
 import { Modal } from '../components/ui'
 import { Avatar } from '../components/ui/avatar'
@@ -201,6 +202,24 @@ function PanelTransferencias() {
       const r = await responderTransferencia(solicitudId, aceptar)
       if (r.ok) {
         setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
+        // Enviar notificación push al ciudadano cuando se acepta la transferencia
+        if (aceptar) {
+          const st = pendientes.find(p => p.solicitud_id === solicitudId)
+          if (st?.turno_id) {
+            try {
+              const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+              const tokenOperador = sesionFresca?.access_token
+              if (tokenOperador) {
+                await fetch(`/api/push?turno_id=${encodeURIComponent(st.turno_id)}`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${tokenOperador}` },
+                }).catch(() => {})
+              }
+            } catch {
+              // El cron es el respaldo.
+            }
+          }
+        }
       } else {
         setAviso(r.motivo || 'No se pudo responder.')
       }

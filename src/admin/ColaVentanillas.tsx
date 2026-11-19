@@ -117,11 +117,35 @@ export default function ColaVentanillas() {
     setModalTransferir(false)
   }
 
+  async function avisarTurnoAhora(turnoId: string): Promise<void> {
+    try {
+      const { data: { session: sesionFresca } } = await supabase.auth.getSession()
+      const tokenOperador = sesionFresca?.access_token
+      if (!tokenOperador) {
+        console.info('[situr] no hay sesión para avisar; el cron lo intentará')
+        return
+      }
+      await fetch(`/api/push?turno_id=${encodeURIComponent(turnoId)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenOperador}` },
+      }).then(async (res) => {
+        if (!res.ok) {
+          const texto = await res.text().catch(() => '')
+          console.error('[situr] push falló:', res.status, texto)
+        }
+      }).catch((e) => console.error('[situr] push (red):', e))
+    } catch (e) {
+      console.error('[situr] push (excepción):', e)
+    }
+  }
+
   async function manejarLlamar() {
     if (!modalTurno) return
     setAccionando(true)
     try {
       await llamarTurnoAsignado(modalTurno.turno_id)
+      // Enviar notificación push al ciudadano
+      avisarTurnoAhora(modalTurno.turno_id)
       setAviso(`Turno ${modalTurno.turno_codigo} llamado.`)
       // Iniciar timer de 15 minutos para el aviso
       setTimerSegundos(15 * 60)
@@ -206,8 +230,8 @@ export default function ColaVentanillas() {
     try {
       const r = await solicitarTransferencia(modalTurno.turno_id, destinoModuloId)
       if (r.ok) {
-        setAviso(`Solicitud de transferencia enviada. Esperando aceptación de la ventanilla destino.`)
-        setModalTransferir(false)
+        setAviso(`Solicitud de transferencia enviada. La ventanilla destino debe aceptarla.`)
+        cerrarModal()
       } else {
         setAviso(r.motivo || 'No se pudo solicitar la transferencia.')
       }
