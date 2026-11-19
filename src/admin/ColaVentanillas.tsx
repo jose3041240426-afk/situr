@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, repetirLlamada, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
 import { useTransferencias } from '../lib/transferencias'
@@ -141,6 +141,34 @@ export default function ColaVentanillas() {
       await cargar()
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'No se pudo llamar el turno.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  /**
+   * «Repetir llamado»: el turno YA está en CALLED, así que hay que usar
+   * `repetir_llamada` y no `llamar_turno_asignado`, que exige ASIGNED y
+   * rechazaría la operación con «El turno no está asignado».
+   *
+   * El aviso al ciudadano lo encola la BASE al cambiar `llamado_en`
+   * (mig 61): el navegador no lo manda, para que no suene dos veces.
+   *
+   * El modal se queda abierto: repetir suele hacerse más de una vez y
+   * cerrarlo obligaría a volver a abrir el turno.
+   */
+  async function manejarRepetir() {
+    if (!modalTurno) return
+    setAccionando(true)
+    try {
+      await repetirLlamada(modalTurno.turno_id)
+      setAviso(`Llamada repetida para ${modalTurno.turno_codigo}.`)
+      // El token vence de nuevo: el contador arranca otra vez.
+      setTimerSegundos(15 * 60)
+      setTimerActivo(true)
+      await cargar()
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'No se pudo repetir la llamada.')
     } finally {
       setAccionando(false)
     }
@@ -537,10 +565,11 @@ export default function ColaVentanillas() {
                 )}
                 {modalTurno.turno_estado === 'CALLED' && (
                   <button
-                    onClick={manejarLlamar}
+                    onClick={manejarRepetir}
                     disabled={accionando}
                     className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-azul-500 hover:text-azul-600 disabled:opacity-50"
                     title="Repetir llamado"
+                    aria-label={`Repetir la llamada al turno ${modalTurno.turno_codigo}`}
                   >
                     <span className="icono-repetir" />
                   </button>
