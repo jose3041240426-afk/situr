@@ -47,8 +47,8 @@ export default function TurnoCiudadano() {
   const [vivo, setVivo] = useState(false)
   /** Cambiando la preferencia del aviso (P14). */
   const [cambiandoPref, setCambiandoPref] = useState<number | null | undefined>(undefined)
-  /** 0 = cerrado, 1 = "¿quieres aviso?", 2 = "precisión o rapidez". */
-  const [pasoModalAviso, setPasoModalAviso] = useState<0 | 1 | 2>(0)
+  /** 0 = cerrado, 1 = "autorizar notificaciones". */
+  const [pasoModalAviso, setPasoModalAviso] = useState<0 | 1>(0)
   /** El ciudadano ya cerró el modal alguna vez (eligió o dijo No). */
   const [yaDecidio, setYaDecidio] = useState(false)
   const [probandoAviso, setProbandoAviso] = useState(false)
@@ -77,8 +77,6 @@ export default function TurnoCiudadano() {
    * responde.
    */
   const [permiso, setPermiso] = useState<EstadoPermiso>('default')
-  /** Error visible del paso 2 (guardar preferencia). */
-  const [errorPref, setErrorPref] = useState<string | null>(null)
   /**
    * El ciudadano YA interactuó con el modal (eligió o cerró).
    *
@@ -361,9 +359,10 @@ export default function TurnoCiudadano() {
   }
 
   /**
-   * Paso 1: activar la suscripción push y pasar al paso 2.
+   * Autorizar notificaciones: pide permiso, suscribe y guarda la preferencia
+   * con 15 minutos por defecto. No hay paso 2 ni opción de rechazar.
    */
-  async function activarAviso() {
+  async function autorizarAviso() {
     setErrorSuscripcion(null)
     if (!pushSoportado()) {
       setErrorSuscripcion(
@@ -391,7 +390,15 @@ export default function TurnoCiudadano() {
         )
         return
       }
-      setPasoModalAviso(2)
+      // Guardar preferencia con 15 minutos por defecto y cerrar el modal
+      await actualizarPreferenciaAviso(token, 15)
+      interactuoRef.current = true
+      localStorage.setItem(`situr_pref_vista_${token}`, '1')
+      setTurno((prev) =>
+        prev ? { ...prev, preferencia_aviso_minutos: 15 } : prev,
+      )
+      setYaDecidio(true)
+      setPasoModalAviso(0)
     } finally {
       setActivando(false)
     }
@@ -458,36 +465,28 @@ export default function TurnoCiudadano() {
   /** Reabrir el modal para que el ciudadano que dijo No pueda cambiar de opinión. */
   function reabrirModalAviso() {
     setErrorSuscripcion(null)
-    setErrorPref(null)
     setPermiso(estadoPermiso())
     setPasoModalAviso(1)
   }
 
-  /** Elegir una preferencia desde el modal (paso 2). */
-  async function elegirPreferencia(minutos: number) {
-    setCambiandoPref(minutos)
+  /** Cambiar la preferencia de aviso: alterna entre 5 y 15 minutos. */
+  async function cambiarPreferenciaAviso() {
+    if (!turno || turno.preferencia_aviso_minutos === null) return
+    setCambiandoPref(turno.preferencia_aviso_minutos)
     try {
-      await actualizarPreferenciaAviso(token, minutos)
-      // Marcar el ref ANTES de cerrar el modal: si el `cargar()` de cada
-      // 10 s corre en paralelo y trae datos viejos, el `useEffect` no
-      // reabrirá el modal.
-      interactuoRef.current = true
-      localStorage.setItem(`situr_pref_vista_${token}`, '1')
-      // Actualizar el turno en memoria sin volver a llamar a `cargar()`:
-      // así el estado `turno` refleja la nueva preferencia de inmediato,
-      // sin depender del endpoint.
+      // Alternar: si tiene 15, poner 5; si tiene 5, poner 15
+      const nuevosMinutos = turno.preferencia_aviso_minutos === 15 ? 5 : 15
+      await actualizarPreferenciaAviso(token, nuevosMinutos)
       setTurno((prev) =>
-        prev ? { ...prev, preferencia_aviso_minutos: minutos } : prev,
+        prev ? { ...prev, preferencia_aviso_minutos: nuevosMinutos } : prev,
       )
-      setYaDecidio(true)
-      setPasoModalAviso(0)
     } catch {
-      // Si la BD rechaza el cambio, el modal se queda abierto para
-      // reintentar. No marcamos `interactuoRef` ni `localStorage`.
+      // Silenciar error — el usuario puede reintentar
     } finally {
       setCambiandoPref(undefined)
     }
   }
+
 
   /**
    * Cambiar la preferencia del aviso (P14).
@@ -688,10 +687,10 @@ export default function TurnoCiudadano() {
           </dl>
         </div>
 
-        {/* Preferencia de aviso (P14): modal en dos pasos */}
+        {/* Aviso push: modal simple que pide autorizar notificaciones */}
         {pasoModalAviso === 1 && (
           <Modal
-            titulo="¿Le avisamos cuando se acerque su turno?"
+            titulo="Necesitamos su autorización"
             onCerrar={cerrarModalAviso}
             ancho="max-w-md"
           >
@@ -703,9 +702,10 @@ export default function TurnoCiudadano() {
                 </svg>
               </span>
               <p className="text-sm text-gris-700">
-                Le enviaremos una notificación al móvil cuando su turno esté
-                próximo, aunque tenga esta pestaña cerrada. No guardamos su
-                nombre ni su teléfono.
+                Necesitamos que autorice recibir notificaciones para estar al
+                tanto de su turno. Le avisaremos cuando se acerque, aunque
+                tenga esta pestaña cerrada. No guardamos su nombre ni su
+                teléfono.
               </p>
               {errorSuscripcion && (
                 <p
@@ -716,11 +716,6 @@ export default function TurnoCiudadano() {
                 </p>
               )}
 
-              {/*
-                El navegador manda. Si los avisos están bloqueados —o el
-                navegador no los admite— no se ofrece un botón que no va a
-                hacer nada: se explica cómo desbloquearlos y se deja cerrar.
-              */}
               {permiso === 'denied' && (
                 <p className="rounded-lg border border-ambar-500/30 bg-ambar-50 px-3 py-2 text-xs font-semibold text-ambar-600">
                   Este navegador tiene los avisos <strong>bloqueados</strong> para
@@ -748,95 +743,16 @@ export default function TurnoCiudadano() {
                     Entendido
                   </button>
                 ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void activarAviso()}
-                      disabled={activando}
-                      className="boton-primario w-full py-3 disabled:opacity-60"
-                    >
-                      {activando ? 'Activando…' : 'Sí, avísame'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cerrarModalAviso}
-                      className="boton-secundario w-full py-3"
-                    >
-                      No, gracias
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={() => void autorizarAviso()}
+                    disabled={activando}
+                    className="boton-primario w-full py-3 disabled:opacity-60"
+                  >
+                    {activando ? 'Activando…' : 'Autorizar notificaciones'}
+                  </button>
                 )}
               </div>
-            </div>
-          </Modal>
-        )}
-
-        {pasoModalAviso === 2 && (
-          <Modal
-            titulo="¿Cómo prefiere el aviso?"
-            onCerrar={cerrarModalAviso}
-            ancho="max-w-md"
-          >
-            <div className="space-y-3">
-              <p className="text-sm text-gris-700">
-                Elija cómo quiere que le avisemos. Podrá cambiarlo después.
-              </p>
-              {errorPref && (
-                <p
-                  role="alert"
-                  className="rounded-lg border border-rojo-500/30 bg-rojo-50 px-3 py-2 text-xs font-semibold text-rojo-600"
-                >
-                  {errorPref}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => void elegirPreferencia(15)}
-                disabled={cambiandoPref !== undefined}
-                className="flex w-full items-start gap-3 rounded-xl border border-gris-200 bg-white p-4 text-left transition-colors hover:border-azul-500 hover:bg-azul-50 disabled:opacity-60"
-              >
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-navy-800">
-                    {cambiandoPref === 15 ? 'Guardando…' : 'Con tiempo · 15 min'}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-gris-700">
-                    Ideal si va a alejarse. Le avisamos 15 minutos antes.
-                  </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void elegirPreferencia(5)}
-                disabled={cambiandoPref !== undefined}
-                className="flex w-full items-start gap-3 rounded-xl border border-gris-200 bg-white p-4 text-left transition-colors hover:border-azul-500 hover:bg-azul-50 disabled:opacity-60"
-              >
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-azul-50 text-azul-500">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-navy-800">
-                    {cambiandoPref === 5 ? 'Guardando…' : 'Rápido · 5 min'}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-gris-700">
-                    Ideal si está cerca. Le avisamos 5 minutos antes.
-                  </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={cerrarModalAviso}
-                className="w-full text-center text-xs text-gris-500 underline"
-              >
-                Decidir después
-              </button>
             </div>
           </Modal>
         )}
@@ -845,7 +761,7 @@ export default function TurnoCiudadano() {
           <div className="mt-3 flex min-w-0 justify-center">
             <button
               type="button"
-              onClick={() => setPasoModalAviso(2)}
+              onClick={() => void cambiarPreferenciaAviso()}
               className="text-xs text-gris-500 underline hover:text-azul-600"
             >
               Cambiar preferencia de aviso
