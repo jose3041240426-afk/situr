@@ -1184,14 +1184,19 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   />
                   <label htmlFor="modo-un-turno">Un turno</label>
 
+                  {/*
+                    Opción "Varios turnos" oculta visualmente.
+                    El código se mantiene intacto para futura reactivación.
+                  */}
                   <input
                     type="radio"
                     name="modo-emision"
                     id="modo-varios-turnos"
                     checked={modoMasivo}
                     onChange={() => setModoMasivo(true)}
+                    className="hidden"
                   />
-                  <label htmlFor="modo-varios-turnos">Varios turnos</label>
+                  <label htmlFor="modo-varios-turnos" className="hidden">Varios turnos</label>
 
                   <div className="glass-glider" aria-hidden="true" />
                 </div>
