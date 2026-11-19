@@ -1099,12 +1099,21 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
           destacado
         />
         <TarjetaCifra
-          rotulo="Siguiente turno"
-          valor={propuesta?.hay_turnos ? (propuesta.codigo_turno ?? '—') : '—'}
+          rotulo="Ventanillas operativas"
+          valor={
+            cargando
+              ? '—'
+              : String(
+                  modulos
+                    .filter((m) => m.activo)
+                    .filter((m) => actuales.some((t) => t.modulo_id === m.id))
+                    .length
+                )
+          }
           pie={
-            propuesta?.hay_turnos
-              ? `${propuesta.denominacion_tramite ?? ''} · en espera`
-              : 'No hay turnos en espera'
+            cargando
+              ? 'Cargando…'
+              : `${modulos.filter((m) => m.activo).length} ventanillas activas en total`
           }
           icono="lista"
         />
