@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BotonLlamar from '../components/BotonLlamar'
-import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, repetirLlamada, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
+import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, repetirLlamada, iniciarAtencion, finalizarTurno, cancelarTurno, omitirTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
 import { useTransferencias } from '../lib/transferencias'
@@ -29,6 +29,7 @@ export default function ColaVentanillas() {
   const [avisando, setAvisando] = useState<TurnoAsignado | null>(null)
   const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
   const [minutosAviso, setMinutosAviso] = useState<number[]>([])
+  const [modalEliminar, setModalEliminar] = useState(false)
   const [accionando, setAccionando] = useState(false)
   const [errorModalAviso, setErrorModalAviso] = useState<string | null>(null)
   const [timerSegundos, setTimerSegundos] = useState(0)
@@ -163,9 +164,10 @@ export default function ColaVentanillas() {
     try {
       await repetirLlamada(modalTurno.turno_id)
       setAviso(`Llamada repetida para ${modalTurno.turno_codigo}.`)
-      // El token vence de nuevo: el contador arranca otra vez.
-      setTimerSegundos(15 * 60)
-      setTimerActivo(true)
+      /*
+       * El timer «Aviso al siguiente en» es del aviso programado a la cola,
+       * no del repetir: no se reactiva aquí, para no confundir.
+       */
       await cargar()
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'No se pudo repetir la llamada.')
@@ -224,16 +226,38 @@ export default function ColaVentanillas() {
 
   async function manejarEliminar() {
     if (!modalTurno) return
-    if (!confirm(`¿Eliminar turno ${modalTurno.turno_codigo}?`)) return
+    setModalEliminar(true)
+  }
+
+  async function manejarOmitir() {
+    if (!modalTurno) return
+    setAccionando(true)
+    try {
+      await omitirTurno(modalTurno.turno_id, 'Omitido por el operador')
+      setAviso(`Turno ${modalTurno.turno_codigo} omitido.`)
+      setTimerActivo(false)
+      cerrarModal()
+      await cargar()
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : 'No se pudo omitir el turno.')
+    } finally {
+      setAccionando(false)
+    }
+  }
+
+  async function confirmarEliminar() {
+    if (!modalTurno) return
     setAccionando(true)
     try {
       await cancelarTurno(modalTurno.turno_id, 'Eliminado por operador')
       setAviso(`Turno ${modalTurno.turno_codigo} eliminado.`)
       setTimerActivo(false)
+      setModalEliminar(false)
       cerrarModal()
       await cargar()
     } catch (e) {
       setAviso(e instanceof Error ? e.message : 'No se pudo eliminar el turno.')
+      setModalEliminar(false)
     } finally {
       setAccionando(false)
     }
@@ -542,7 +566,7 @@ export default function ColaVentanillas() {
               {/* Timer de aviso */}
               {timerActivo && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-                  <div className="text-xs text-amber-600">Aviso al siguiente en</div>
+                  <div className="text-xs text-amber-600">Aviso programado al siguiente en</div>
                   <div className="text-2xl font-bold text-amber-700 font-mono">
                     {formatoTiempo(timerSegundos)}
                   </div>
@@ -553,14 +577,26 @@ export default function ColaVentanillas() {
             {/* Acciones: una sola fila, ancho dividido en partes iguales */}
             <div className="border-t border-gris-200 bg-gris-50 px-5 py-4">
               <div className="flex gap-2">
-                {modalTurno.turno_estado !== 'SERVING' && (
+                {modalTurno.turno_estado !== 'SERVING' && modalTurno.turno_estado !== 'CALLED' && (
                   <button
                     onClick={manejarEliminar}
                     disabled={accionando}
                     className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-rojo-500 hover:text-rojo-600 disabled:opacity-50"
                     title="Eliminar turno"
+                    aria-label={`Eliminar el turno ${modalTurno.turno_codigo}`}
                   >
                     {accionando ? 'Procesando…' : <span className="icono-papelera" />}
+                  </button>
+                )}
+                {modalTurno.turno_estado === 'CALLED' && (
+                  <button
+                    onClick={manejarOmitir}
+                    disabled={accionando}
+                    className="inline-flex items-center justify-center rounded-lg px-2 py-2.5 text-ambar-500 hover:text-ambar-600 disabled:opacity-50"
+                    title="Omitir turno"
+                    aria-label={`Omitir el turno ${modalTurno.turno_codigo}`}
+                  >
+                    {accionando ? 'Procesando…' : 'Omitir'}
                   </button>
                 )}
                 {modalTurno.turno_estado === 'CALLED' && (
@@ -782,6 +818,55 @@ export default function ColaVentanillas() {
       )}
 
       {/* (El panel de solicitudes vive ahora en la cabecera global, como desplegable de la campana.) */}
+
+      {/* Modal de confirmación de eliminación */}
+      {modalEliminar && modalTurno && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 modal-bg-entrada">
+          <div className="tarjeta w-full max-w-sm p-0 modal-entrada overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gris-200 px-5 py-4 bg-rojo-50">
+              <div>
+                <h3 className="text-lg font-bold text-gris-900">Eliminar turno</h3>
+                <p className="text-xs text-gris-500">
+                  {modalTurno.turno_codigo}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalEliminar(false)}
+                className="rounded-lg p-1 text-gris-400 hover:bg-gris-200 hover:text-gris-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
+                  <path d="M0 0h24v24H0z" fill="none" />
+                  <path fill="currentColor" d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 py-5">
+              <p className="text-sm text-gris-700">
+                ¿Seguro que desea eliminar el turno <strong>{modalTurno.turno_codigo}</strong>?
+                Esta acción no se puede deshacer.
+              </p>
+              <div className="mt-5 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModalEliminar(false)}
+                  className="boton-secundario px-4 py-2"
+                  disabled={accionando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarEliminar}
+                  className="boton-peligro px-4 py-2"
+                  disabled={accionando}
+                >
+                  {accionando ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
