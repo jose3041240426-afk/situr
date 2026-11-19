@@ -257,7 +257,15 @@ export default function TurnosVivos() {
       const [cola, ultimoTurno] = await Promise.all([colaEnVivo(VISIBLES), ultimoTurnoEmitido()])
       setFilas(cola.filas)
       setTotal(cola.total)
-      setUltimo(ultimoTurno)
+      // Si se emitió un turno nuevo, el QR vuelve al último emitido por defecto
+      // (no se queda "pegado" en el turno que se pulsó antes).
+      setUltimo((prev) => {
+        if (prev?.codigo_turno !== ultimoTurno?.codigo_turno) {
+          setElegido(null)
+          setTokenElegido(null)
+        }
+        return ultimoTurno
+      })
       setListo(true)
     } catch (err) {
       console.error('TurnosVivos: error al cargar', err)
