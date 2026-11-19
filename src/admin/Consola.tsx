@@ -5,7 +5,6 @@ import { AnimatePresence } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BotonChispa from '../components/BotonChispa'
-import BotonLlamar from '../components/BotonLlamar'
 import BotonEmitir from '../components/BotonEmitir'
 import BotonRepartir from '../components/BotonRepartir'
 import Selector from '../components/Selector'
@@ -47,10 +46,8 @@ import {
   listarCifrasDelPeriodo,
   listarTurnosActuales,
   listarTurnosRetirados,
-  llamarSiguiente,
   marcarTurnoReclamado,
   omitirTurno,
-  proponerSiguienteTurno,
   repetirLlamada,
 } from '../lib/rpc'
 import type {
@@ -61,7 +58,6 @@ import type {
   LoteTurnos,
   Modulo,
   PeriodoOperativo,
-  PropuestaSiguiente,
   RespuestaProgramarAviso,
   Tramite,
 } from '../lib/tipos'
@@ -162,7 +158,8 @@ export default function Consola() {
   const [emitido, setEmitido] = useState<{ codigo: string; token: string } | null>(null)
 
   // Emisión masiva (migración 009). Un renglón por trámite con su cantidad.
-  const [modoMasivo, setModoMasivo] = useState(false)
+  // Oculto visualmente: el radiogroup no se muestra, pero el estado se mantiene.
+  const [modoMasivo, _setModoMasivo] = useState(false)
   const [lotes, setLotes] = useState<LoteTurnos[]>([])
   /** Qué se emitió en el último lote, para poder imprimir o dictar los folios. */
   const [loteEmitido, setLoteEmitido] = useState<
@@ -171,20 +168,6 @@ export default function Consola() {
 
   // Aviso programado al siguiente (migración 009).
 const [minutosAviso, setMinutosAviso] = useState<number[]>([])
-  // Llamada
-  const [turnoLlamado, setTurnoLlamado] = useState<FilaActual | null>(null)
-  /** La propuesta del sistema, con su razón (P5). */
-  const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
-
-  /**
-   * La confirmacion de la llamada (RF-029).
-   *
-   * Antes, «Llamar» llamaba directamente: un clic y el estado de un turno
-   * de un ciudadano cambiaba a «En atención». Ahora el boton abre un
-   * dialogo con a quien va a llamar el sistema y con lo que va a pasar, y
-   * la llamada solo sale de ahi. Es una confirmacion, no un adorno.
-   */
-  const [confirmandoLlamada, setConfirmandoLlamada] = useState(false)
   const [modalMotivo, setModalMotivo] = useState<
     { turno: FilaActual; accion: 'omitir' | 'cancelar' } | null
   >(null)
@@ -337,7 +320,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
        * esperar a las otras seis. Una sola petición: antes se pedía dos veces
        * (una por el efecto y otra por este bloque).
        */
-      const promesaPeriodo = obtenerPeriodoAbierto()
+      obtenerPeriodoAbierto()
         .then((p) => {
           setPeriodoAbierto(p)
           setPeriodoListo(true)
@@ -365,24 +348,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       setModulos(ms)
       setActualizado(new Date())
       if (!tramiteId && ts.length > 0) setTramiteId(ts[0].id)
-
-      /*
-       * La propuesta: qué va a llamar el sistema y por qué (P5 + P11).
-       * Solo tiene sentido si hay un periodo abierto.
-       *
-       * Se reutiliza la consulta del periodo en vez de lanzar otra: es la
-       * misma que dispara el efecto de arriba, y pedirla dos veces haría dos
-       * viajes a la base para el mismo dato.
-       */
-      if (await promesaPeriodo) {
-        try {
-          setPropuesta(await proponerSiguienteTurno())
-        } catch {
-          setPropuesta(null)
-        }
-      } else {
-        setPropuesta(null)
-      }
 
       /*
        * El tope de turnos abiertos (migración 010). Si falla, se queda en 3:
@@ -586,11 +551,10 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
 
   async function cerrar() {
     if (!periodoAbierto) return
-    const { ok } = await ejecutar(
+    await ejecutar(
       () => cerrarPeriodo(periodoAbierto.id),
       `Periodo ${formatearFecha(periodoAbierto.clave)} cerrado. Los turnos en espera se omitieron.`,
     )
-    if (ok) setTurnoLlamado(null)
   }
 
   async function emitir() {
@@ -696,57 +660,8 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     }
   }
 
-  async function llamar() {
-    setOcupado(true)
-    setAviso(null)
-    try {
-      const r = await llamarSiguiente(
-        null,
-        null, // Cola global (RN-017).
-      )
-      setTurnoLlamado({
-        turno_id: r.turno_id,
-        codigo_turno: r.codigo_turno,
-        folio: r.folio,
-        estado: r.estado,
-        creado_en: '',
-        llamado_en: r.llamado_en,
-        inicio_atencion: null,
-        numero_llamadas: r.numero_llamadas,
-        periodo_operativo_id: '',
-        tramite_id: '',
-        clave_tramite: r.clave_tramite,
-        denominacion_tramite: r.denominacion_tramite,
-        modulo_id: null,
-        codigo_modulo: r.codigo_modulo,
-        denominacion_modulo: r.denominacion_modulo,
-        trabajador_id: null,
-        nombre_trabajador: r.operador,
-        numero_empleado: null,
-      })
-      /*
-        El aviso del turno llamado no espera al cron: se manda en el acto,
-        desde aquí, con el token del operador. Así el ciudadano se entera en
-        segundos y no en cinco minutos.
-
-        Si falla (sin red, sin suscripción, token caducado) no se interrumpe
-        la llamada: el cron es el respaldo y volverá a intentarlo.
-      */
-      await avisarTurnoAhora(r.turno_id)
-      await cargar()
-    } catch (e) {
-      setAviso({
-        tono: 'peligro',
-        texto: e instanceof ErrorSitur ? e.message : 'No se pudo llamar al siguiente turno.',
-      })
-    } finally {
-      setOcupado(false)
-    }
-  }
-
   async function conTurno(fn: () => Promise<unknown>, exito: string) {
-    const { ok } = await ejecutar(fn, exito)
-    if (ok) setTurnoLlamado(null)
+    await ejecutar(fn, exito)
   }
 
   /**
@@ -1159,57 +1074,12 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                     emitir 100 turnos no es lo mismo que emitir uno y no debe
                     parecerlo. */}
                 {/*
-                  Selector de cristal deslizante.
-
-                  Antes eran dos <button> con `aria-pressed`. Eso describía dos
-                  botones independientes, no una elección entre dos opciones.
-                  Aquí son RADIOS de verdad: el lector anuncia «opción 1 de 2»
-                  y las flechas del teclado cambian de modo solas. La pastilla
-                  que se desliza es solo la representación visual.
-
-                  `name` distinto de cualquier otro grupo de la página para que
-                  el teclado no los mezcle.
-                */}
-                {/*
-                  Selector de modo de emisión.
-                  "Varios turnos" está oculto: solo se muestra "Un turno".
+                  Selector de modo de emisión eliminado visualmente.
+                  "Un turno" y "Varios turnos" ya no se muestran porque no tiene
+                  sentido un selector de una sola opción.
                   El código de emisión masiva se mantiene para futura reactivación.
                 */}
-                <div
-                  className="glass-radio-group"
-                  role="radiogroup"
-                  aria-label="Modo de emisión"
-                  style={{ '--opciones': 1 } as React.CSSProperties}
-                >
-                  <input
-                    type="radio"
-                    name="modo-emision"
-                    id="modo-un-turno"
-                    checked={!modoMasivo}
-                    onChange={() => setModoMasivo(false)}
-                  />
-                  <label htmlFor="modo-un-turno">Un turno</label>
-
-                  {/*
-                    Opción "Varios turnos" oculta completamente.
-                    No se renderiza en el DOM para que el glider no la detecte.
-                  */}
-                  {false && (
-                    <>
-                      <input
-                        type="radio"
-                        name="modo-emision"
-                        id="modo-varios-turnos"
-                        checked={modoMasivo}
-                        onChange={() => setModoMasivo(true)}
-                      />
-                      <label htmlFor="modo-varios-turnos">Varios turnos</label>
-                    </>
-                  )}
-
-                  <div className="glass-glider" aria-hidden="true" />
-                </div>
-
+                {/* Radiogroup oculto: {!modoMasivo ? ( */}
                 {!modoMasivo ? (
                   /*
                    * Contenedores cuadrados por trámite, 2 por fila: el mismo
@@ -1508,9 +1378,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                                                 await avisarTurnoAhora(
                                                   t.turno_id,
                                                 )
-                                              if (ok)
-                                                setTurnoLlamado(null)
-                                            })()
+                                              })()
                                           }
                                           disabled={ocupado}
                                           className="boton-secundario px-2.5 py-1.5"
@@ -1656,90 +1524,13 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             )}
           </section>
           <section className="tarjeta p-6">
-            <div className="flex flex-wrap items-center justify-between gap-5">
-              <h2 className="text-sm font-bold text-gris-700">
-                Llamar siguiente
-              </h2>
-              <BotonLlamar
-                onClick={() => setConfirmandoLlamada(true)}
-                disabled={ocupado || !periodoAbierto || topeAtencion}
-                title={
-                  topeAtencion
-                    ? `Tiene ${actuales.length} turnos sin cerrar (máximo ${maximoAtencion}). Finalice o cancele uno antes de llamar a otro.`
-                    : undefined
-                }
-              >
-                Llamar
-              </BotonLlamar>
-            </div>
-
-            {/*
-              LA PROPUESTA (P5 + P11).
-              Antes de apretar, el operador ve a quién va a llamar el sistema
-              y POR QUÉ. Sin esto, el "Llamar" era un reflejo: la tabla de la
-              cola muestra la posición por trámite (RN-014, lo que ve el
-              ciudadano) y no el orden real de llamada (RN-017), así que había
-              tres turnos con "posición 1" y ninguno era previsualizable.
-            */}
-            {/*
-              SIN `!turnoLlamado`.
-
-              Antes la previsualización se ocultaba en cuanto había un turno
-              llamado, así que con la lista «En atención ahora» llena el
-              operador veía la cola pero no a QUIÉN iba a llamar. La condición
-              sobraba: la tarjeta de acuse («Llamando a C-183») es otra cosa y
-              vive más abajo, no choca con esta.
-            */}
-            {propuesta?.hay_turnos && (
-              <div className="mt-5 rounded-2xl border-2 border-gris-200 bg-gris-50 p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gris-500">
-                  El sistema va a llamar a
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <span className="text-3xl font-black text-navy-800">
-                    {propuesta.codigo_turno}
-                  </span>
-                  <span className="text-sm text-gris-700">
-                    {propuesta.denominacion_tramite}
-                  </span>
-                </div>
-                {propuesta.razon && (
-                  <p className="mt-3 text-sm text-gris-700">{propuesta.razon}</p>
-                )}
-                <p className="mt-2 text-xs text-gris-500">
-                  Posición {propuesta.posicion_global} de {propuesta.en_espera} en la cola
-                  · {propuesta.minutos_esperando} min esperando
-                </p>
-              </div>
-            )}
-
-            {cargando && (
-              <div className="mt-3 space-y-2" aria-busy="true">
-                <span className="sr-only">Buscando el siguiente turno…</span>
-                <div aria-hidden="true" className="esqueleto-bloque h-4 w-64 rounded" />
-                <div aria-hidden="true" className="esqueleto-bloque h-4 w-40 rounded" />
-              </div>
-            )}
-
-            {!cargando && !propuesta?.hay_turnos && (
-              <p className="mt-3 text-sm text-gris-500">
-                {propuesta?.mensaje ?? 'No hay turnos en espera.'}
-              </p>
-            )}
-
             {/*
               ============================ COLA DE ESPERA ============
 
-              La cola vive DENTRO de este panel, no en una tarjeta aparte.
-
-              «Llamar» y la lista de turnos en espera son la MISMA acción con
-              distinto alcance: el siguiente de la cola, o uno concreto. Al
-              estar en dos bloques separados parecían cosas distintas, y por
-              eso se podía pulsar «Llamar a este» en la cola sin pasar por la
-              validación que sí aplica «Llamar». Ahora hay un solo lugar con
-              un solo camino.
+              Solo se muestra la cola de turnos en espera. La función de
+              "Llamar siguiente" se eliminó porque ahora cada ventanilla
+              gestiona sus propios turnos desde "En atención ahora".
             */}
-            <div className="mt-5 border-t border-gris-200 pt-4">
               <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gris-700">
             Cola de espera
@@ -2125,42 +1916,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
             porPagina={POR_PAGINA}
             onCambiar={setPaginaCola}
           />
-              </div>
-            </div>
-
-            {/*
-              CONFIRMACIÓN DE LA LLAMADA.
-
-              Solo confirma: «llamaste a este». Los botones para gestionarlo
-              (Repetir, Omitir, Cancelar, Iniciar atención) se han quitado de
-              aquí porque ya están en «En atención ahora», justo arriba.
-
-              Antes estaban en LOS DOS sitios, así que un turno recién llamado
-              mostraba cuatro botones idénticos duplicados en la misma
-              pantalla. Se conservaba la copia de arriba porque al recargar la
-              página el turno seguía en `CALLED` pero este panel ya no existía:
-              el panel persistente es el que garantiza que las acciones
-              siempre estén disponibles. El de aquí es solo un acuse.
-            */}
-            {turnoLlamado && (
-              <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-azul-200 bg-azul-50 p-4">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-azul-500 text-white">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                </span>
-                <p className="min-w-0 flex-1 text-sm text-navy-800">
-                  Llamando a{' '}
-                  <strong className="font-black">{turnoLlamado.codigo_turno}</strong>
-                  {' · '}
-                  {turnoLlamado.denominacion_tramite}
-                  {turnoLlamado.codigo_modulo ? ` · ${turnoLlamado.codigo_modulo}` : ''}
-                </p>
-                <p className="text-xs text-gris-700">
-                  Gestiónelo en «En atención ahora», arriba.
-                </p>
-              </div>
-            )}
+        </div>
 
           </section>
         </div>
@@ -2192,86 +1948,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       )}
 
 
-      {/*
-        LA CONFIRMACIÓN DE LA LLAMADA (RF-029).
-
-        Llamar cambia el estado de un turno de un ciudadano. Con un solo
-        clic, en una pantalla con tres filas, ese clic se puede dar sin
-        querer. Aquí se ve a quién va a llamar el sistema, con su código y
-        su módulo, y se explica lo que va a pasar. La llamada sale del
-        botón de dentro, no del de fuera.
-      */}
-      {confirmandoLlamada && propuesta?.hay_turnos && (
-          <Modal
-            titulo="Llamar al siguiente turno"
-            onCerrar={() => setConfirmandoLlamada(false)}
-            ancho="max-w-md"
-          >
-            <div className="text-center">
-              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-azul-50 text-azul-500">
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-                </svg>
-              </span>
-
-              <p className="text-2xl font-black tracking-tight text-navy-800">
-                ¿Llamar al siguiente turno?
-              </p>
-              <p className="mx-auto mt-2 max-w-xs text-sm text-gris-700">
-                Se asignará a la ventanilla actual y cambiará su estado a «En
-                atención».
-              </p>
-
-              <div className="mt-4 rounded-xl bg-azul-50 px-5 py-4">
-                <p className="text-3xl font-black leading-none tracking-tight text-navy-800">
-                  {propuesta.codigo_turno}
-                </p>
-                <p className="mt-1.5 text-sm text-gris-700">
-                  {propuesta.denominacion_tramite}
-                </p>
-                <p className="mt-2">
-                  <span className="etiqueta bg-azul-50 text-azul-600">En espera</span>
-                </p>
-              </div>
-
-              {propuesta.razon && (
-                <p className="mt-3 text-sm text-gris-700">{propuesta.razon}</p>
-              )}
-
-              <div className="mt-5 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmandoLlamada(false)
-                    void llamar()
-                  }}
-                  disabled={ocupado}
-                  className="boton-primario w-full py-3"
-                >
-                  Llamar turno
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmandoLlamada(false)}
-                  className="boton-secundario w-full py-3"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </Modal>
-      )}
 
       {/*
         CIERRE DE PERIODO (Nielsen H5: prevención de errores).
@@ -2583,25 +2259,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         próximos de la cola para que se preparen: recibirán un push que dice
         que su turno está por llegar.
       </p>
-
-      {propuesta?.hay_turnos && (
-        <div className="rounded-xl border border-gris-200 bg-gris-50 px-3 py-2">
-          <p className="text-xs font-semibold text-gris-500">
-            El siguiente
-          </p>
-          <p className="mt-0.5 text-sm font-bold text-navy-800">
-            {propuesta.codigo_turno}
-            {propuesta.denominacion_tramite
-              ? ` · ${propuesta.denominacion_tramite}`
-              : ''}
-          </p>
-          {propuesta.razon && (
-            <p className="mt-0.5 text-[11px] leading-snug text-gris-700">
-              {propuesta.razon}
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="aviso-modal-opciones mt-1 flex flex-wrap justify-center gap-2">
         {minutosAviso.map((m) => (
