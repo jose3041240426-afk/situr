@@ -84,8 +84,8 @@ export default function Entrar() {
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
           <img
-            src="/logo-durango.png"
-            alt="Emblema del Municipio de Durango"
+            src="/favicon.png"
+            alt="SITUR"
             className="h-20 w-auto"
           />
           <p className="mt-3 text-sm text-gris-200">
