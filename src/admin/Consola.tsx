@@ -178,7 +178,6 @@ export default function Consola() {
   // Aviso programado al siguiente (migración 009).
 const [minutosAviso, setMinutosAviso] = useState<number[]>([])
   // Llamada
-  const [moduloFiltro, setModuloFiltro] = useState('')
   const [turnoLlamado, setTurnoLlamado] = useState<FilaActual | null>(null)
   /** La propuesta del sistema, con su razón (P5). */
   const [propuesta, setPropuesta] = useState<PropuestaSiguiente | null>(null)
@@ -313,6 +312,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
    */
   const refrescoEnCurso = useRef(false)
   const paginaAnterior = useRef(paginaActual)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const direccion = paginaActual > paginaAnterior.current ? 'derecha' : 'izquierda'
   useEffect(() => {
     paginaAnterior.current = paginaActual
@@ -707,8 +707,8 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
     setAviso(null)
     try {
       const r = await llamarSiguiente(
-        moduloFiltro || null,
-        null, // Opción C del punto 10: con null la cola es global (RN-017).
+        null,
+        null, // Cola global (RN-017).
       )
       setTurnoLlamado({
         turno_id: r.turno_id,
@@ -1389,14 +1389,14 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   sin atenderlos, así que la salida siempre es cerrar uno.
                 */}
                 {topeAtencion && actuales.length > 0 && (
-                  <div className="flex items-start gap-2 border-b border-ambar-500/30 bg-ambar-50 px-6 py-3">
-                    <span className="mt-0.5 shrink-0 text-ambar-600" aria-hidden="true">
+                  <div className="flex items-start gap-2 border-b border-azul-500/30 bg-azul-500 px-6 py-3">
+                    <span className="mt-0.5 shrink-0 text-white" aria-hidden="true">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                         <path d="M12 8v5M12 16.5v.5" />
                         <circle cx="12" cy="12" r="9" />
                       </svg>
                     </span>
-                    <p className="text-xs leading-snug text-navy-800">
+                    <p className="text-sm font-medium leading-snug text-white">
                       Ya tiene <strong>{actuales.length}</strong> turnos abiertos, el
                       máximo permitido. Finalice, omita o cancele uno para poder llamar
                       al siguiente.
@@ -1409,30 +1409,22 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   completo de la sala. Navegación con flechas en lugar de scroll
                   nativo.
                 */}
-                {(() => {
-                  const scrollRef = useRef<HTMLDivElement>(null)
-                  const scrollStep = 300
-                  const scrollLeft = () =>
-                    scrollRef.current?.scrollBy({ left: -scrollStep, behavior: 'smooth' })
-                  const scrollRight = () =>
-                    scrollRef.current?.scrollBy({ left: scrollStep, behavior: 'smooth' })
-                  return (
-                    <div className="transicion-datos p-5">
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={scrollLeft}
-                          className="flex-shrink-0 rounded-full bg-gris-100 p-2 text-gris-600 hover:bg-gris-200"
-                          title="Ver ventanillas anteriores"
-                          aria-label="Ver ventanillas anteriores"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                        </button>
-                        <div
-                          ref={scrollRef}
-                          className="flex gap-4 overflow-x-auto scrollbar-hide"
-                          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
+                <div className="transicion-datos p-5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => scrollRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
+                      className="flex-shrink-0 rounded-full bg-azul-500 p-2 text-white hover:bg-azul-600"
+                      title="Ver ventanillas anteriores"
+                      aria-label="Ver ventanillas anteriores"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <div
+                      ref={scrollRef}
+                      className="flex gap-4 overflow-x-auto scrollbar-hide"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', flex: 1 }}
+                    >
                   {modulos
                     .filter((m) => m.activo)
                     .map((m) => {
@@ -1446,17 +1438,8 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           style={{ minWidth: '220px', width: 'min-content' }}
                         >
                           <div className="mb-3 flex items-center justify-between border-b border-gris-100 pb-2">
-                            <div>
-                              <span className="text-sm font-bold text-navy-800">
-                                {m.codigo}
-                              </span>
-                              <span className="ml-2 text-xs text-gris-500">
-                                {m.denominacion}
-                              </span>
-                            </div>
-                            <span className="rounded-full bg-gris-100 px-2 py-0.5 text-xs font-semibold text-gris-600">
-                              {turnosVentanilla.length} turno
-                              {turnosVentanilla.length !== 1 ? 's' : ''}
+                            <span className="text-sm font-bold text-navy-800">
+                              Ventanilla {m.codigo.replace(/[^0-9]/g, '')}
                             </span>
                           </div>
                           {turnosVentanilla.length === 0 ? (
@@ -1629,20 +1612,29 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                         </div>
                       )
                     })}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={scrollRight}
-                          className="flex-shrink-0 rounded-full bg-gris-100 p-2 text-gris-600 hover:bg-gris-200"
-                          title="Ver siguientes ventanillas"
-                          aria-label="Ver siguientes ventanillas"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                        </button>
-                      </div>
                     </div>
-                  )
-                })()}
+                    <button
+                      type="button"
+                      onClick={() => scrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
+                      className="flex-shrink-0 rounded-full bg-azul-500 p-2 text-white hover:bg-azul-600"
+                      title="Ver siguientes ventanillas"
+                      aria-label="Ver siguientes ventanillas"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Diagnóstico oculto: ayuda a depurar sin ensuciar la UI */}
+                {import.meta.env.DEV && (
+                  <div className="px-5 pb-3 text-xs text-gris-400">
+                    Turnos en atención: {actuales.length} / {maximoAtencion}
+                    {' '}|{' '}
+                    Cola: {cola.length}
+                    {' '}|{' '}
+                    Ventanillas: {modulos.filter(m => m.activo).length}
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -1651,67 +1643,17 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
               <h2 className="text-sm font-bold text-gris-700">
                 Llamar siguiente
               </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {/*
-                  Este selector no va dentro de un <label>: es un control
-                  suelto en la cabecera, y sin nombre accesible un lector de
-                  pantalla anuncia «combo box» a secas (WCAG 4.1.2, critico).
-                  El `max-w` y el `min-w-0` son para que a 320 px no imponga
-                  su ancho intrínseco (el de la opción más larga) y desborde
-                  la fila (WCAG 1.4.10).
-                */}
-                {/*
-                  Mismo `.selector` que el campo Trámite de «Emitir turno»,
-                  sin utilidades que lo sobrescriban.
-
-                  Antes llevaba `py-2 text-sm`, que pisaban el `py-2.5` y la
-                  altura de 42px del componente: este control medía 2px menos
-                  que los demás y el texto salía más pequeño. Se veía de otra
-                  familia que el resto del formulario.
-
-                  `max-w-[13rem]` se mantiene porque a 320 px la opción más
-                  larga impondría su ancho intrínseco y desbordaría la fila
-                  (WCAG 1.4.10).
-                */}
-                <Selector
-                  etiqueta="Módulo al que llamar"
-                  /*
-                   * `min-w` y no `max-w`: el control tiene el ancho de la
-                   * opción más larga («M01 — Módulo 01 - Atención general»).
-                   * Antes se limitaba a 13rem y el texto se cortaba; el ancho
-                   * ya no es un problema porque la lista lo sigue, así que se
-                   * deja crecer.
-                   *
-                   * `w-full` a pantalla completa y `sm:w-auto` desde tablet:
-                   * a 320 px el ancho intrínseco desbordaría la fila
-                   * (WCAG 1.4.10).
-                   */
-                  className="selector-propio--auto w-full sm:w-auto"
-                  valor={moduloFiltro}
-                  onCambiar={setModuloFiltro}
-                  opciones={[
-                    { valor: '', etiqueta: 'Módulo automático' },
-                    ...modulos
-                      .filter((m) => m.estado === 'ACTIVO')
-                      .map((m) => ({ valor: m.id, etiqueta: `${m.codigo} — ${m.denominacion}` })),
-                  ]}
-                />
-                <BotonLlamar
-                  onClick={() => setConfirmandoLlamada(true)}
-                  disabled={ocupado || !periodoAbierto || topeAtencion}
-                  /*
-                   * El `title` explica el bloqueo en el propio botón: un botón
-                   * apagado sin motivo es el fallo que se quiere evitar.
-                   */
-                  title={
-                    topeAtencion
-                      ? `Tiene ${actuales.length} turnos sin cerrar (máximo ${maximoAtencion}). Finalice o cancele uno antes de llamar a otro.`
-                      : undefined
-                  }
-                >
-                  Llamar
-                </BotonLlamar>
-              </div>
+              <BotonLlamar
+                onClick={() => setConfirmandoLlamada(true)}
+                disabled={ocupado || !periodoAbierto || topeAtencion}
+                title={
+                  topeAtencion
+                    ? `Tiene ${actuales.length} turnos sin cerrar (máximo ${maximoAtencion}). Finalice o cancele uno antes de llamar a otro.`
+                    : undefined
+                }
+              >
+                Llamar
+              </BotonLlamar>
             </div>
 
             {/*
