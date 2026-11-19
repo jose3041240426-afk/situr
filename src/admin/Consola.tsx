@@ -129,12 +129,6 @@ export default function Consola() {
    */
   const [maximoAtencion, setMaximoAtencion] = useState(3)
 
-  /** El turno que esta en atencion ahora, si hay alguno. */
-  const enAtencion =
-    actuales.find((t) => t.estado === 'SERVING') ??
-    actuales.find((t) => t.estado === 'CALLED') ??
-    null
-
   /*
    * ¿Se alcanzó el tope de turnos abiertos? (migración 010)
    *
@@ -1088,14 +1082,14 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       ) : (
       <div className="transicion-datos mb-6 grid gap-5 sm:grid-cols-3">
         <TarjetaCifra
-          rotulo="Turnos actuales"
-          valor={enAtencion?.codigo_turno ?? '—'}
+          rotulo="Turnos en cola"
+          valor={String(cola.length)}
           pie={
-            enAtencion
-              ? `${enAtencion.denominacion_tramite} · módulo ${enAtencion.codigo_modulo ?? '—'}`
-              : 'No hay ningún turno en atención'
+            cola.length > 0
+              ? `${cola.length} turno${cola.length !== 1 ? 's' : ''} esperando atención`
+              : 'No hay turnos en espera'
           }
-          icono="persona"
+          icono="lista"
           destacado
         />
         <TarjetaCifra
