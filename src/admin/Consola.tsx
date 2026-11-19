@@ -1170,10 +1170,16 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   `name` distinto de cualquier otro grupo de la página para que
                   el teclado no los mezcle.
                 */}
+                {/*
+                  Selector de modo de emisión.
+                  "Varios turnos" está oculto: solo se muestra "Un turno".
+                  El código de emisión masiva se mantiene para futura reactivación.
+                */}
                 <div
                   className="glass-radio-group"
                   role="radiogroup"
                   aria-label="Modo de emisión"
+                  style={{ '--opciones': 1 } as React.CSSProperties}
                 >
                   <input
                     type="radio"
@@ -1185,18 +1191,21 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                   <label htmlFor="modo-un-turno">Un turno</label>
 
                   {/*
-                    Opción "Varios turnos" oculta visualmente.
-                    El código se mantiene intacto para futura reactivación.
+                    Opción "Varios turnos" oculta completamente.
+                    No se renderiza en el DOM para que el glider no la detecte.
                   */}
-                  <input
-                    type="radio"
-                    name="modo-emision"
-                    id="modo-varios-turnos"
-                    checked={modoMasivo}
-                    onChange={() => setModoMasivo(true)}
-                    className="hidden"
-                  />
-                  <label htmlFor="modo-varios-turnos" className="hidden">Varios turnos</label>
+                  {false && (
+                    <>
+                      <input
+                        type="radio"
+                        name="modo-emision"
+                        id="modo-varios-turnos"
+                        checked={modoMasivo}
+                        onChange={() => setModoMasivo(true)}
+                      />
+                      <label htmlFor="modo-varios-turnos">Varios turnos</label>
+                    </>
+                  )}
 
                   <div className="glass-glider" aria-hidden="true" />
                 </div>
