@@ -57,7 +57,7 @@ BEGIN
      WHERE id = p_usuario_id;
 
     -- Registrar en auditoria
-    INSERT INTO public.auditoria (accion, entidad, entidad_id, detalles)
+    INSERT INTO public.auditoria (accion, entidad, entidad_id, metadata)
     VALUES (
         'ASIGNAR_USUARIO_VENTANILLA',
         'usuarios',
