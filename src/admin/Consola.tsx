@@ -1823,10 +1823,14 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           type="button"
                           onClick={() => void abrirQr(f)}
                           disabled={ocupado}
-                          className="boton-secundario whitespace-nowrap px-3 py-1.5 text-xs"
+                          className="boton-secundario px-2.5 py-1.5"
                           title="Mostrar el código QR de este turno para entregarlo"
+                          aria-label={`Mostrar el código QR del turno ${f.codigo_turno}`}
                         >
-                          QR
+                          <span
+                            className="bi--qr-code-scan text-xl"
+                            aria-hidden="true"
+                          />
                         </button>
 
                         {/*
@@ -1864,10 +1868,14 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           type="button"
                           onClick={() => setCancelando(f)}
                           disabled={ocupado || !periodoAbierto}
-                          className="rounded-lg px-2 py-1.5 text-xs font-semibold text-gris-500 transition-colors hover:bg-rojo-50 hover:text-rojo-600"
+                          className="rounded-lg px-2 py-1.5 text-gris-500 transition-colors hover:bg-rojo-50 hover:text-rojo-600"
                           title="Cancelar este turno (el ciudadano verá que su turno fue cancelado)"
+                          aria-label={`Cancelar el turno ${f.codigo_turno}`}
                         >
-                          Cancelar
+                          <span
+                            className="bi--trash-fill text-base"
+                            aria-hidden="true"
+                          />
                         </button>
                       </div>
                     </td>
