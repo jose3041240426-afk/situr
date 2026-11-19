@@ -4,7 +4,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useTransferencias } from '../lib/transferencias'
 import { estadoVentanillas, responderTransferencia } from '../lib/rpc'
-import { supabase } from '../lib/supabase'
 import { nombreCompleto } from '../lib/operador'
 import { Modal } from '../components/ui'
 import { Avatar } from '../components/ui/avatar'
@@ -202,26 +201,11 @@ function PanelTransferencias() {
       const r = await responderTransferencia(solicitudId, aceptar)
       if (r.ok) {
         setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
-        // Aviso push al ciudadano. El turno lo devuelve la RPC (mig 60): así
-        // funciona aunque el panel se acepte desde una pantalla donde la lista
-        // local de pendientes no está publicada.
-        if (aceptar) {
-          const turnoAvisar = r.turno_id ?? pendientes.find(p => p.solicitud_id === solicitudId)?.turno_id
-          if (turnoAvisar) {
-            try {
-              const { data: { session: sesionFresca } } = await supabase.auth.getSession()
-              const tokenOperador = sesionFresca?.access_token
-              if (tokenOperador) {
-                await fetch(`/api/push?turno_id=${encodeURIComponent(turnoAvisar)}`, {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${tokenOperador}` },
-                }).catch(() => {})
-              }
-            } catch {
-              // El cron es el respaldo.
-            }
-          }
-        }
+        /*
+         * El aviso «transferido a V2» lo encola la base al mover el turno
+         * (mig 61). Antes lo mandaba el navegador y solo si la lista local
+         * de pendientes estaba publicada en esta pantalla.
+         */
       } else {
         setAviso(r.motivo || 'No se pudo responder.')
       }

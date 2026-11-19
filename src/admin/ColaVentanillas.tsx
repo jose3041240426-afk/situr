@@ -4,7 +4,6 @@ import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/auth'
 import { useTransferencias } from '../lib/transferencias'
 import { AlertBanner } from '../components/ui/alert-banner'
 import { AnimatePresence } from 'framer-motion'
@@ -36,7 +35,6 @@ export default function ColaVentanillas() {
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
   const { publicar, registrarRefrescar } = useTransferencias()
-  const { sesion } = useAuth()
 
   function nombreVentanilla(codigo: string): string {
     const m = codigo.match(/^V(\d+)$/i)
@@ -84,10 +82,12 @@ export default function ColaVentanillas() {
     try {
       const r = await solicitarTurnoVentanilla(moduloId)
       if (r.servido) {
+        /*
+         * El aviso «asignado a ventanilla N» lo encola la base al cambiar el
+         * turno (mig 61): así también sale cuando el reparto es automático,
+         * que es justo cuando antes se retrasaba hasta un minuto.
+         */
         setAviso(`Turno ${r.codigo_turno} asignado a la ventanilla.`)
-        // El ciudadano se entera de «asignado a ventanilla N» en el acto,
-        // sin esperar a la vuelta del cron.
-        if (r.turno_id) await avisarTurnoAhora(r.turno_id)
       } else {
         setAviso(r.motivo || 'La ventanilla sigue en la cola.')
       }
@@ -122,47 +122,17 @@ export default function ColaVentanillas() {
     setModalTransferir(false)
   }
 
-  async function avisarTurnoAhora(turnoId: string): Promise<void> {
-    try {
-      const { data: { session: sesionFresca } } = await supabase.auth.getSession()
-      /*
-       * El token se pide FRESCO y, si no lo hay, se cae al de la sesión ya
-       * abierta. Es la misma doble fuente que usa la consola de
-       * administración —que sí avisa—: sin el respaldo, una sesión que el
-       * cliente aún no ha renovado dejaba el aviso sin enviar y solo se
-       * enteraba el ciudadano cuando el cron daba su vuelta.
-       */
-      const tokenOperador = sesionFresca?.access_token ?? sesion?.access_token
-      if (!tokenOperador) {
-        console.info('[situr] no hay sesión para avisar; el cron lo intentará')
-        return
-      }
-      await fetch(`/api/push?turno_id=${encodeURIComponent(turnoId)}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tokenOperador}` },
-      }).then(async (res) => {
-        if (!res.ok) {
-          const texto = await res.text().catch(() => '')
-          console.error('[situr] push falló:', res.status, texto)
-        } else {
-          const d = await res.json().catch(() => ({}))
-          console.info('[situr] push enviado:', d)
-        }
-      }).catch((e) => console.error('[situr] push (red):', e))
-    } catch (e) {
-      console.error('[situr] push (excepción):', e)
-    }
-  }
-
   async function manejarLlamar() {
     if (!modalTurno) return
     setAccionando(true)
     try {
       await llamarTurnoAsignado(modalTurno.turno_id)
-      // Aviso al ciudadano EN EL ACTO, antes de cerrar el modal. Se espera:
-      // si el emisor falla, el error queda registrado en el mismo orden en
-      // que ocurrió y el cron sigue siendo el respaldo.
-      await avisarTurnoAhora(modalTurno.turno_id)
+      /*
+       * El aviso al ciudadano lo encola la BASE, en el mismo momento en que
+       * el turno pasa a CALLED (mig 61). Aquí no se manda: si lo mandara
+       * también el navegador, el ciudadano recibiría dos alertas, porque el
+       * Service Worker usa `renotify: true`.
+       */
       setAviso(`Turno ${modalTurno.turno_codigo} llamado.`)
       // Iniciar timer de 15 minutos para el aviso
       setTimerSegundos(15 * 60)

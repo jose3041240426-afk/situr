@@ -1485,14 +1485,17 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                                           type="button"
                                           onClick={() =>
                                             void (async () => {
-                                              const { ok } = await ejecutar(
+                                              /*
+                                               * El aviso lo encola la base
+                                               * al cambiar `llamado_en`
+                                               * (mig 61): el navegador no
+                                               * lo manda, para que no suene
+                                               * dos veces.
+                                               */
+                                              await ejecutar(
                                                 () => repetirLlamada(t.turno_id),
                                                 'Llamada repetida.',
                                               )
-                                              if (ok)
-                                                await avisarTurnoAhora(
-                                                  t.turno_id,
-                                                )
                                               })()
                                           }
                                           disabled={ocupado}
