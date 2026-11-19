@@ -1540,25 +1540,19 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
               <span className="esqueleto-bloque inline-block h-3 w-20 rounded align-middle" aria-hidden="true" />
             ) : (
               <>
-                {colaFiltrada.length}
-                {filtroTramite ? ` de ${cola.length}` : ''}{' '}
-                {cola.length === 1 ? 'turno' : 'turnos'}
-              </>
-            )}{' '}·{' '}
-            <strong className="text-gris-700">Nº de llamada</strong> y{' '}
-            posición por trámite (RN-014)
-            {actualizado && (
-              <>
-                {' · '}
-                <span title="Última lectura de la cola">
-                  actualizado{' '}
-                  {actualizado.toLocaleTimeString('es-MX', {
-                    timeZone: 'America/Mazatlan',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  })}
-                </span>
+                {actualizado ? (
+                  <span title="Última lectura de la cola">
+                    Actualizado en{' '}
+                    {actualizado.toLocaleTimeString('es-MX', {
+                      timeZone: 'America/Mazatlan',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })}
+                  </span>
+                ) : (
+                  'Cargando...'
+                )}
               </>
             )}
           </span>
@@ -1666,7 +1660,7 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
         {cargando ? (
           /* Mismo esqueleto que la tabla real: 6 columnas, 10 filas. Al llegar
              los datos no hay salto de altura. */
-          <EsqueletoTabla columnas={6} filas={10} />
+          <EsqueletoTabla columnas={5} filas={10} />
         ) : cola.length === 0 ? (
           <Vacio
             titulo="No hay nadie en espera"
@@ -1682,12 +1676,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                     title="Orden real de llamada (RN-017)"
                   >
                     Llamada
-                  </th>
-                  <th
-                    className="px-3 py-2 font-medium whitespace-nowrap"
-                    title="Posición dentro de su trámite (RN-014)"
-                  >
-                    Pos.
                   </th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">Folio</th>
                   <th className="px-3 py-2 font-medium">Trámite</th>
@@ -1737,13 +1725,6 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                         }`}
                       >
                         {f.posicion_global}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-sm tabular-nums text-gris-700">
-                      {f.posicion}
-                      <span className="sr-only">
-                        {' '}
-                        (posición dentro de su trámite)
                       </span>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">

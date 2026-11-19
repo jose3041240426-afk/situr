@@ -574,10 +574,12 @@ export default function Disposicion({
 
           <h1 className="truncate text-lg font-bold text-white">{tituloActual}</h1>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <div className="relative">
-              <CampanaTransferencias />
-              <PanelTransferencias />
-            </div>
+            {operador?.rol === 'OPERADOR' && (
+              <div className="relative">
+                <CampanaTransferencias />
+                <PanelTransferencias />
+              </div>
+            )}
             {operador && (
               <NavLink
                 to="/admin/perfil"
