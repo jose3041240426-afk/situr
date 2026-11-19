@@ -88,12 +88,11 @@ async function handler(req: Request): Promise<Response> {
   }
 
   /*
-   * Si el turno ya estaba llamado cuando el ciudadano se suscribió, el cron
-   * no lo va a ofrecer (ultima_activacion queda NULL y la regla de CALLED
-   * exige ultima_activacion < llamado_en, que es verdad, pero el cron pasa
-   * cada 5 minutos). Para no hacer esperar al ciudadano, se envía en el
-   * acto: el propio servidor llama a /api/push con el secreto del cron, que
-   * es lo que autoriza el envío.
+   * Si el turno ya salió de la cola (asignado a una ventanilla o ya
+   * llamado) cuando el ciudadano se suscribió, ese aviso no se va a repetir
+   * por sí solo: el cron solo ofrece cada marca una vez. Para no hacer
+   * esperar al ciudadano, se envía en el acto: el propio servidor llama a
+   * /api/push con el secreto del cron, que es lo que autoriza el envío.
    */
   if (serviceKey) {
     try {
@@ -105,8 +104,8 @@ async function handler(req: Request): Promise<Response> {
         .select('id, estado')
         .eq('token_publico', token)
         .maybeSingle()
-      if (turno?.estado === 'CALLED') {
-        const secreto = process.env.CRON_SECRET
+      if (turno && ['ASIGNED', 'CALLED'].includes(turno.estado)) {
+        const secreto = process.env.CRON_SECRET ?? process.env.SITUR_PUSH_TOKEN
         if (secreto) {
           fetch(
             new URL(`/api/push?turno_id=${encodeURIComponent(turno.id)}`, `https://${req.headers.get('host') ?? 'localhost'}`),

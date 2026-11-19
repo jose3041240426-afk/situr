@@ -4,6 +4,7 @@ import BotonLlamar from '../components/BotonLlamar'
 import { estadoVentanillas, solicitarTurnoVentanilla, llamarTurnoAsignado, iniciarAtencion, finalizarTurno, cancelarTurno, solicitarTransferencia, programarAvisoSiguiente, opcionesAviso, proponerSiguienteTurno } from '../lib/rpc'
 import type { RespuestaEstadoVentanillas, Ventanilla, FilaColaVentanilla, TurnoAsignado, RespuestaProgramarAviso, PropuestaSiguiente } from '../lib/tipos'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { useTransferencias } from '../lib/transferencias'
 import { AlertBanner } from '../components/ui/alert-banner'
 import { AnimatePresence } from 'framer-motion'
@@ -35,6 +36,7 @@ export default function ColaVentanillas() {
   const [timerActivo, setTimerActivo] = useState(false)
   const [modalTransferir, setModalTransferir] = useState(false)
   const { publicar, registrarRefrescar } = useTransferencias()
+  const { sesion } = useAuth()
 
   function nombreVentanilla(codigo: string): string {
     const m = codigo.match(/^V(\d+)$/i)
@@ -83,6 +85,9 @@ export default function ColaVentanillas() {
       const r = await solicitarTurnoVentanilla(moduloId)
       if (r.servido) {
         setAviso(`Turno ${r.codigo_turno} asignado a la ventanilla.`)
+        // El ciudadano se entera de «asignado a ventanilla N» en el acto,
+        // sin esperar a la vuelta del cron.
+        if (r.turno_id) await avisarTurnoAhora(r.turno_id)
       } else {
         setAviso(r.motivo || 'La ventanilla sigue en la cola.')
       }
@@ -120,7 +125,14 @@ export default function ColaVentanillas() {
   async function avisarTurnoAhora(turnoId: string): Promise<void> {
     try {
       const { data: { session: sesionFresca } } = await supabase.auth.getSession()
-      const tokenOperador = sesionFresca?.access_token
+      /*
+       * El token se pide FRESCO y, si no lo hay, se cae al de la sesión ya
+       * abierta. Es la misma doble fuente que usa la consola de
+       * administración —que sí avisa—: sin el respaldo, una sesión que el
+       * cliente aún no ha renovado dejaba el aviso sin enviar y solo se
+       * enteraba el ciudadano cuando el cron daba su vuelta.
+       */
+      const tokenOperador = sesionFresca?.access_token ?? sesion?.access_token
       if (!tokenOperador) {
         console.info('[situr] no hay sesión para avisar; el cron lo intentará')
         return
@@ -132,6 +144,9 @@ export default function ColaVentanillas() {
         if (!res.ok) {
           const texto = await res.text().catch(() => '')
           console.error('[situr] push falló:', res.status, texto)
+        } else {
+          const d = await res.json().catch(() => ({}))
+          console.info('[situr] push enviado:', d)
         }
       }).catch((e) => console.error('[situr] push (red):', e))
     } catch (e) {
@@ -144,8 +159,10 @@ export default function ColaVentanillas() {
     setAccionando(true)
     try {
       await llamarTurnoAsignado(modalTurno.turno_id)
-      // Enviar notificación push al ciudadano
-      avisarTurnoAhora(modalTurno.turno_id)
+      // Aviso al ciudadano EN EL ACTO, antes de cerrar el modal. Se espera:
+      // si el emisor falla, el error queda registrado en el mismo orden en
+      // que ocurrió y el cron sigue siendo el respaldo.
+      await avisarTurnoAhora(modalTurno.turno_id)
       setAviso(`Turno ${modalTurno.turno_codigo} llamado.`)
       // Iniciar timer de 15 minutos para el aviso
       setTimerSegundos(15 * 60)

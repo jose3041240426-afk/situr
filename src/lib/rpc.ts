@@ -1071,10 +1071,13 @@ export async function solicitarTransferencia(turnoId: string, destinoModuloId: s
   return data as { ok: boolean; motivo?: string }
 }
 
-export async function responderTransferencia(solicitudId: number, aceptar: boolean): Promise<{ ok: boolean; motivo?: string }> {
+export async function responderTransferencia(
+  solicitudId: number,
+  aceptar: boolean,
+): Promise<{ ok: boolean; motivo?: string; turno_id?: string }> {
   const { data, error } = await supabase.rpc('responder_transferencia', { p_solicitud_id: solicitudId, p_aceptar: aceptar })
   if (error) throw traducirError(error)
-  return data as { ok: boolean; motivo?: string }
+  return data as { ok: boolean; motivo?: string; turno_id?: string }
 }
 
 /**

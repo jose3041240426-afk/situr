@@ -202,15 +202,17 @@ function PanelTransferencias() {
       const r = await responderTransferencia(solicitudId, aceptar)
       if (r.ok) {
         setAviso(aceptar ? 'Transferencia aceptada.' : 'Transferencia rechazada.')
-        // Enviar notificación push al ciudadano cuando se acepta la transferencia
+        // Aviso push al ciudadano. El turno lo devuelve la RPC (mig 60): así
+        // funciona aunque el panel se acepte desde una pantalla donde la lista
+        // local de pendientes no está publicada.
         if (aceptar) {
-          const st = pendientes.find(p => p.solicitud_id === solicitudId)
-          if (st?.turno_id) {
+          const turnoAvisar = r.turno_id ?? pendientes.find(p => p.solicitud_id === solicitudId)?.turno_id
+          if (turnoAvisar) {
             try {
               const { data: { session: sesionFresca } } = await supabase.auth.getSession()
               const tokenOperador = sesionFresca?.access_token
               if (tokenOperador) {
-                await fetch(`/api/push?turno_id=${encodeURIComponent(st.turno_id)}`, {
+                await fetch(`/api/push?turno_id=${encodeURIComponent(turnoAvisar)}`, {
                   method: 'POST',
                   headers: { Authorization: `Bearer ${tokenOperador}` },
                 }).catch(() => {})
