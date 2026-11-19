@@ -84,7 +84,7 @@ export default function Entrar() {
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
           <img
-            src="/favicon.png"
+            src="/escudo-blanco.png"
             alt="SITUR"
             className="h-20 w-auto"
           />
