@@ -1076,3 +1076,38 @@ export async function responderTransferencia(solicitudId: number, aceptar: boole
   if (error) throw traducirError(error)
   return data as { ok: boolean; motivo?: string }
 }
+
+/**
+ * Asignar usuario a ventanilla (migración 55).
+ */
+export interface UsuarioParaAsignacion {
+  id: string
+  nombres: string
+  apellido_paterno: string
+  apellido_materno: string
+  email: string
+  numero_empleado: string
+  rol: string
+  modulo_id: string | null
+  modulo_codigo: string | null
+  modulo_denominacion: string | null
+  activo: boolean
+}
+
+export async function listarUsuariosParaAsignacion(): Promise<UsuarioParaAsignacion[]> {
+  const { data, error } = await supabase.rpc('listar_usuarios_para_asignacion')
+  if (error) throw traducirError(error)
+  return data as UsuarioParaAsignacion[]
+}
+
+export async function asignarUsuarioVentanilla(
+  usuarioId: string,
+  moduloId: string | null,
+): Promise<{ ok: boolean }> {
+  const { data, error } = await supabase.rpc('asignar_usuario_ventanilla', {
+    p_usuario_id: usuarioId,
+    p_modulo_id: moduloId,
+  })
+  if (error) throw traducirError(error)
+  return data as { ok: boolean }
+}

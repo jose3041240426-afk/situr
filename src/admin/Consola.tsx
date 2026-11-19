@@ -21,6 +21,11 @@ import {
   Vacio,
 } from '../components/ui'
 import {
+  asignarUsuarioVentanilla,
+  listarUsuariosParaAsignacion,
+  type UsuarioParaAsignacion,
+} from '../lib/rpc'
+import {
   ErrorSitur,
   abrirPeriodo,
   cancelarTurno,
@@ -142,6 +147,10 @@ export default function Consola() {
   const [configModuloId, setConfigModuloId] = useState('')
   const [configTramiteIds, setConfigTramiteIds] = useState<string[]>([])
   const [configPasoLista, setConfigPasoLista] = useState(true)
+  const [modalAsignarUsuario, setModalAsignarUsuario] = useState(false)
+  const [usuariosAsignacion, setUsuariosAsignacion] = useState<UsuarioParaAsignacion[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  const [asignandoUsuario, setAsignandoUsuario] = useState(false)
 
   const [aviso, setAviso] = useState<{ tono: 'ok' | 'alerta' | 'peligro'; texto: string } | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -520,6 +529,48 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
       setConfigPasoLista(true)
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  async function abrirModalAsignarUsuario() {
+    setModalAsignarUsuario(true)
+    setCargandoUsuarios(true)
+    try {
+      const usuarios = await listarUsuariosParaAsignacion()
+      setUsuariosAsignacion(usuarios)
+    } catch (e) {
+      console.error(e)
+      setUsuariosAsignacion([])
+    } finally {
+      setCargandoUsuarios(false)
+    }
+  }
+
+  async function asignarUsuario(usuarioId: string) {
+    setAsignandoUsuario(true)
+    try {
+      await asignarUsuarioVentanilla(usuarioId, configModuloId)
+      setModalAsignarUsuario(false)
+      setAviso({ tono: 'ok', texto: 'Usuario asignado a la ventanilla.' })
+    } catch (e) {
+      console.error(e)
+      setAviso({ tono: 'peligro', texto: e instanceof ErrorSitur ? e.message : 'No se pudo asignar.' })
+    } finally {
+      setAsignandoUsuario(false)
+    }
+  }
+
+  async function desasignarUsuario(usuarioId: string) {
+    setAsignandoUsuario(true)
+    try {
+      await asignarUsuarioVentanilla(usuarioId, null)
+      setModalAsignarUsuario(false)
+      setAviso({ tono: 'ok', texto: 'Usuario desasignado de la ventanilla.' })
+    } catch (e) {
+      console.error(e)
+      setAviso({ tono: 'peligro', texto: e instanceof ErrorSitur ? e.message : 'No se pudo desasignar.' })
+    } finally {
+      setAsignandoUsuario(false)
     }
   }
 
@@ -907,22 +958,86 @@ const [minutosAviso, setMinutosAviso] = useState<number[]>([])
                           </label>
                         ))}
                       </div>
-                      <div className="flex justify-end gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <button
                           type="button"
-                          onClick={() => setModalConfigTramites(false)}
-                          className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
+                          onClick={() => void abrirModalAsignarUsuario()}
+                          className="flex items-center gap-1 rounded-lg border border-violeta-200 bg-violeta-50 px-4 py-2 text-sm font-medium text-violeta-700 hover:bg-violeta-100"
                         >
-                          Cancelar
+                          <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+                            <path d="M0 0h24v24H0z" fill="none" />
+                            <path fill="currentColor" d="M12 2a5 5 0 1 1-5 5a5 5 0 0 1 5-5m0 2a3 3 0 1 0 3 3a3 3 0 0 0-3-3m0 4c-4.42 0-8 2.57-8 5.76V19h16v-5.24c0-3.19-3.58-5.76-8-5.76" />
+                          </svg>
+                          Asignar usuario
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => void guardarConfigTramites()}
-                          className="boton-primario px-4 py-2 text-sm"
-                        >
-                          Guardar
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setModalConfigTramites(false)}
+                            className="rounded-lg border border-gris-200 bg-white px-4 py-2 text-sm font-medium text-gris-700"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void guardarConfigTramites()}
+                            className="boton-primario px-4 py-2 text-sm"
+                          >
+                            Guardar
+                          </button>
+                        </div>
                       </div>
+                    </div>
+                  )}
+                </Modal>
+              ) : null,
+              document.body,
+            )}
+            {/* Sub-modal: Asignar usuario a ventanilla */}
+            {createPortal(
+              modalAsignarUsuario ? (
+                <Modal titulo={`Asignar usuario a ${modulos.find((m) => m.id === configModuloId)?.codigo}`} onCerrar={() => setModalAsignarUsuario(false)}>
+                  <p className="mb-4 text-sm text-gris-700">
+                    Selecciona el usuario que será asignado a esta ventanilla. Si ya tiene otra, se reasignará.
+                  </p>
+                  {cargandoUsuarios ? (
+                    <div className="py-8 text-center text-sm text-gris-500">Cargando usuarios…</div>
+                  ) : usuariosAsignacion.length === 0 ? (
+                    <Vacio titulo="No hay usuarios disponibles" />
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                      {usuariosAsignacion.map((u) => {
+                        const nombreCompleto = `${u.nombres} ${u.apellido_paterno} ${u.apellido_materno}`.trim()
+                        const yaAsignado = u.modulo_id === configModuloId
+                        const tieneVentanilla = u.modulo_id !== null
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => yaAsignado ? void desasignarUsuario(u.id) : void asignarUsuario(u.id)}
+                            disabled={asignandoUsuario}
+                            className="flex items-center justify-between rounded-xl border border-gris-200 bg-white p-3 text-left hover:bg-azul-50 hover:border-azul-200 transition-colors disabled:opacity-50"
+                          >
+                            <div>
+                              <div className="font-semibold text-gris-900">{nombreCompleto}</div>
+                              <div className="text-xs text-gris-500">{u.email} · {u.numero_empleado}</div>
+                              <div className="text-xs text-gris-400">Rol: {u.rol}</div>
+                              {tieneVentanilla && (
+                                <div className="text-xs text-azul-600 mt-1">
+                                  Ventanilla actual: {u.modulo_codigo} {u.modulo_denominacion}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs">
+                              {yaAsignado ? (
+                                <span className="rounded-full bg-rojo-100 px-2 py-1 text-rojo-700">Desasignar</span>
+                              ) : (
+                                <span className="rounded-full bg-verde-100 px-2 py-1 text-verde-700">Asignar</span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </Modal>
